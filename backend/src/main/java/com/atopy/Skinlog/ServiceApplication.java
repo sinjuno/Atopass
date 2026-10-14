@@ -1,4 +1,4 @@
-package com.atopy.service;
+package com.atopy.Skinlog;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

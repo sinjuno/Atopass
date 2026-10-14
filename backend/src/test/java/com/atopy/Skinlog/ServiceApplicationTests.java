@@ -1,4 +1,4 @@
-package com.atopy.service;
+package com.atopy.Skinlog;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
