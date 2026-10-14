@@ -1,0 +1,28 @@
+// 지금까지 구현된 엔티티만 반영한다 (Member, Record, SkinCondition — backend 부트스트랩 Task 4~5).
+// photo, report 등 다른 테이블은 각 기능 브랜치에서 구현하면서 추가한다.
+
+Table member {
+  id bigint [pk, increment]
+  email varchar [not null, unique]
+  nickname varchar [not null]
+  password varchar [not null]
+}
+
+Table record {
+  id bigint [pk, increment]
+  member_id bigint [not null]
+  record_date date [not null]
+}
+
+Table skin_condition {
+  id bigint [pk, increment]
+  record_id bigint [not null, ref: > record.id]
+  body_part varchar [not null]
+  itching int
+  stinging int
+  redness int
+  dryness int
+  flaking int
+  swelling int
+  pain int
+}
