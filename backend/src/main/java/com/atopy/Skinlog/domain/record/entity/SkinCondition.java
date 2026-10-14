@@ -13,6 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+// TEMP STUB — 백1의 실제 피부 기록 엔티티 머지 시 교체
 @Entity
 @Table(name = "skin_condition")
 @Getter

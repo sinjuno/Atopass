@@ -9,6 +9,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
+// TEMP STUB — 백1 공통 모듈(JWT 인증) 머지 시 교체
 @Component
 public class CurrentMemberArgumentResolver implements HandlerMethodArgumentResolver {
 

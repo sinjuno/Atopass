@@ -1,5 +1,13 @@
 # 기능명세서 v1.0
 
+## 개발 중 임시 인증 (백1의 JWT 머지 전까지)
+
+백1의 실제 회원가입/로그인/JWT가 아직 없어서, 그 전까지는 `Authorization: Bearer {accessToken}` 대신
+요청 헤더 `X-Member-Id: {memberId}` (Long)를 보내면 그 회원으로 인증된 것처럼 동작한다.
+헤더가 없거나 숫자가 아니면 `401 UNAUTHORIZED`. 이 방식은 보안이 전혀 없는 임시 스텁이며,
+`com.atopy.Skinlog.global.auth.CurrentMemberArgumentResolver`에 구현되어 있다.
+백1의 JWT가 머지되면 이 헤더 방식은 제거된다.
+
 ## 1. 회원/인증
 
 | 기능 ID | 기능명 | 입력 | 처리 | 출력 | 설명 |

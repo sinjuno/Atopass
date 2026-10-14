@@ -1,5 +1,6 @@
 package com.atopy.Skinlog.global.exception;
 
+// TEMP STUB — 백1 공통 모듈 머지 시 교체
 public enum ErrorCode {
 
     INVALID_INPUT(400, "입력값이 올바르지 않습니다."),

@@ -7,6 +7,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
+// TEMP STUB — 백1 공통 모듈(JWT 인증) 머지 시 교체
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

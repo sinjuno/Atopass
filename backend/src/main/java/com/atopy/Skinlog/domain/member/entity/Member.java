@@ -10,6 +10,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+// TEMP STUB — 백1의 실제 회원 엔티티 머지 시 교체
 @Entity
 @Table(name = "member")
 @Getter

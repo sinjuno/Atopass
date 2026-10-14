@@ -5,6 +5,7 @@ import com.atopy.Skinlog.global.response.ErrorDetail;
 import java.util.Collections;
 import java.util.List;
 
+// TEMP STUB — 백1 공통 모듈 머지 시 교체
 public class BusinessException extends RuntimeException {
 
     private final ErrorCode errorCode;

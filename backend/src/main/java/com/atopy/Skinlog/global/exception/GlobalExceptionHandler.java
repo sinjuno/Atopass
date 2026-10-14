@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 
+// TEMP STUB — 백1 공통 모듈 머지 시 교체
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
