@@ -33,7 +33,7 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 대화_전의_새_세션은_빈_초안과_부위_대기_상태다() throws Exception {
+	void 대화_전의_새_세션은_빈_초안과_고통_지수_대기_상태다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
@@ -41,7 +41,7 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.draft.skinConditions").isEmpty())
 			.andExpect(jsonPath("$.data.draft.sleepHours").doesNotExist())
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyPart"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
 	}
 
@@ -51,8 +51,8 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
-			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}], "alcohol": false}}""");
-		mockMvc.perform(sendMessage(bearer, session, "팔이 4점이고 술은 안 마셨어요"))
+			 "updates": {"painIndex": 5, "conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}], "alcohol": false}}""");
+		mockMvc.perform(sendMessage(bearer, session, "고통은 5점, 팔 가려움 4점이고 술은 안 마셨어요"))
 			.andExpect(status().isOk());
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
@@ -60,9 +60,12 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("ARM"))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.itching").value(4))
 			.andExpect(jsonPath("$.data.draft.lifestyle.alcohol").value(false))
-			.andExpect(jsonPath("$.data.pendingFields.length()").value(2))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(4))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
-			.andExpect(jsonPath("$.data.pendingFields[1]").value("notes"))
+			.andExpect(jsonPath("$.data.pendingFields[1]").value("medication"))
+			.andExpect(jsonPath("$.data.pendingFields[2]").value("skinSigns"))
+			.andExpect(jsonPath("$.data.pendingFields[3]").value("notes"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
 	}
 
@@ -72,15 +75,18 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
-			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}], "sleepHours": 6,
-			 "skipped": ["lifestyle", "notes"]}}""");
-		mockMvc.perform(sendMessage(bearer, session, "팔 4점, 6시간 잤고 나머진 없어요"))
+			 "updates": {"painIndex": 4, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS"],
+			 "skipped": ["notes"]}}""");
+		mockMvc.perform(sendMessage(bearer, session, "고통 4점, 6시간 잤고 약 먹었어요. 건조증만 있고 나머진 없어요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
-			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0));
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0))
+			.andExpect(jsonPath("$.data.draft.sleepScore").value(4))
+			.andExpect(jsonPath("$.data.draft.medication").value(true))
+			.andExpect(jsonPath("$.data.draft.skinSigns[0]").value("XEROSIS"));
 	}
 
 	@Test
@@ -90,8 +96,8 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		// 선택 항목(수면 등)이 남아 있지만 사용자가 마치겠다고 한 경우: 메시지 응답은 requiresConfirmation=true였다.
 		llm.enqueue("""
 			{"understood": true, "reply": "네", "finished": true,
-			 "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"dryness": 3}}]}}""");
-		mockMvc.perform(sendMessage(bearer, session, "얼굴 건조 3점이고 그만할게요"))
+			 "updates": {"painIndex": 3}}""");
+		mockMvc.perform(sendMessage(bearer, session, "고통은 3점이고 그만할게요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
@@ -105,8 +111,8 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "네", "finished": true,
-			 "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"dryness": 3}}]}}""");
-		mockMvc.perform(sendMessage(bearer, session, "얼굴 건조 3점, 그만할게요"));
+			 "updates": {"painIndex": 3, "conditions": [{"bodyPart": "FACE", "symptoms": {"dryness": 3}}]}}""");
+		mockMvc.perform(sendMessage(bearer, session, "고통 3점, 얼굴 건조 3점, 그만할게요"));
 		// 총정리에서 되돌아와 새 내용을 말한 경우: 점수를 빠뜨린 새 부위가 생기면 필수 항목이 비게 된다.
 		llm.enqueue("""
 			{"understood": true, "reply": "팔은 몇 점인가요?",

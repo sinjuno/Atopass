@@ -6,12 +6,15 @@ import com.atopy.Skinlog.domain.record.dto.response.SkinConditionResponse;
 import com.atopy.Skinlog.domain.record.dto.response.SymptomsResponse;
 import com.atopy.Skinlog.domain.record.entity.BodyPart;
 import com.atopy.Skinlog.domain.record.entity.OutdoorActivity;
+import com.atopy.Skinlog.domain.record.entity.SkinSign;
+import com.atopy.Skinlog.domain.record.entity.SleepScore;
 import com.atopy.Skinlog.domain.record.entity.Symptom;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -25,26 +28,39 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 챗봇이 대화로 모아 가는 기록 초안. 사용자가 말한 값만 담고, 말하지 않은 값은 비워 둔다.
  * 세션에는 JSON으로 저장된다. LLM이 준 값은 {@link #apply}에서 모두 검증한 뒤에만 반영한다.
+ *
+ * <p>챗봇이 묻는 항목: 고통 지수(필수), 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
+ * 부위별 증상 점수와 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  */
 public final class ChatDraft {
 
 	/** 사용자가 "없어요/넘어갈게요"라고 답해 더 묻지 않을 선택 항목 */
 	static final String SKIP_SLEEP = "sleepHours";
+	static final String SKIP_MEDICATION = "medication";
+	static final String SKIP_SKIN_SIGNS = "skinSigns";
 	static final String SKIP_LIFESTYLE = "lifestyle";
 	static final String SKIP_NOTES = "notes";
-	private static final Set<String> SKIPPABLE = Set.of(SKIP_SLEEP, SKIP_LIFESTYLE, SKIP_NOTES);
+	private static final Set<String> SKIPPABLE = Set.of(
+		SKIP_SLEEP, SKIP_MEDICATION, SKIP_SKIN_SIGNS, SKIP_LIFESTYLE, SKIP_NOTES);
 
 	private static final int MIN_SCORE = 0;
 	private static final int MAX_SCORE = 10;
-	private static final int MAX_NOTES_LENGTH = 2000;
+	private static final int MIN_PAIN_INDEX = 1;
+	private static final int MAX_PAIN_INDEX = 10;
+	/** 특이사항은 채팅 메시지 한 번(500자)으로 받는다. */
+	static final int MAX_NOTES_LENGTH = 500;
 
 	/** 업데이트 반영 결과 */
 	enum ApplyResult {
-		OK, INVALID_SCORE, INVALID_VALUE
+		OK, INVALID_SCORE, INVALID_PAIN_INDEX, INVALID_VALUE
 	}
 
 	private final Map<BodyPart, Map<Symptom, Integer>> conditions = new EnumMap<>(BodyPart.class);
+	private Integer painIndex;
 	private BigDecimal sleepHours;
+	private Boolean medication;
+	/** null이면 아직 묻지 않음, 비어 있으면 "증상 없음" */
+	private Set<SkinSign> skinSigns;
 	private Boolean alcohol;
 	private OutdoorActivity outdoorActivity;
 	private String notes;
@@ -63,8 +79,18 @@ public final class ChatDraft {
 			ObjectNode scoresNode = conditionsNode.putObject(bodyPart.name());
 			scores.forEach((symptom, score) -> scoresNode.put(symptom.key(), score));
 		});
+		if (painIndex != null) {
+			root.put("painIndex", painIndex);
+		}
 		if (sleepHours != null) {
 			root.put("sleepHours", sleepHours);
+		}
+		if (medication != null) {
+			root.put("medication", medication);
+		}
+		if (skinSigns != null) {
+			ArrayNode signsNode = root.putArray("skinSigns");
+			skinSigns.forEach(sign -> signsNode.add(sign.name()));
 		}
 		if (alcohol != null) {
 			root.put("alcohol", alcohol);
@@ -102,8 +128,20 @@ public final class ChatDraft {
 					draft.conditions.put(bodyPart, scores);
 				}
 			}
+			if (root.path("painIndex").isInt()) {
+				draft.painIndex = root.path("painIndex").intValue();
+			}
 			if (root.path("sleepHours").isNumber()) {
 				draft.sleepHours = root.path("sleepHours").decimalValue();
+			}
+			if (root.path("medication").isBoolean()) {
+				draft.medication = root.path("medication").booleanValue();
+			}
+			if (root.path("skinSigns").isArray()) {
+				draft.skinSigns = EnumSet.noneOf(SkinSign.class);
+				for (JsonNode item : root.path("skinSigns")) {
+					draft.skinSigns.add(SkinSign.valueOf(item.asString()));
+				}
 			}
 			if (root.path("alcohol").isBoolean()) {
 				draft.alcohol = root.path("alcohol").booleanValue();
@@ -129,7 +167,7 @@ public final class ChatDraft {
 
 	/**
 	 * LLM 응답의 updates를 검증한 뒤 반영한다. 하나라도 규칙에 어긋나면 아무것도 반영하지 않는다.
-	 * 점수는 0~10 정수만 허용하고, 모르는 부위·증상 이름은 값 오류로 본다.
+	 * 증상 점수는 0~10, 고통 지수는 1~10 정수만 허용하고, 모르는 부위·증상 이름은 값 오류로 본다.
 	 */
 	ApplyResult apply(JsonNode updates) {
 		if (updates == null || updates.isMissingNode() || updates.isNull()) {
@@ -142,7 +180,7 @@ public final class ChatDraft {
 		ChatDraft next = copy();
 
 		JsonNode conditionList = updates.path("conditions");
-		if (!conditionList.isMissingNode() && !conditionList.isNull()) {
+		if (present(conditionList)) {
 			if (!conditionList.isArray()) {
 				return ApplyResult.INVALID_VALUE;
 			}
@@ -154,8 +192,20 @@ public final class ChatDraft {
 			}
 		}
 
+		JsonNode pain = updates.path("painIndex");
+		if (present(pain)) {
+			// 4.0처럼 소수점이 붙은 값도 정수로 인정하지 않는다. 점수를 임의로 반올림하지 않기 위해서다.
+			if (!pain.isInt()) {
+				return pain.isNumber() ? ApplyResult.INVALID_PAIN_INDEX : ApplyResult.INVALID_VALUE;
+			}
+			if (pain.intValue() < MIN_PAIN_INDEX || pain.intValue() > MAX_PAIN_INDEX) {
+				return ApplyResult.INVALID_PAIN_INDEX;
+			}
+			next.painIndex = pain.intValue();
+		}
+
 		JsonNode sleep = updates.path("sleepHours");
-		if (!sleep.isMissingNode() && !sleep.isNull()) {
+		if (present(sleep)) {
 			if (!sleep.isNumber()) {
 				return ApplyResult.INVALID_VALUE;
 			}
@@ -166,8 +216,36 @@ public final class ChatDraft {
 			next.sleepHours = hours;
 		}
 
+		JsonNode medicationNode = updates.path("medication");
+		if (present(medicationNode)) {
+			if (!medicationNode.isBoolean()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			next.medication = medicationNode.booleanValue();
+		}
+
+		JsonNode signs = updates.path("skinSigns");
+		if (present(signs)) {
+			if (!signs.isArray()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			// 대화 중에 하나씩 말할 수 있으므로 기존 증상에 더한다. 빈 배열은 "증상 없음"이다.
+			Set<SkinSign> merged = next.skinSigns == null ? EnumSet.noneOf(SkinSign.class) : next.skinSigns;
+			for (JsonNode item : signs) {
+				if (!item.isString()) {
+					return ApplyResult.INVALID_VALUE;
+				}
+				try {
+					merged.add(SkinSign.valueOf(item.asString().trim().toUpperCase(Locale.ROOT)));
+				} catch (IllegalArgumentException e) {
+					return ApplyResult.INVALID_VALUE;
+				}
+			}
+			next.skinSigns = merged;
+		}
+
 		JsonNode alcoholNode = updates.path("alcohol");
-		if (!alcoholNode.isMissingNode() && !alcoholNode.isNull()) {
+		if (present(alcoholNode)) {
 			if (!alcoholNode.isBoolean()) {
 				return ApplyResult.INVALID_VALUE;
 			}
@@ -175,7 +253,7 @@ public final class ChatDraft {
 		}
 
 		JsonNode outdoor = updates.path("outdoorActivity");
-		if (!outdoor.isMissingNode() && !outdoor.isNull()) {
+		if (present(outdoor)) {
 			if (!outdoor.isString()) {
 				return ApplyResult.INVALID_VALUE;
 			}
@@ -187,7 +265,7 @@ public final class ChatDraft {
 		}
 
 		JsonNode notesNode = updates.path("notes");
-		if (!notesNode.isMissingNode() && !notesNode.isNull()) {
+		if (present(notesNode)) {
 			if (!notesNode.isString() || notesNode.asString().length() > MAX_NOTES_LENGTH) {
 				return ApplyResult.INVALID_VALUE;
 			}
@@ -208,6 +286,10 @@ public final class ChatDraft {
 		return ApplyResult.OK;
 	}
 
+	private static boolean present(JsonNode node) {
+		return !node.isMissingNode() && !node.isNull();
+	}
+
 	private ApplyResult applyCondition(JsonNode item) {
 		if (!item.isObject() || !item.path("bodyPart").isString()) {
 			return ApplyResult.INVALID_VALUE;
@@ -221,7 +303,7 @@ public final class ChatDraft {
 		Map<Symptom, Integer> scores = conditions.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class));
 
 		JsonNode symptoms = item.path("symptoms");
-		if (symptoms.isMissingNode() || symptoms.isNull()) {
+		if (!present(symptoms)) {
 			return ApplyResult.OK;
 		}
 		if (!symptoms.isObject()) {
@@ -253,17 +335,21 @@ public final class ChatDraft {
 
 	// ── 진행 상황 ──
 
-	/** 기록으로 저장하려면 꼭 필요한 항목이 모두 채워졌는지(부위 하나 이상, 각 부위마다 증상 점수 하나 이상) */
+	/**
+	 * 기록으로 저장하려면 꼭 필요한 항목이 모두 채워졌는지.
+	 * 고통 지수가 있어야 하고, 사용자가 말한 부위가 있다면 그 부위마다 증상 점수가 하나 이상 있어야 한다.
+	 */
 	public boolean requiredSatisfied() {
-		return !conditions.isEmpty() && conditions.values().stream().noneMatch(Map::isEmpty);
+		return painIndex != null && conditions.values().stream().noneMatch(Map::isEmpty);
 	}
 
-	/** 아직 입력되지 않은 항목. 필수 항목을 먼저, 선택 항목은 건너뛰지 않은 것만 알려 준다. */
+	/** 아직 입력되지 않은 항목. 필수 항목을 먼저, 선택 항목은 건너뛰지 않은 것만 묻는 순서대로 알려 준다. */
 	public List<String> pendingFields() {
 		List<String> pending = new ArrayList<>();
-		if (conditions.isEmpty()) {
-			pending.add("bodyPart");
-		} else if (conditions.values().stream().anyMatch(Map::isEmpty)) {
+		if (painIndex == null) {
+			pending.add("painIndex");
+		}
+		if (conditions.values().stream().anyMatch(Map::isEmpty)) {
 			pending.add("symptoms");
 		}
 		pending.addAll(pendingOptionalFields());
@@ -275,8 +361,11 @@ public final class ChatDraft {
 		if (sleepHours == null && !skipped.contains(SKIP_SLEEP)) {
 			pending.add("sleepHours");
 		}
-		if (alcohol == null && outdoorActivity == null && !skipped.contains(SKIP_LIFESTYLE)) {
-			pending.add("lifestyle");
+		if (medication == null && !skipped.contains(SKIP_MEDICATION)) {
+			pending.add("medication");
+		}
+		if (skinSigns == null && !skipped.contains(SKIP_SKIN_SIGNS)) {
+			pending.add("skinSigns");
 		}
 		if (notes == null && !skipped.contains(SKIP_NOTES)) {
 			pending.add("notes");
@@ -296,7 +385,15 @@ public final class ChatDraft {
 			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
 			.map(e -> new SkinConditionResponse(e.getKey(), SymptomsResponse.from(e.getValue())))
 			.toList();
-		return new ChatDraftResponse(list, sleepHours, new LifestyleResponse(alcohol, outdoorActivity), notes);
+		return new ChatDraftResponse(
+			list,
+			painIndex,
+			sleepHours,
+			SleepScore.of(sleepHours),
+			medication,
+			skinSigns == null ? null : List.copyOf(skinSigns),
+			new LifestyleResponse(alcohol, outdoorActivity),
+			notes);
 	}
 
 	/** LLM에게 현재 초안을 알려 주기 위한 사람이 읽는 JSON */
@@ -314,7 +411,11 @@ public final class ChatDraft {
 		ChatDraft copy = new ChatDraft();
 		conditions.forEach((bodyPart, scores) -> copy.conditions.put(bodyPart, new EnumMap<>(
 			scores.isEmpty() ? new EnumMap<>(Symptom.class) : scores)));
+		copy.painIndex = painIndex;
 		copy.sleepHours = sleepHours;
+		copy.medication = medication;
+		copy.skinSigns = skinSigns == null ? null : EnumSet.copyOf(skinSigns.isEmpty()
+			? EnumSet.noneOf(SkinSign.class) : skinSigns);
 		copy.alcohol = alcohol;
 		copy.outdoorActivity = outdoorActivity;
 		copy.notes = notes;
@@ -325,7 +426,10 @@ public final class ChatDraft {
 	private void commit(ChatDraft next) {
 		conditions.clear();
 		conditions.putAll(next.conditions);
+		painIndex = next.painIndex;
 		sleepHours = next.sleepHours;
+		medication = next.medication;
+		skinSigns = next.skinSigns;
 		alcohol = next.alcohol;
 		outdoorActivity = next.outdoorActivity;
 		notes = next.notes;

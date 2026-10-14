@@ -111,10 +111,53 @@ class RecordIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 고통_지수와_약_복용과_나타난_증상을_저장하고_수면_점수를_계산한다() throws Exception {
+		String bearer = newMemberBearer();
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("recordDate", "2026-10-13");
+		body.put("painIndex", 6);
+		body.put("sleepHours", 5.5);
+		body.put("medication", true);
+		body.put("skinSigns", List.of("EXCORIATION", "XEROSIS", "XEROSIS"));
+
+		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		long id = jsonMapper.readTree(response).get("data").get("recordId").asLong();
+
+		// 부위별 증상 없이 고통 지수만 있어도 저장된다. 증상은 중복 없이 정의된 순서로 내려간다.
+		mockMvc.perform(get("/api/v1/records/" + id).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.skinConditions").isEmpty())
+			.andExpect(jsonPath("$.data.painIndex").value(6))
+			.andExpect(jsonPath("$.data.sleepScore").value(4))
+			.andExpect(jsonPath("$.data.medication").value(true))
+			.andExpect(jsonPath("$.data.skinSigns.length()").value(2))
+			.andExpect(jsonPath("$.data.skinSigns[0]").value("XEROSIS"))
+			.andExpect(jsonPath("$.data.skinSigns[1]").value("EXCORIATION"));
+
+		mockMvc.perform(get("/api/v1/records").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.content[0].painIndex").value(6))
+			.andExpect(jsonPath("$.data.content[0].sleepScore").value(4));
+	}
+
+	@Test
+	void 고통_지수는_1에서_10만_허용한다() throws Exception {
+		String bearer = newMemberBearer();
+		for (int painIndex : new int[] {0, 11}) {
+			Map<String, Object> body = new LinkedHashMap<>();
+			body.put("recordDate", "2026-10-13");
+			body.put("painIndex", painIndex);
+			mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.details[?(@.field=='painIndex')]").exists());
+		}
+	}
+
+	@Test
 	void 입력이_잘못되면_INVALID_INPUT을_반환한다() throws Exception {
 		String bearer = newMemberBearer();
 
-		// 날짜 없음, 부위 목록 비어 있음, 수면 시간 범위 초과
+		// 날짜 없음, 부위 목록과 고통 지수 모두 없음, 수면 시간 범위 초과
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("skinConditions", List.of());
 		body.put("sleepHours", 25);
@@ -122,7 +165,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"))
 			.andExpect(jsonPath("$.error.details[?(@.field=='recordDate')]").exists())
-			.andExpect(jsonPath("$.error.details[?(@.field=='skinConditions')]").exists())
+			.andExpect(jsonPath("$.error.details[?(@.field=='skinConditionsOrPainIndexPresent')]").exists())
 			.andExpect(jsonPath("$.error.details[?(@.field=='sleepHours')]").exists());
 	}
 

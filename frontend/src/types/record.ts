@@ -9,6 +9,16 @@ export type Symptoms = Partial<Record<SymptomKey, number>>;
 
 export type OutdoorActivity = 'LOW' | 'MEDIUM' | 'HIGH';
 
+/** 나타난 증상(있음/없음) — 피부건조증, 홍반, 각질, 구진, 긁은 자국, 결절, 태선화 */
+export type SkinSign =
+  | 'XEROSIS'
+  | 'ERYTHEMA'
+  | 'SCALING'
+  | 'PAPULE'
+  | 'EXCORIATION'
+  | 'NODULE'
+  | 'LICHENIFICATION';
+
 export interface SkinCondition {
   bodyPart: BodyPart;
   symptoms: Symptoms;
@@ -19,11 +29,16 @@ export interface Lifestyle {
   outdoorActivity?: OutdoorActivity | null;
 }
 
-/** RecordRequest — POST /records, PUT /records/{id}. skinConditions는 최소 1개 */
+/** RecordRequest — POST /records, PUT /records/{id}. skinConditions와 painIndex 중 하나 이상 필요 */
 export interface RecordInput {
   recordDate: string; // yyyy-MM-dd
   skinConditions: SkinCondition[];
+  /** 고통 지수 1~10 */
+  painIndex?: number | null;
   sleepHours?: number | null;
+  /** 약 복용 여부 */
+  medication?: boolean | null;
+  skinSigns?: SkinSign[] | null;
   lifestyle?: Lifestyle | null;
   notes?: string | null;
 }
@@ -44,6 +59,8 @@ export interface PhotoUploaded {
 /** RecordDetail — GET /records/{recordId}, PUT 응답 */
 export interface RecordDetail extends RecordInput {
   recordId: number;
+  /** 수면 점수 1~5 (서버 계산, 수면 시간이 없으면 없음) */
+  sleepScore?: number | null;
   photos: PhotoRef[];
   createdAt?: string;
   updatedAt?: string;
@@ -60,7 +77,9 @@ export interface RecordSummary {
   recordId: number;
   recordDate: string;
   skinConditions?: SkinCondition[];
+  painIndex?: number | null;
   sleepHours?: number | null;
+  sleepScore?: number | null;
   photoCount?: number;
 }
 

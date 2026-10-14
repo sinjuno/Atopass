@@ -93,14 +93,15 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "어제 몇 시간 주무셨나요?",
-			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}, "finished": false}""");
+			 "updates": {"painIndex": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}, "finished": false}""");
 
-		mockMvc.perform(sendMessage(bearer, session, "팔이 가려워요. 4점이에요"))
+		mockMvc.perform(sendMessage(bearer, session, "고통은 6점이고 팔 가려움이 4점이에요"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.reply").value("어제 몇 시간 주무셨나요?"))
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("ARM"))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.itching").value(4));
 	}
@@ -112,8 +113,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"updates\": {}}");
 
 		mockMvc.perform(sendMessage(bearer, session, "안녕하세요"))
-			.andExpect(jsonPath("$.data.reply").value("어느 부위가 불편하신가요?"))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyPart"));
+			.andExpect(jsonPath("$.data.reply").value("오늘 피부 때문에 느낀 고통은 1~10 중 몇 점인가요? (1은 거의 없음, 10은 매우 심함)"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"));
 	}
 
 	@Test
@@ -122,14 +123,14 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
-			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}}""");
+			 "updates": {"painIndex": 4}}""");
 		llm.enqueue("""
 			{"understood": true, "reply": "다른 건요?",
-			 "updates": {"sleepHours": 6, "skipped": ["lifestyle", "notes"]}}""");
+			 "updates": {"sleepHours": 6, "medication": false, "skinSigns": [], "skipped": ["notes"]}}""");
 
-		mockMvc.perform(sendMessage(bearer, session, "팔이 4점"))
+		mockMvc.perform(sendMessage(bearer, session, "고통은 4점"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
-		mockMvc.perform(sendMessage(bearer, session, "6시간 잤고 나머진 없어요"))
+		mockMvc.perform(sendMessage(bearer, session, "6시간 잤고 약은 안 먹었고 증상도 특이사항도 없어요"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
@@ -143,9 +144,9 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?", "finished": true,
-			 "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"dryness": 3}}]}}""");
+			 "updates": {"painIndex": 3}}""");
 
-		mockMvc.perform(sendMessage(bearer, session, "얼굴 건조 3점이고 그만할게요"))
+		mockMvc.perform(sendMessage(bearer, session, "고통은 3점이고 그만할게요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"));
 	}
@@ -154,11 +155,11 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	void 필수_항목이_없으면_마치겠다고_해도_확인_단계로_넘어가지_않는다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
-		llm.enqueue("{\"understood\": true, \"reply\": \"어느 부위인가요?\", \"finished\": true, \"updates\": {}}");
+		llm.enqueue("{\"understood\": true, \"reply\": \"고통은 몇 점인가요?\", \"finished\": true, \"updates\": {}}");
 
 		mockMvc.perform(sendMessage(bearer, session, "그만할래요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
-			.andExpect(jsonPath("$.data.reply").value("어느 부위인가요?"));
+			.andExpect(jsonPath("$.data.reply").value("고통은 몇 점인가요?"));
 	}
 
 	@Test
@@ -193,8 +194,45 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.understood").value(false))
 			.andExpect(jsonPath("$.data.reply").value("점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)"))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyPart"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").doesNotExist());
+	}
+
+	@Test
+	void 고통_지수가_범위를_벗어나면_반영하지_않고_다시_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		llm.enqueue("{\"understood\": true, \"reply\": \"알겠어요\", \"updates\": {\"painIndex\": 0}}");
+
+		mockMvc.perform(sendMessage(bearer, session, "고통 0점"))
+			.andExpect(jsonPath("$.data.understood").value(false))
+			.andExpect(jsonPath("$.data.reply").value("고통 지수는 1~10 사이 숫자로 알려 주세요. (1은 거의 없음, 10은 매우 심함)"))
+			.andExpect(jsonPath("$.data.draft.painIndex").doesNotExist());
+	}
+
+	@Test
+	void 질문은_고통_지수_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
+		mockMvc.perform(sendMessage(bearer, session, "5점"))
+			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"sleepHours\": 8}}");
+		mockMvc.perform(sendMessage(bearer, session, "8시간"))
+			.andExpect(jsonPath("$.data.draft.sleepScore").value(5))
+			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요? '예' 또는 '아니오'로 답해 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
+		mockMvc.perform(sendMessage(bearer, session, "예"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"PAPULE\"]}}");
+		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
+			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'라고 말씀해 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
+		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(2))
+			.andExpect(jsonPath("$.data.draft.notes").value("새 보습제를 썼어요"));
 	}
 
 	@Test
@@ -213,7 +251,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(sendMessage(bearer, session, "그냥 그래요"))
 			.andExpect(jsonPath("$.data.understood").value(false))
 			.andExpect(jsonPath("$.data.reply").value(
-				"어떤 증상인지 알려 주세요. 예: \"팔이 가려워요. 가려움은 4점이고 잠은 6시간 잤어요.\""));
+				"어떤 증상인지 알려 주세요. 예: \"고통은 6점이고 잠은 6시간 잤어요.\""));
 
 		// 한 번 해석에 성공하면 다시 처음부터 센다.
 		llm.enqueue("{\"understood\": true, \"reply\": \"수면은요?\", \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\", \"symptoms\": {\"itching\": 3}}]}}");
@@ -234,7 +272,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "꼬리가 가려워요"))
 			.andExpect(jsonPath("$.data.understood").value(false))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyPart"));
+			.andExpect(jsonPath("$.data.draft.skinConditions").isEmpty());
 	}
 
 	@Test
@@ -255,7 +293,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"reply\": \"몇 점인가요?\", \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\"}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "팔이 가려워요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("symptoms"));
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"))
+			.andExpect(jsonPath("$.data.pendingFields[1]").value("symptoms"));
 	}
 
 	@Test
@@ -276,7 +315,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	void 대화_내역을_시간순으로_조회한다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
-		llm.enqueue("{\"understood\": true, \"reply\": \"어느 부위인가요?\", \"updates\": {}}");
+		llm.enqueue("{\"understood\": true, \"reply\": \"고통은 몇 점인가요?\", \"updates\": {}}");
 		mockMvc.perform(sendMessage(bearer, session, "기록할게요"));
 		llm.enqueue("{\"understood\": true, \"reply\": \"몇 점인가요?\", \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\"}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "팔이요"));
@@ -287,7 +326,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].role").value("USER"))
 			.andExpect(jsonPath("$.data.messages[0].content").value("기록할게요"))
 			.andExpect(jsonPath("$.data.messages[1].role").value("ASSISTANT"))
-			.andExpect(jsonPath("$.data.messages[1].content").value("어느 부위인가요?"))
+			.andExpect(jsonPath("$.data.messages[1].content").value("고통은 몇 점인가요?"))
 			.andExpect(jsonPath("$.data.messages[3].content").value("몇 점인가요?"))
 			.andExpect(jsonPath("$.data.messages[0].createdAt").isNotEmpty());
 	}
@@ -458,7 +497,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	void 보존_기간이_지난_메시지만_삭제한다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
-		llm.enqueue("{\"understood\": true, \"reply\": \"어느 부위인가요?\", \"updates\": {}}");
+		llm.enqueue("{\"understood\": true, \"reply\": \"고통은 몇 점인가요?\", \"updates\": {}}");
 		mockMvc.perform(sendMessage(bearer, session, "기록할게요"));
 
 		// 방금 만든 메시지는 보존 기간 안이라 정기 삭제로 지워지지 않는다.

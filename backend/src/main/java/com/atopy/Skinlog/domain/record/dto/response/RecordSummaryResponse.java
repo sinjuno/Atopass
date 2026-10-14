@@ -11,7 +11,9 @@ public record RecordSummaryResponse(
 	Long recordId,
 	LocalDate recordDate,
 	List<SkinConditionResponse> skinConditions,
+	Integer painIndex,
 	BigDecimal sleepHours,
+	Integer sleepScore,
 	int photoCount
 ) {
 
@@ -23,7 +25,9 @@ public record RecordSummaryResponse(
 				.sorted(Comparator.comparing(c -> c.getBodyPart().ordinal()))
 				.map(SkinConditionResponse::from)
 				.toList(),
+			record.getPainIndex(),
 			record.getSleepHours(),
+			record.getSleepScore(),
 			photoCount);
 	}
 

@@ -16,7 +16,10 @@ export type DailyRecordMode = 'edit' | 'chatDraft' | 'new';
 const emptyRecord = (recordDate: string): RecordInput => ({
   recordDate,
   skinConditions: [],
+  painIndex: null,
   sleepHours: null,
+  medication: null,
+  skinSigns: [],
   lifestyle: null,
   notes: null,
 });
@@ -31,7 +34,10 @@ async function loadChatDraft(sessionId: string) {
     .getDraft(sessionId)
     .then(({ draft }) => ({
       skinConditions: draft.skinConditions ?? [],
+      painIndex: draft.painIndex ?? null,
       sleepHours: draft.sleepHours ?? null,
+      medication: draft.medication ?? null,
+      skinSigns: draft.skinSigns ?? [],
       lifestyle: draft.lifestyle ?? null,
       notes: draft.notes ?? null,
     }))
@@ -57,7 +63,7 @@ export function useDailyRecord(recordDate: string) {
       const summary = await recordApi.findByDate(recordDate);
       if (summary) {
         const detail = await recordApi.getDetail(summary.recordId);
-        const { recordId, photos, createdAt: _c, updatedAt: _u, ...input } = detail;
+        const { recordId, photos, sleepScore: _s, createdAt: _c, updatedAt: _u, ...input } = detail;
         setMode('edit');
         setRecordId(recordId);
         setForm(input);

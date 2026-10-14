@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/apis/client';
 import PageHeader from '@/components/common/PageHeader';
+import DailyConditionEditor from '@/components/record/DailyConditionEditor';
 import LifestyleEditor from '@/components/record/LifestyleEditor';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import SavedPhotoList from '@/components/record/SavedPhotoList';
@@ -9,7 +10,7 @@ import Section from '@/components/record/Section';
 import SkinConditionEditor from '@/components/record/SkinConditionEditor';
 import { useDailyRecord, type DailyRecordMode } from '@/hooks/useDailyRecord';
 import { useRecordDraft } from '@/hooks/useRecordDraft';
-import { PHOTO_ACCEPT } from '@/utils/constants';
+import { CHAT_NOTES_MAX_LENGTH, NOTES_MAX_LENGTH, PHOTO_ACCEPT } from '@/utils/constants';
 import { formatKoreanDate, isValidDateString } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 
@@ -38,12 +39,15 @@ function RecordSummary({ date }: { date: string }) {
   if (loading) return <p className="p-6 text-center text-gray-500">기록을 불러오는 중…</p>;
   if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
 
+  // 챗봇으로 기록할 때 특이사항은 채팅 한 번(500자)으로 받는다
+  const notesMaxLength = mode === 'chatDraft' ? CHAT_NOTES_MAX_LENGTH : NOTES_MAX_LENGTH;
+
   const handleSave = async () => {
     setMessage(null);
     setFieldErrors({});
-    // RecordRequest.skinConditions는 minItems: 1
-    if (form.skinConditions.length === 0) {
-      setFieldErrors({ skinConditions: '증상이 있었던 부위를 하나 이상 추가해 주세요.' });
+    // RecordRequest: 부위별 증상과 고통 지수 중 하나 이상 필요
+    if (form.skinConditions.length === 0 && form.painIndex == null) {
+      setFieldErrors({ painIndex: '고통 지수를 고르거나 증상이 있었던 부위를 추가해 주세요.' });
       return;
     }
     setSaving(true);
@@ -91,7 +95,19 @@ function RecordSummary({ date }: { date: string }) {
       <PageHeader title={formatKoreanDate(date)} />
       <p className="bg-gray-50 px-4 py-2 text-sm text-gray-600">{MODE_LABEL[mode]}</p>
 
-      <Section title="부위·증상">
+      <Section title="오늘의 상태">
+        <DailyConditionEditor
+          painIndex={form.painIndex}
+          medication={form.medication}
+          skinSigns={form.skinSigns}
+          onChange={(next) => setForm({ ...form, ...next })}
+        />
+        <FieldError errors={fieldErrors} prefix="painIndex" />
+        <FieldError errors={fieldErrors} prefix="medication" />
+        <FieldError errors={fieldErrors} prefix="skinSigns" />
+      </Section>
+
+      <Section title="부위별 증상 점수">
         <SkinConditionEditor
           value={form.skinConditions}
           onChange={(skinConditions) => setForm({ ...form, skinConditions })}
@@ -114,9 +130,14 @@ function RecordSummary({ date }: { date: string }) {
           value={form.notes ?? ''}
           onChange={(e) => setForm({ ...form, notes: e.target.value || null })}
           rows={3}
+          maxLength={notesMaxLength}
           placeholder="기록 없음"
           className="w-full rounded-xl border border-gray-300 p-3 text-base"
         />
+        <p className="mt-1 text-right text-sm text-gray-400">
+          {(form.notes ?? '').length}/{notesMaxLength}
+        </p>
+        <FieldError errors={fieldErrors} prefix="notes" />
       </Section>
 
       <Section title="사진">

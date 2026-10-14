@@ -35,8 +35,9 @@ public class ChatbotService {
 
 	static final String NOT_UNDERSTOOD = "죄송해요, 잘 이해하지 못했어요. 다시 한 번 말씀해 주시겠어요?";
 	static final String SCORE_OUT_OF_RANGE = "점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
+	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 1~10 사이 숫자로 알려 주세요. (1은 거의 없음, 10은 매우 심함)";
 	static final String CONFIRM = "입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요.";
-	static final String EXAMPLE = " 예: \"팔이 가려워요. 가려움은 4점이고 잠은 6시간 잤어요.\"";
+	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -101,6 +102,7 @@ public class ChatbotService {
 					finished = output.finished();
 				}
 				case INVALID_SCORE -> reply = SCORE_OUT_OF_RANGE;
+				case INVALID_PAIN_INDEX -> reply = PAIN_INDEX_OUT_OF_RANGE;
 				case INVALID_VALUE -> reply = NOT_UNDERSTOOD;
 			}
 		} else if (parsed.isPresent()) {
@@ -144,11 +146,13 @@ public class ChatbotService {
 			return CONFIRM;
 		}
 		return switch (pendingFields.get(0)) {
-			case "bodyPart" -> "어느 부위가 불편하신가요?";
+			case "painIndex" -> "오늘 피부 때문에 느낀 고통은 1~10 중 몇 점인가요? (1은 거의 없음, 10은 매우 심함)";
 			case "symptoms" -> "그 부위의 증상 정도를 0~10점으로 알려 주세요. (0은 없음, 10은 매우 심함)";
-			case "sleepHours" -> "어제 몇 시간 주무셨나요?";
-			case "lifestyle" -> "음주나 야외활동이 있었나요? 없으면 '없어요'라고 말씀해 주세요.";
-			default -> "평소와 다른 점(약 복용 여부 등)이 있나요? 없으면 '없어요'라고 말씀해 주세요.";
+			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
+			case "medication" -> "오늘 약을 복용하셨나요? '예' 또는 '아니오'로 답해 주세요.";
+			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. "
+				+ "1 피부건조증, 2 홍반, 3 각질, 4 구진, 5 긁은 자국, 6 결절, 7 태선화 (없으면 '없어요')";
+			default -> "평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'라고 말씀해 주세요.";
 		};
 	}
 

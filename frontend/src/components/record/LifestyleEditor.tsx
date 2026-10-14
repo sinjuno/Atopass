@@ -1,5 +1,6 @@
 import type { Lifestyle, OutdoorActivity } from '@/types/record';
-import { EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS } from '@/utils/constants';
+import { EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, SLEEP_SCORE_MAX } from '@/utils/constants';
+import { sleepScore } from '@/utils/sleepScore';
 
 interface Props {
   sleepHours: number | null | undefined;
@@ -9,9 +10,10 @@ interface Props {
 
 const ACTIVITIES = Object.keys(OUTDOOR_ACTIVITY_LABELS) as OutdoorActivity[];
 
-/** 수면 시간 + 생활습관(음주, 외출) */
+/** 수면 시간(+수면 점수) + 생활습관(음주, 외출) */
 export default function LifestyleEditor({ sleepHours, lifestyle, onChange }: Props) {
   const current = { sleepHours: sleepHours ?? null, lifestyle: lifestyle ?? null };
+  const score = sleepScore(current.sleepHours);
   const setLifestyle = (patch: Partial<Lifestyle>) =>
     onChange({ ...current, lifestyle: { ...current.lifestyle, ...patch } });
 
@@ -34,6 +36,11 @@ export default function LifestyleEditor({ sleepHours, lifestyle, onChange }: Pro
           시간
         </span>
       </label>
+      {score != null && (
+        <p className="-mt-2 text-right text-sm text-gray-500">
+          수면 점수 {score}/{SLEEP_SCORE_MAX}점 <span className="text-gray-400">(7~9시간 5점, 2시간마다 1점 감점)</span>
+        </p>
+      )}
 
       <fieldset className="flex items-center justify-between gap-3">
         <legend className="sr-only">음주</legend>

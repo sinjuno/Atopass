@@ -8,10 +8,10 @@ export interface ChatSession {
 }
 
 /** 아직 입력되지 않은 항목 */
-export type PendingField = 'bodyPart' | 'symptoms' | 'sleepHours' | 'lifestyle' | 'notes';
+export type PendingField = 'painIndex' | 'symptoms' | 'sleepHours' | 'medication' | 'skinSigns' | 'notes';
 
-/** 챗봇이 대화로 모은 기록 초안 (recordDate 제외) */
-export type ChatDraft = Omit<RecordInput, 'recordDate'>;
+/** 챗봇이 대화로 모은 기록 초안 (recordDate 제외). skinSigns는 아직 묻지 않았으면 null, "없음"이면 [] */
+export type ChatDraft = Omit<RecordInput, 'recordDate'> & { sleepScore?: number | null };
 
 export interface SendMessageResponse {
   /** 3번 연속 해석 실패 시 입력 예시는 서버가 reply에 붙여 준다 */
@@ -54,5 +54,5 @@ export interface ChatMessagesResponse {
 export interface SaveChatRecordRequest {
   recordDate: string;
   confirmed: boolean;
-  record: ChatDraft;
+  record: Omit<RecordInput, 'recordDate'>;
 }
