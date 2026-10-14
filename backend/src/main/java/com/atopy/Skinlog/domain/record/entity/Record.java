@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,8 +17,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+// TEMP STUB — 백1의 실제 피부 기록 엔티티 머지 시 교체
 @Entity
-@Table(name = "record")
+@Table(name = "record", uniqueConstraints = @UniqueConstraint(columnNames = {"member_id", "record_date"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Record {
