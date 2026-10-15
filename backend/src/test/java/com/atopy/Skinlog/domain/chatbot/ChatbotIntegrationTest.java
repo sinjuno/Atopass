@@ -183,6 +183,20 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 프롬프트가_증상_점수를_일정한_문구로_하나씩_묻도록_안내한다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		llm.enqueue("{\"understood\": true, \"reply\": \"가려움 정도를 점수로 나타내면 0~10점 중 몇 점인가요?\", \"updates\": {}}");
+		mockMvc.perform(sendMessage(bearer, session, "팔이 가려워요"));
+
+		assertThat(llm.lastSystemPrompt())
+			.contains("{증상} 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
+			.contains("한 번에 하나씩 차례로 묻습니다")
+			.contains("다른 증상도 있으신가요?");
+	}
+
+	@Test
 	void 점수가_범위를_벗어나면_초안에_반영하지_않고_다시_묻는다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");

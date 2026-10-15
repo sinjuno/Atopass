@@ -15,7 +15,7 @@ class AnthropicChatModelClientTest {
 	@Test
 	void API_키가_없으면_네트워크를_타지_않고_CHATBOT_UNAVAILABLE을_던진다() {
 		AnthropicChatModelClient client = new AnthropicChatModelClient(
-			new LlmProperties("", "claude-opus-5-5", "low", 2048, 30));
+			new LlmProperties("", "claude-opus-5-5", "low", 2048, 30, 100));
 
 		assertThatThrownBy(() -> client.complete("시스템", List.of(new ChatTurn(ChatRole.USER, "안녕"))))
 			.isInstanceOfSatisfying(BusinessException.class,
@@ -25,7 +25,7 @@ class AnthropicChatModelClientTest {
 	@Test
 	void API_키가_null이어도_CHATBOT_UNAVAILABLE을_던진다() {
 		AnthropicChatModelClient client = new AnthropicChatModelClient(
-			new LlmProperties(null, "claude-opus-5-5", "low", 2048, 30));
+			new LlmProperties(null, "claude-opus-5-5", "low", 2048, 30, 100));
 
 		assertThatThrownBy(() -> client.complete("시스템", List.of(new ChatTurn(ChatRole.USER, "안녕"))))
 			.isInstanceOf(BusinessException.class);

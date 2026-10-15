@@ -64,6 +64,18 @@ public class ReportService {
 		return ReportResponse.from(report);
 	}
 
+	public List<ReportResponse> list(Long memberId) {
+		return reportRepository.findByMemberIdOrderByCreatedAtDesc(memberId).stream()
+			.map(ReportResponse::from)
+			.toList();
+	}
+
+	public ReportResponse get(Long memberId, Long reportId) {
+		Report report = reportRepository.findByIdAndMemberId(reportId, memberId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
+		return ReportResponse.from(report);
+	}
+
 	/**
 	 * 소유자에게 PDF를 준다. 저장된 파일이 없으면(보존 기간이 지나 삭제된 경우 등) 현재 기록으로 다시 만든다.
 	 * 다른 회원의 보고서는 존재 여부가 드러나지 않도록 404로 처리한다.

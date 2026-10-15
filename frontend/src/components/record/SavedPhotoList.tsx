@@ -5,7 +5,8 @@ import type { PhotoRef } from '@/types/record';
 interface Props {
   recordId: number;
   photos: PhotoRef[];
-  onRemove: (photoId: number) => void;
+  /** 없으면 삭제 버튼을 숨긴다 (보기 모드) */
+  onRemove?: (photoId: number) => void;
 }
 
 /** 저장된 사진 — 인증 헤더로 blob을 받아 표시한다 */
@@ -16,14 +17,16 @@ export default function SavedPhotoList({ recordId, photos, onRemove }: Props) {
       {photos.map((p, i) => (
         <li key={p.photoId} className="relative shrink-0">
           <AuthImage recordId={recordId} photoId={p.photoId} alt={`기록 사진 ${i + 1}`} />
-          <button
-            type="button"
-            onClick={() => onRemove(p.photoId)}
-            className="absolute -right-1 -top-1 size-6 rounded-full bg-gray-800 text-sm text-white"
-            aria-label={`사진 ${i + 1} 삭제`}
-          >
-            ×
-          </button>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(p.photoId)}
+              className="absolute -right-1 -top-1 size-6 rounded-full bg-gray-800 text-sm text-white"
+              aria-label={`사진 ${i + 1} 삭제`}
+            >
+              ×
+            </button>
+          )}
         </li>
       ))}
     </ul>

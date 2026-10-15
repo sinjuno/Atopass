@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+**/node_modules
+**/build
+**/.gradle
+frontend/dist
+backend/src/main/resources/static/*
+!backend/src/main/resources/static/.gitkeep
+deploy
+docs
+*.md
+.env

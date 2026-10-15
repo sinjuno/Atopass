@@ -2,7 +2,7 @@ spring:
   application:
     name: service
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/skinlog?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/atopass?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
   jpa:
@@ -14,6 +14,14 @@ spring:
         default_batch_fetch_size: 100
         jdbc:
           time_zone: Asia/Seoul
+  web:
+    resources:
+      # 화면(정적 파일)은 WebConfig에서 직접 서빙한다. (index.html 대체 응답 포함)
+      add-mappings: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 app:
   jwt:
@@ -31,6 +39,9 @@ app:
     effort: ${LLM_EFFORT:low}
     max-tokens: 2048
     timeout-seconds: 30
+    # 회원 한 명이 최근 24시간 동안 보낼 수 있는 챗봇 메시지 수. 넘으면 429 CHAT_LIMIT_EXCEEDED
+    daily-message-limit: ${CHATBOT_DAILY_LIMIT:100}
   storage:
-    # 보고서 PDF 저장 위치. 웹으로 공개되는 경로 밖이어야 한다.
+    # 보고서 PDF/사진 저장 위치. 웹으로 공개되는 경로 밖이어야 한다.
     report-dir: ${REPORT_DIR:./data/reports}
+    photo-dir: ${PHOTO_DIR:./data/photos}

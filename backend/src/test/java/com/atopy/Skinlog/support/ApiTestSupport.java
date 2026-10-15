@@ -29,7 +29,11 @@ public abstract class ApiTestSupport {
 
 	/** 새 회원을 가입시키고 로그인해서 "Bearer ..." 형태의 Authorization 헤더 값을 돌려준다. */
 	protected String newMemberBearer() throws Exception {
-		String email = "user-" + UUID.randomUUID() + "@example.com";
+		return newMemberBearer("user-" + UUID.randomUUID() + "@example.com");
+	}
+
+	/** 지정한 이메일로 회원을 가입시키고 로그인해서 "Bearer ..." 형태의 Authorization 헤더 값을 돌려준다. */
+	protected String newMemberBearer(String email) throws Exception {
 		mockMvc.perform(post("/api/v1/auth/signup")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content(json(Map.of("email", email, "password", PASSWORD, "nickname", "테스터"))));

@@ -15,6 +15,7 @@ import com.atopy.Skinlog.domain.record.entity.SkinRecord;
 import com.atopy.Skinlog.domain.record.entity.SkinSign;
 import com.atopy.Skinlog.domain.record.entity.Symptom;
 import com.atopy.Skinlog.domain.record.event.RecordDeletedEvent;
+import com.atopy.Skinlog.domain.record.repository.PhotoRepository;
 import com.atopy.Skinlog.domain.record.repository.RecordRepository;
 import com.atopy.Skinlog.global.exception.BusinessException;
 import com.atopy.Skinlog.global.exception.ErrorCode;
@@ -45,6 +46,7 @@ public class RecordService {
 
 	private final RecordRepository recordRepository;
 	private final MemberRepository memberRepository;
+	private final PhotoRepository photoRepository;
 	private final ApplicationEventPublisher eventPublisher;
 
 	@Transactional
@@ -154,9 +156,10 @@ public class RecordService {
 		return RecordDetailResponse.from(record, photosOf(record));
 	}
 
-	/** 사진 기능 연동 지점. 사진이 구현되면 이곳에서 기록의 사진 목록을 채운다. */
 	private List<PhotoSummary> photosOf(SkinRecord record) {
-		return List.of();
+		return photoRepository.findByRecordIdOrderByCreatedAtAsc(record.getId()).stream()
+			.map(PhotoSummary::from)
+			.toList();
 	}
 
 	private int photoCount(SkinRecord record) {

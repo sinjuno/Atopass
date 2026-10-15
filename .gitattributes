@@ -1,0 +1,4 @@
+# 서버(Linux)에서 실행되는 파일은 Windows에서 커밋해도 LF로 유지한다.
+*.sh text eol=lf
+Dockerfile text eol=lf
+backend/gradlew text eol=lf

@@ -4,3 +4,7 @@
 *.log
 .env
 .gradle/
+
+# Docker 이미지를 만들 때 프론트 빌드 결과가 복사되는 위치 (저장소에는 올리지 않는다)
+backend/src/main/resources/static/*
+!backend/src/main/resources/static/.gitkeep

@@ -1,0 +1,5 @@
+# 도메인으로 들어오는 요청을 앱으로 넘긴다. HTTPS 인증서는 Caddy가 자동으로 발급·갱신한다.
+{$DOMAIN} {
+	encode gzip zstd
+	reverse_proxy app:8080
+}

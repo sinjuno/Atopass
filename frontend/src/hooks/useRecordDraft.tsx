@@ -51,7 +51,7 @@ export function useRecordDraft(date: string) {
 
 // ---------- 날짜별 챗봇 세션 ID (화면 재진입 시 대화 복원용) ----------
 // 세션은 날짜 하나당 하나 (API 명세서 5. 세부 사항). 비밀정보가 아니라 sessionStorage에 보관한다.
-const sessionKey = (date: string) => `skinlog:chat-session:${date}`;
+const sessionKey = (date: string) => `atopass:chat-session:${date}`;
 
 export const chatSessionStore = {
   get: (date: string) => {

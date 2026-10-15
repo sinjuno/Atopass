@@ -35,6 +35,7 @@ public enum ErrorCode {
 	CHATBOT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "챗봇을 일시적으로 사용할 수 없습니다."),
 	DRAFT_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "확인되지 않은 기록 초안은 저장할 수 없습니다."),
 	CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "챗봇을 이용하려면 동의가 필요합니다."),
+	CHAT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "챗봇 이용 한도에 도달했습니다. 잠시 후 다시 시도하거나 직접 입력해 주세요."),
 
 	// 보고서
 	REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 보고서를 찾을 수 없습니다."),

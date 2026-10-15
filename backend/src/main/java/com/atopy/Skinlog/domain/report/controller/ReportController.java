@@ -6,6 +6,7 @@ import com.atopy.Skinlog.domain.report.service.ReportService;
 import com.atopy.Skinlog.global.response.ApiResponse;
 import com.atopy.Skinlog.global.security.CurrentMember;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -20,13 +21,22 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 보고서 목록·상세 조회(GET /reports, GET /reports/{reportId})는 별도 작업에서 이 컨트롤러에 추가한다. */
 @RestController
 @RequestMapping("/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
 	private final ReportService reportService;
+
+	@GetMapping
+	public ApiResponse<List<ReportResponse>> list(@CurrentMember Long memberId) {
+		return ApiResponse.ok(reportService.list(memberId));
+	}
+
+	@GetMapping("/{reportId}")
+	public ApiResponse<ReportResponse> get(@CurrentMember Long memberId, @PathVariable Long reportId) {
+		return ApiResponse.ok(reportService.get(memberId, reportId));
+	}
 
 	@PostMapping
 	public ResponseEntity<ApiResponse<ReportResponse>> create(

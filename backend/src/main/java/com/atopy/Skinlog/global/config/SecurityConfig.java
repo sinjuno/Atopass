@@ -37,7 +37,9 @@ public class SecurityConfig {
 					"/api/v1/auth/signup",
 					"/api/v1/auth/login",
 					"/api/v1/auth/refresh").permitAll()
-				.anyRequest().authenticated())
+				// API는 인증이 필요하다. 그 밖의 경로는 화면(정적 파일)이라 누구나 받을 수 있다.
+				.requestMatchers("/api/**").authenticated()
+				.anyRequest().permitAll())
 			.oauth2ResourceServer(oauth -> oauth
 				.jwt(Customizer.withDefaults())
 				.authenticationEntryPoint(authenticationEntryPoint)

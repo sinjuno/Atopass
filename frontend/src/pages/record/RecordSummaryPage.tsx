@@ -5,17 +5,19 @@ import PageHeader from '@/components/common/PageHeader';
 import DailyConditionEditor from '@/components/record/DailyConditionEditor';
 import LifestyleEditor from '@/components/record/LifestyleEditor';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
+import RecordView from '@/components/record/RecordView';
 import SavedPhotoList from '@/components/record/SavedPhotoList';
 import Section from '@/components/record/Section';
 import SkinConditionEditor from '@/components/record/SkinConditionEditor';
 import { useDailyRecord, type DailyRecordMode } from '@/hooks/useDailyRecord';
 import { useRecordDraft } from '@/hooks/useRecordDraft';
+import type { RecordInput } from '@/types/record';
 import { CHAT_NOTES_MAX_LENGTH, NOTES_MAX_LENGTH, PHOTO_ACCEPT } from '@/utils/constants';
 import { formatKoreanDate, isValidDateString } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 
 const MODE_LABEL: Record<DailyRecordMode, string> = {
-  edit: '저장된 기록',
+  edit: '기록을 수정하고 있어요',
   chatDraft: '챗봇이 정리한 내용을 확인해 주세요',
   new: '아직 기록이 없어요. 직접 입력할 수 있어요',
 };
@@ -35,12 +37,55 @@ function RecordSummary({ date }: { date: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // 저장된 기록은 보기 모드로 열고, "수정"을 눌렀을 때만 입력할 수 있다. 취소하면 수정 전 값으로 되돌린다.
+  const [editSnapshot, setEditSnapshot] = useState<RecordInput | null>(null);
 
   if (loading) return <p className="p-6 text-center text-gray-500">기록을 불러오는 중…</p>;
   if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
 
   // 챗봇으로 기록할 때 특이사항은 채팅 한 번(500자)으로 받는다
   const notesMaxLength = mode === 'chatDraft' ? CHAT_NOTES_MAX_LENGTH : NOTES_MAX_LENGTH;
+
+  const isEditing = mode !== 'edit' || editSnapshot !== null;
+
+  const startEdit = () => {
+    setMessage(null);
+    setEditSnapshot(form);
+  };
+
+  const cancelEdit = () => {
+    if (editSnapshot) setForm(editSnapshot);
+    draft.clearPhotos();
+    setFieldErrors({});
+    setMessage(null);
+    setConfirmDelete(false);
+    setEditSnapshot(null);
+  };
+
+  if (mode === 'edit' && recordId && !isEditing) {
+    return (
+      <div>
+        <PageHeader
+          title={formatKoreanDate(date)}
+          right={
+            <button
+              type="button"
+              onClick={startEdit}
+              className="rounded-lg border border-gray-300 px-4 py-1.5 text-base font-semibold text-gray-700"
+            >
+              수정
+            </button>
+          }
+        />
+        {message && (
+          <p role="status" className="bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+            {message}
+          </p>
+        )}
+        <RecordView record={form} recordId={recordId} photos={photos} />
+      </div>
+    );
+  }
 
   const handleSave = async () => {
     setMessage(null);
@@ -59,6 +104,7 @@ function RecordSummary({ date }: { date: string }) {
         setMessage(`기록은 저장했지만 사진 ${failed.length}장을 올리지 못했어요. 다시 저장해 주세요.`);
       } else {
         setMessage('기록이 저장되었어요.');
+        setEditSnapshot(null); // 저장한 기록은 보기 모드로 돌아간다
       }
     } catch (e) {
       if (e instanceof ApiError) {
@@ -92,7 +138,16 @@ function RecordSummary({ date }: { date: string }) {
 
   return (
     <div>
-      <PageHeader title={formatKoreanDate(date)} />
+      <PageHeader
+        title={formatKoreanDate(date)}
+        right={
+          mode === 'edit' && (
+            <button type="button" onClick={cancelEdit} className="rounded-lg px-3 py-1.5 text-base text-gray-500">
+              취소
+            </button>
+          )
+        }
+      />
       <p className="bg-gray-50 px-4 py-2 text-sm text-gray-600">{MODE_LABEL[mode]}</p>
 
       <Section title="오늘의 상태">

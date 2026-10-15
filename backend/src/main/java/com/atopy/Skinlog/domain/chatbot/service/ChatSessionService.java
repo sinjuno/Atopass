@@ -138,6 +138,11 @@ public class ChatSessionService {
 		return created;
 	}
 
+	/** 회원이 {@code from} 이후 보낸 메시지 수 */
+	public long countUserMessagesSince(Long memberId, LocalDateTime from) {
+		return messageRepository.countByMemberSince(memberId, ChatRole.USER, from);
+	}
+
 	/** 보존 기간이 지난 메시지를 지운다. 지운 개수를 돌려준다. */
 	@Transactional
 	public int deleteMessagesOlderThan(LocalDateTime limit) {

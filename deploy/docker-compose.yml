@@ -1,0 +1,79 @@
+# 서버(VM)에서 앱 + MySQL + HTTPS(Caddy)를 한 번에 실행한다.
+# 비밀값은 같은 폴더의 .env 파일에만 둔다. (.env.example을 복사해서 채운다. 저장소에는 올리지 않는다)
+name: atopass
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?.env에 MYSQL_ROOT_PASSWORD를 채워 주세요}
+      MYSQL_DATABASE: atopass
+      MYSQL_USER: atopass
+      MYSQL_PASSWORD: ${DB_PASSWORD:?.env에 DB_PASSWORD를 채워 주세요}
+      TZ: Asia/Seoul
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-time-zone=+09:00
+      --innodb-buffer-pool-size=128M
+      --performance-schema=OFF
+      --max-connections=60
+    mem_limit: 640m
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/sinjuno/atopass}:${APP_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET을 채워 주세요}
+      DB_URL: jdbc:mysql://mysql:3306/atopass?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: atopass
+      DB_PASSWORD: ${DB_PASSWORD}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-claude-haiku-5-5}
+      CHATBOT_DAILY_LIMIT: ${CHATBOT_DAILY_LIMIT:-100}
+      COOKIE_SECURE: "true"
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN:?.env에 DOMAIN을 채워 주세요}
+      REPORT_DIR: /data/reports
+      PHOTO_DIR: /data/photos
+      JPA_DDL_AUTO: update
+      # 작은 서버(메모리 2GB)에서도 MySQL과 함께 돌도록 자바 메모리를 제한한다. 큰 서버면 .env의 JAVA_OPTS로 바꾼다.
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx640m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Djava.awt.headless=true}
+    mem_limit: 1g
+    volumes:
+      - app-data:/data
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  mysql-data:
+  app-data:
+  caddy-data:
+  caddy-config:

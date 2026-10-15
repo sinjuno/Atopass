@@ -1,15 +1,21 @@
 package com.atopy.Skinlog.domain.analysis.service;
 
 import com.atopy.Skinlog.domain.analysis.dto.response.AnalysisSummaryResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.ComparisonResponse;
 import com.atopy.Skinlog.domain.analysis.dto.response.InsightResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.RecordSnapshotResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.TrendResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.TrendResponse.TrendPoint;
 import com.atopy.Skinlog.domain.analysis.service.ChangePointDetector.Direction;
 import com.atopy.Skinlog.domain.analysis.service.ChangePointDetector.Point;
 import com.atopy.Skinlog.domain.analysis.service.ChangePointDetector.Range;
+import com.atopy.Skinlog.domain.record.dto.response.PhotoSummary;
 import com.atopy.Skinlog.domain.record.entity.BodyPart;
 import com.atopy.Skinlog.domain.record.entity.SkinCondition;
 import com.atopy.Skinlog.domain.record.entity.SkinRecord;
 import com.atopy.Skinlog.domain.record.entity.Symptom;
 import com.atopy.Skinlog.domain.record.entity.SymptomScore;
+import com.atopy.Skinlog.domain.record.repository.PhotoRepository;
 import com.atopy.Skinlog.domain.record.repository.RecordRepository;
 import com.atopy.Skinlog.global.exception.BusinessException;
 import com.atopy.Skinlog.global.exception.ErrorCode;
@@ -39,6 +45,7 @@ public class AnalysisService {
 	private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("M/d", Locale.KOREA);
 
 	private final RecordRepository recordRepository;
+	private final PhotoRepository photoRepository;
 
 	public AnalysisSummaryResponse summary(Long memberId, LocalDate startDate, LocalDate endDate) {
 		if (startDate.isAfter(endDate)) {
@@ -51,6 +58,44 @@ public class AnalysisService {
 		List<InsightResponse> insights = available ? detectInsights(records) : List.of();
 		return new AnalysisSummaryResponse(
 			new AnalysisSummaryResponse.Period(startDate, endDate), records.size(), available, insights);
+	}
+
+	public TrendResponse trends(
+		Long memberId, BodyPart bodyPart, Symptom symptom, LocalDate startDate, LocalDate endDate) {
+		if (startDate.isAfter(endDate)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "시작일은 종료일보다 늦을 수 없습니다.");
+		}
+		List<SkinRecord> records = recordRepository
+			.findByMemberIdAndRecordDateBetweenOrderByRecordDateAsc(memberId, startDate, endDate);
+
+		List<TrendPoint> points = new ArrayList<>();
+		for (SkinRecord record : records) {
+			record.getConditions().stream()
+				.filter(condition -> condition.getBodyPart() == bodyPart)
+				.findFirst()
+				.flatMap(condition -> condition.getScores().stream()
+					.filter(score -> score.getSymptom() == symptom)
+					.findFirst())
+				.ifPresent(score -> points.add(
+					new TrendPoint(record.getRecordDate(), record.getId(), score.getScore())));
+		}
+		return new TrendResponse(points);
+	}
+
+	public ComparisonResponse comparison(Long memberId, LocalDate dateA, LocalDate dateB) {
+		return new ComparisonResponse(snapshotOf(memberId, dateA), snapshotOf(memberId, dateB));
+	}
+
+	private RecordSnapshotResponse snapshotOf(Long memberId, LocalDate date) {
+		return recordRepository.findByMemberIdAndRecordDate(memberId, date)
+			.map(record -> RecordSnapshotResponse.from(record, photosOf(record)))
+			.orElse(null);
+	}
+
+	private List<PhotoSummary> photosOf(SkinRecord record) {
+		return photoRepository.findByRecordIdOrderByCreatedAtAsc(record.getId()).stream()
+			.map(PhotoSummary::from)
+			.toList();
 	}
 
 	/** 부위·증상별 점수 시계열마다 변화점을 찾아 인사이트로 만든다. */

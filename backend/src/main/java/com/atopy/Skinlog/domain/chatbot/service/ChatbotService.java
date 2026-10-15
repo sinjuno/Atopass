@@ -9,9 +9,13 @@ import com.atopy.Skinlog.domain.chatbot.entity.ChatMode;
 import com.atopy.Skinlog.domain.chatbot.entity.ChatRole;
 import com.atopy.Skinlog.domain.chatbot.llm.ChatModelClient;
 import com.atopy.Skinlog.domain.chatbot.llm.ChatTurn;
+import com.atopy.Skinlog.domain.chatbot.llm.LlmProperties;
 import com.atopy.Skinlog.domain.chatbot.service.ChatReplyParser.ModelOutput;
 import com.atopy.Skinlog.domain.chatbot.service.ChatSessionService.TurnContext;
 import com.atopy.Skinlog.domain.record.dto.response.RecordCreatedResponse;
+import com.atopy.Skinlog.global.exception.BusinessException;
+import com.atopy.Skinlog.global.exception.ErrorCode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +49,7 @@ public class ChatbotService {
 	private final ChatPromptFactory promptFactory;
 	private final ChatReplyParser replyParser;
 	private final JsonMapper jsonMapper;
+	private final LlmProperties llmProperties;
 
 	public ChatSessionResponse createSession(Long memberId, ChatMode mode) {
 		consentService.requireConsent(memberId);
@@ -62,6 +67,7 @@ public class ChatbotService {
 	public ChatReplyResponse sendMessage(Long memberId, String sessionId, String userText) {
 		// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
 		consentService.requireConsent(memberId);
+		requireWithinDailyLimit(memberId);
 		TurnContext context = sessionService.loadForTurn(memberId, sessionId);
 
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
@@ -77,6 +83,14 @@ public class ChatbotService {
 		sessionService.saveTurn(sessionId, userText, outcome.response().reply(),
 			outcome.draftJson(), outcome.failCount(), outcome.response().requiresConfirmation());
 		return outcome.response();
+	}
+
+	/** 최근 24시간 동안 보낸 메시지가 한도에 도달했으면 LLM을 부르기 전에 막는다. (비용 보호) */
+	private void requireWithinDailyLimit(Long memberId) {
+		long used = sessionService.countUserMessagesSince(memberId, LocalDateTime.now().minusHours(24));
+		if (used >= llmProperties.dailyMessageLimit()) {
+			throw new BusinessException(ErrorCode.CHAT_LIMIT_EXCEEDED);
+		}
 	}
 
 	/** 세션에 쌓인 초안과 진행 상태. 마지막 메시지 응답의 draft·pendingFields·requiresConfirmation과 같은 값이다. */
