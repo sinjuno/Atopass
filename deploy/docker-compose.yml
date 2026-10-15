@@ -16,6 +16,10 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --default-time-zone=+09:00
+      --innodb-buffer-pool-size=128M
+      --performance-schema=OFF
+      --max-connections=60
+    mem_limit: 640m
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -44,6 +48,9 @@ services:
       REPORT_DIR: /data/reports
       PHOTO_DIR: /data/photos
       JPA_DDL_AUTO: update
+      # 작은 서버(메모리 2GB)에서도 MySQL과 함께 돌도록 자바 메모리를 제한한다. 큰 서버면 .env의 JAVA_OPTS로 바꾼다.
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx640m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Djava.awt.headless=true}
+    mem_limit: 1g
     volumes:
       - app-data:/data
     expose:
