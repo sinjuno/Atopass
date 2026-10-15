@@ -14,6 +14,8 @@ interface SendResult {
   ok: boolean;
   /** SESSION_CLOSED — 이미 저장된 기록이라 총정리로 이동해야 함 */
   closed?: boolean;
+  /** CHAT_LIMIT_EXCEEDED — 최근 24시간 이용 한도 도달, 총정리에서 직접 입력하도록 안내 */
+  limitReached?: boolean;
 }
 
 const isApiError = (e: unknown, code: string) => e instanceof ApiError && e.code === code;
@@ -31,6 +33,8 @@ export function useChatSession(recordDate: string) {
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   const [status, setStatus] = useState<ChatStatus>('loading');
   const [error, setError] = useState<string | null>(null);
+  // 한도에 도달해도 대화 내역·초안 조회는 되므로 status는 그대로 두고 안내만 띄운다
+  const [limitReached, setLimitReached] = useState(false);
   const startedRef = useRef(false);
 
   const start = useCallback(async () => {
@@ -120,6 +124,7 @@ export function useChatSession(recordDate: string) {
         setPendingFields(res.pendingFields);
         setRequiresConfirmation(res.requiresConfirmation);
         setStatus('ready');
+        setLimitReached(false);
         return { ok: true };
       } catch (e) {
         // 실패한 메시지는 목록에서 빼고, 입력창에 내용을 되돌려 놓도록 호출부에 알린다
@@ -135,6 +140,10 @@ export function useChatSession(recordDate: string) {
           setError('이미 저장된 기록이에요. 총정리 화면으로 이동할게요.');
           return { ok: false, closed: true };
         }
+        if (isApiError(e, 'CHAT_LIMIT_EXCEEDED')) {
+          setLimitReached(true);
+          return { ok: false, limitReached: true };
+        }
         if (isApiError(e, 'CHATBOT_UNAVAILABLE')) {
           setError('잠시 후 다시 시도해 주세요.');
         } else {
@@ -146,5 +155,16 @@ export function useChatSession(recordDate: string) {
     [sessionId, recordDate],
   );
 
-  return { sessionId, messages, pendingFields, requiresConfirmation, status, error, send, agree, retry: start };
+  return {
+    sessionId,
+    messages,
+    pendingFields,
+    requiresConfirmation,
+    status,
+    error,
+    limitReached,
+    send,
+    agree,
+    retry: start,
+  };
 }

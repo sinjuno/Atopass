@@ -16,7 +16,7 @@ import { recordPath } from '@/utils/routes';
 export default function ChatbotPage() {
   const navigate = useNavigate();
   const recordDate = today();
-  const { messages, pendingFields, requiresConfirmation, status, error, send, agree, retry } =
+  const { messages, pendingFields, requiresConfirmation, status, error, limitReached, send, agree, retry } =
     useChatSession(recordDate);
   const draft = useRecordDraft(recordDate);
   const [input, setInput] = useState('');
@@ -82,6 +82,21 @@ export default function ChatbotPage() {
         <div className="border-t border-gray-100 px-3 pt-3">
           <PendingPhotoList files={draft.photos} onRemove={draft.removePhoto} />
           {photoError && <p className="mt-2 text-sm text-red-500">{photoError}</p>}
+        </div>
+      )}
+
+      {limitReached && (
+        <div role="alert" className="border-t border-amber-100 bg-amber-50 p-3">
+          <p className="mb-2 text-center text-base text-gray-700">
+            오늘 챗봇 이용 한도에 도달했어요. 총정리 화면에서 직접 입력할 수 있어요
+          </p>
+          <button
+            type="button"
+            onClick={goToSummary}
+            className="w-full rounded-xl border border-amber-300 bg-white py-3 text-lg font-bold text-gray-800"
+          >
+            총정리에서 직접 입력하기
+          </button>
         </div>
       )}
 
