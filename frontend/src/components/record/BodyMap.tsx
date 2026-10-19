@@ -1,12 +1,13 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import type { BodyPart } from '@/types/record';
-import { painColor, type BodyMapScores } from '@/utils/bodyMap';
+import { BODY_MAP_EMPTY_COLOR, SIGN_COUNT_MAX, signCountColor, type BodyMapCounts } from '@/utils/bodyMap';
 import { BODY_PART_LABELS } from '@/utils/constants';
 
 interface Props {
-  scores: BodyMapScores;
-  /** 고른 부위 — 테두리로 표시 */
-  selected?: BodyPart | null;
+  /** 기록한 부위마다 나타난 증상 개수 — 많을수록 붉게 칠한다 */
+  counts: BodyMapCounts;
+  /** 고른 부위 — 진한 테두리로 표시. 여러 곳을 고를 때는 배열로 넘긴다 */
+  selected?: BodyPart | readonly BodyPart[] | null;
   /** 부위를 눌렀을 때 */
   onSelect: (part: BodyPart) => void;
 }
@@ -66,14 +67,15 @@ const BACK_TRANSFORM = 'translate(430 0) scale(-1 1)';
 const DECORATION = { fill: '#f3f4f6', stroke: '#d1d5db', strokeWidth: 1.5 };
 
 /**
- * 사람 모양 마네킹(앞면·뒷면). 부위 색은 고통 점수가 높을수록 붉고, 낮을수록 연하다(0점·기록 없음은 무색).
+ * 사람 모양 마네킹(앞면·뒷면). 부위 색은 나타난 증상이 많을수록 붉다(0개는 하얀색, 7개는 새빨간색, 기록 없음은 회색).
  * 부위를 누르면 고른다. 팔·다리·손·발·목은 앞뒤 어느 쪽을 눌러도 같은 부위다.
  */
-export default function BodyMap({ scores, selected, onSelect }: Props) {
+export default function BodyMap({ counts, selected, onSelect }: Props) {
+  const selectedParts: readonly BodyPart[] = selected == null ? [] : typeof selected === 'string' ? [selected] : selected;
   const renderPart = (part: BodyPart, side: 'front' | 'back') => {
-    const score = scores[part];
-    const label = `${BODY_PART_LABELS[part]} ${score === undefined ? '기록 없음' : `${score}점`}`;
-    const isSelected = selected === part;
+    const count = counts[part];
+    const label = `${BODY_PART_LABELS[part]} ${count === undefined ? '기록 없음' : `증상 ${count}개`}`;
+    const isSelected = selectedParts.includes(part);
     const select = () => onSelect(part);
     return (
       <g
@@ -89,8 +91,9 @@ export default function BodyMap({ scores, selected, onSelect }: Props) {
             select();
           }
         }}
-        fill={painColor(score)}
-        stroke={isSelected ? '#111827' : '#ffffff'}
+        fill={signCountColor(count)}
+        // 기록한 부위는 하얀색(증상 0개)이어도 보이도록 회색 테두리를 두른다
+        stroke={isSelected ? '#111827' : count === undefined ? '#ffffff' : '#9ca3af'}
         strokeWidth={isSelected ? 3 : 1.5}
         className="cursor-pointer outline-none transition-[fill] hover:opacity-85 focus-visible:opacity-75"
       >
@@ -101,7 +104,7 @@ export default function BodyMap({ scores, selected, onSelect }: Props) {
   };
 
   return (
-    <svg viewBox="0 0 430 400" className="mx-auto h-auto w-full max-w-[380px]" role="group" aria-label="부위별 고통 점수 마네킹">
+    <svg viewBox="0 0 430 400" className="mx-auto h-auto w-full max-w-[380px]" role="group" aria-label="부위별 증상 마네킹">
       <g fill="#9ca3af" fontSize="11" textAnchor="middle">
         <text x="24" y="14">오른쪽</text>
         <text x="176" y="14">왼쪽</text>
@@ -126,21 +129,21 @@ export default function BodyMap({ scores, selected, onSelect }: Props) {
   );
 }
 
-/** 색 범례: 0점·기록 없음(무색) / 1점(연함) → 10점(붉음) */
+/** 색 범례: 기록 없음(회색) / 증상 0개(하얀색) → 7개(새빨간색) */
 export function BodyMapLegend() {
   return (
     <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded-sm" style={{ background: painColor(0) }} />
-        0점·기록 없음
+        <span className="inline-block h-3 w-3 rounded-sm" style={{ background: BODY_MAP_EMPTY_COLOR }} />
+        기록 없음
       </span>
       <span className="flex items-center gap-1.5">
-        1점
+        증상 0개
         <span
-          className="inline-block h-3 w-20 rounded-sm"
-          style={{ background: `linear-gradient(to right, ${painColor(1)}, ${painColor(5)}, ${painColor(10)})` }}
+          className="inline-block h-3 w-20 rounded-sm border border-gray-300"
+          style={{ background: `linear-gradient(to right, ${signCountColor(0)}, ${signCountColor(SIGN_COUNT_MAX)})` }}
         />
-        10점
+        {SIGN_COUNT_MAX}개
       </span>
     </div>
   );

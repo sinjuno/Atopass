@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import BodyMap from '@/components/record/BodyMap';
+import PainIndexSlider from '@/components/record/PainIndexSlider';
 import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
 import type { BodyPart, SkinSign } from '@/types/record';
-import type { BodyMapScores } from '@/utils/bodyMap';
+import type { BodyMapCounts } from '@/utils/bodyMap';
 import {
   BODY_MAP_PARTS,
   BODY_PART_LABELS,
   CHAT_SLEEP_HOURS_DEFAULT,
   CHAT_SLEEP_HOURS_OPTIONS,
-  PAIN_INDEX_MAX,
   PAIN_INDEX_MIN,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
@@ -17,11 +17,8 @@ interface Props {
   field: ChoiceField;
   onChoose: (choice: ChatChoiceRequest) => void;
   disabled?: boolean;
-  /** 방금 받은 고통 지수 — 부위를 고를 때 그 점수 색으로 칠한다 */
-  painIndex?: number | null;
 }
 
-const PAIN_INDEXES = Array.from({ length: PAIN_INDEX_MAX - PAIN_INDEX_MIN + 1 }, (_, i) => PAIN_INDEX_MIN + i);
 const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
 
 /**
@@ -29,16 +26,16 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
  * 특이사항은 글로 받으므로 "없어요"만 보여 준다.
  * 고통 지수와 부위는 한 묶음이라, 고통 지수 다음에 바로 마네킹에서 고통이 있는 부위를 고른다.
  */
-export default function ChatChoices({ field, onChoose, disabled, painIndex }: Props) {
+export default function ChatChoices({ field, onChoose, disabled }: Props) {
   // 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
-      <ChoiceBody key={field} field={field} onChoose={onChoose} disabled={disabled} painIndex={painIndex} />
+      <ChoiceBody key={field} field={field} onChoose={onChoose} disabled={disabled} />
     </div>
   );
 }
 
-function ChoiceBody({ field, onChoose, disabled, painIndex: chosenPainIndex }: Props) {
+function ChoiceBody({ field, onChoose, disabled }: Props) {
   const [painIndex, setPainIndex] = useState(PAIN_INDEX_MIN);
   const [parts, setParts] = useState<BodyPart[]>([]);
   const [sleepHours, setSleepHours] = useState(CHAT_SLEEP_HOURS_DEFAULT);
@@ -53,44 +50,18 @@ function ChoiceBody({ field, onChoose, disabled, painIndex: chosenPainIndex }: P
   switch (field) {
     case 'painIndex':
       return (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between">
-            <p className="text-sm text-gray-500">고통 지수 · 0은 없음, 10은 매우 심함</p>
-            <span className="text-lg font-bold text-emerald-700" aria-hidden>
-              {painIndex}점
-            </span>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <PainIndexSlider value={painIndex} onChange={setPainIndex} disabled={disabled} />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <input
-                type="range"
-                min={PAIN_INDEX_MIN}
-                max={PAIN_INDEX_MAX}
-                step={1}
-                value={painIndex}
-                onChange={(e) => setPainIndex(Number(e.target.value))}
-                disabled={disabled}
-                aria-label="고통 지수"
-                aria-valuetext={`${painIndex}점`}
-                className="h-11 w-full accent-emerald-600"
-              />
-              <div className="flex justify-between px-1 text-xs text-gray-400" aria-hidden>
-                {PAIN_INDEXES.map((n) => (
-                  <span key={n} className="w-3 text-center">
-                    {n}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <ChoiceButton onClick={() => onChoose({ field, value: painIndex })} disabled={disabled} primary>
-              확인
-            </ChoiceButton>
-          </div>
+          <ChoiceButton onClick={() => onChoose({ field, value: painIndex })} disabled={disabled} primary>
+            확인
+          </ChoiceButton>
         </div>
       );
     case 'bodyParts': {
-      // 고른 부위는 방금 받은 고통 지수 색으로 칠한다
-      const scores: BodyMapScores = Object.fromEntries(parts.map((part) => [part, chosenPainIndex ?? PAIN_INDEX_MAX]));
+      // 고른 부위는 아직 증상이 없으므로(0개) 하얀색에 진한 테두리로 보인다
+      const counts: BodyMapCounts = Object.fromEntries(parts.map((part) => [part, 0]));
       const toggle = (part: BodyPart) =>
         setParts((prev) =>
           prev.includes(part) ? prev.filter((p) => p !== part) : BODY_MAP_PARTS.filter((p) => p === part || prev.includes(p)),
@@ -99,7 +70,7 @@ function ChoiceBody({ field, onChoose, disabled, painIndex: chosenPainIndex }: P
         <div className="flex flex-col gap-2">
           <p className="text-sm text-gray-500">고통이 있는 부위를 모두 눌러 주세요</p>
           <div className="mx-auto w-full max-w-[300px]">
-            <BodyMap scores={scores} onSelect={toggle} />
+            <BodyMap counts={counts} selected={parts} onSelect={toggle} />
           </div>
           {parts.length > 0 && (
             <p className="text-center text-sm text-gray-700">{parts.map((part) => BODY_PART_LABELS[part]).join(', ')}</p>

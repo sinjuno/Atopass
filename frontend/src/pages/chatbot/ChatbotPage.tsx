@@ -120,12 +120,7 @@ export default function ChatbotPage() {
       )}
 
       {choiceField && (status === 'ready' || status === 'sending') && (
-        <ChatChoices
-          field={choiceField}
-          onChoose={(c) => void handleChoose(c)}
-          disabled={status !== 'ready'}
-          painIndex={painIndex}
-        />
+        <ChatChoices field={choiceField} onChoose={(c) => void handleChoose(c)} disabled={status !== 'ready'} />
       )}
 
       {requiresConfirmation && (
