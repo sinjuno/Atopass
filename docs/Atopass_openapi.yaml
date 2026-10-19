@@ -603,6 +603,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/ConsentRequired'
+        '409':
+          description: 기록(RECORD) 모드인데 오늘 기록이 이미 존재 (`RECORD_ALREADY_EXISTS`) — 저장된 기록은 일일 총정리에서 수정한다
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /chatbot/sessions/{sessionId}/messages:
     parameters:
@@ -845,7 +851,7 @@ paths:
         '404':
           $ref: '#/components/responses/SessionNotFound'
         '409':
-          description: 이미 기록을 저장해 닫힌 세션 (`SESSION_CLOSED`). 저장된 기록은 `GET /records`로 조회한다.
+          description: 이미 기록을 저장해 닫힌 세션 (`SESSION_CLOSED`), 또는 대화하는 사이 같은 날짜의 기록이 따로 저장됨 (`RECORD_ALREADY_EXISTS`). 저장된 기록은 `GET /records`로 조회한다.
           content:
             application/json:
               schema:

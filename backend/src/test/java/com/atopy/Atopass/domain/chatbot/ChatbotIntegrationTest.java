@@ -426,6 +426,25 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 오늘_기록이_이미_있으면_기록_모드_세션은_409이고_질의_모드는_열린다() throws Exception {
+		String bearer = newMemberBearer();
+		String opened = createSession(bearer, "RECORD");
+		// 대화하는 사이 같은 날짜의 기록을 직접 저장한 경우
+		createRecord(bearer, LocalDate.now(ZoneId.of("Asia/Seoul")), 3, null);
+
+		// 열려 있던 대화의 초안으로는 저장할 수 없으므로, 이어서 대화하지 않고 저장된 기록으로 보낸다.
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + opened + "/draft").header(AUTH, bearer))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.error.code").value("RECORD_ALREADY_EXISTS"));
+
+		// 저장한 뒤 챗봇을 다시 열어도 대화로 다시 기록하지 않도록, 저장된 기록(총정리)으로 보낸다.
+		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions").header(AUTH, bearer), Map.of("mode", "RECORD")))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.error.code").value("RECORD_ALREADY_EXISTS"));
+		assertThat(createSession(bearer, "QUERY")).isNotBlank();
+	}
+
+	@Test
 	void 확인하지_않은_초안은_저장하지_않는다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");

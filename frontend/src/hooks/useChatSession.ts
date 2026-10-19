@@ -115,6 +115,12 @@ export function useChatSession(recordDate: string) {
       chatSessionStore.set(recordDate, session.sessionId);
       await restore(session.sessionId);
     } catch (e) {
+      if (isApiError(e, 'RECORD_ALREADY_EXISTS')) {
+        // 오늘 기록은 이미 저장됨 — 대화로 다시 기록하지 않고 총정리 화면에서 본다
+        chatSessionStore.clear(recordDate);
+        setStatus('closed');
+        return;
+      }
       if (isApiError(e, 'CONSENT_REQUIRED')) {
         setStatus('consent');
         return;

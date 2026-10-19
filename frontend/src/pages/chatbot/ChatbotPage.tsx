@@ -46,7 +46,8 @@ export default function ChatbotPage() {
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
-  const textLocked = started && choiceField !== null && choiceField !== 'notes';
+  // 선택지로 답하는 질문이거나 확인 단계이면 글을 보내지 못하게 한다 (사진은 계속 추가할 수 있다)
+  const textLocked = (started && choiceField !== null && choiceField !== 'notes') || requiresConfirmation;
   // 부위를 고르는 동안에는 마네킹에 집중하도록 남은 항목과 "기록 마치기"를 숨긴다
   const pickingParts = choiceField === 'bodyParts';
   const canFinish =
