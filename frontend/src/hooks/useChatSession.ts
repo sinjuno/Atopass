@@ -80,20 +80,22 @@ export function useChatSession(recordDate: string) {
         return;
       }
 
+      // 대화 내역과 진행 상태를 서버에서 불러온다
+      const restore = async (id: string) => {
+        const [{ messages }, state] = await Promise.all([chatbotApi.getMessages(id), chatbotApi.getDraft(id)]);
+        setSessionId(id);
+        setMessages(messages);
+        setPendingFields(state.pendingFields);
+        setAskingField(state.askingField);
+        setRequiresConfirmation(state.requiresConfirmation);
+        setPainIndex(state.draft.painIndex ?? null);
+        setStatus('ready');
+      };
+
       const saved = chatSessionStore.get(recordDate);
       if (saved) {
         try {
-          const [{ messages }, state] = await Promise.all([
-            chatbotApi.getMessages(saved),
-            chatbotApi.getDraft(saved),
-          ]);
-          setSessionId(saved);
-          setMessages(messages);
-          setPendingFields(state.pendingFields);
-          setAskingField(state.askingField);
-          setRequiresConfirmation(state.requiresConfirmation);
-          setPainIndex(state.draft.painIndex ?? null);
-          setStatus('ready');
+          await restore(saved);
           return;
         } catch (e) {
           if (isApiError(e, 'SESSION_CLOSED')) {
@@ -107,15 +109,11 @@ export function useChatSession(recordDate: string) {
           chatSessionStore.clear(recordDate);
         }
       }
+      // 서버는 오늘 열려 있는 세션이 있으면 그 세션을 돌려준다(다른 탭·기기에서 시작한 대화).
+      // 새 세션이라고 가정하지 않고 항상 서버 상태를 불러와야 이미 답한 항목을 다시 묻지 않는다.
       const session = await chatbotApi.createSession('RECORD');
       chatSessionStore.set(recordDate, session.sessionId);
-      setSessionId(session.sessionId);
-      setMessages([]);
-      setPendingFields([]);
-      setAskingField('painIndex');
-      setRequiresConfirmation(false);
-      setPainIndex(null);
-      setStatus('ready');
+      await restore(session.sessionId);
     } catch (e) {
       if (isApiError(e, 'CONSENT_REQUIRED')) {
         setStatus('consent');
