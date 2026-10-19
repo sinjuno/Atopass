@@ -27,9 +27,10 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
  * 고통 지수와 부위는 한 묶음이라, 고통 지수 다음에 바로 마네킹에서 고통이 있는 부위를 고른다.
  */
 export default function ChatChoices({ field, onChoose, disabled }: Props) {
-  // 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다
+  // 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다.
+  // 마네킹처럼 긴 선택지는 화면 절반까지만 차지하고 안에서 스크롤해, 위의 대화가 가려지지 않게 한다.
   return (
-    <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
+    <div className="max-h-[50dvh] shrink-0 overflow-y-auto border-t border-gray-100 bg-gray-50 px-3 py-3">
       <ChoiceBody key={field} field={field} onChoose={onChoose} disabled={disabled} />
     </div>
   );
@@ -66,17 +67,18 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
         setParts((prev) =>
           prev.includes(part) ? prev.filter((p) => p !== part) : BODY_MAP_PARTS.filter((p) => p === part || prev.includes(p)),
         );
+      // 마네킹 옆에 고른 부위와 버튼을 두어, 좁은 화면에서도 스크롤 없이 "선택 완료"가 보이게 한다
       return (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-gray-500">고통이 있는 부위를 모두 눌러 주세요</p>
-          <div className="mx-auto w-full max-w-[300px]">
+        <div className="flex items-start gap-3">
+          <div className="w-[110px] shrink-0">
             <BodyMap counts={counts} selected={parts} onSelect={toggle} />
           </div>
-          {parts.length > 0 && (
-            <p className="text-center text-sm text-gray-700">{parts.map((part) => BODY_PART_LABELS[part]).join(', ')}</p>
-          )}
-          <div className="flex gap-2">
-            <ChoiceButton onClick={() => onChoose({ field, value: parts })} disabled={disabled || parts.length === 0} primary wide>
+          <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch">
+            <p className="text-sm text-gray-500">고통이 있는 부위를 모두 눌러 주세요</p>
+            <p className="flex-1 text-sm text-gray-700">
+              {parts.length > 0 ? parts.map((part) => BODY_PART_LABELS[part]).join(', ') : ''}
+            </p>
+            <ChoiceButton onClick={() => onChoose({ field, value: parts })} disabled={disabled || parts.length === 0} primary>
               {parts.length > 0 ? `${parts.length}곳 선택 완료` : '선택 완료'}
             </ChoiceButton>
             <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled}>
