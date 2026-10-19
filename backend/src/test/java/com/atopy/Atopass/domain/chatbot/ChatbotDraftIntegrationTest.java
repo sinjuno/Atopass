@@ -76,7 +76,7 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
 			 "updates": {"painIndex": 4, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS"],
-			 "skipped": ["notes"]}}""");
+			 "skipped": ["bodyParts", "notes"]}}""");
 		mockMvc.perform(sendMessage(bearer, session, "고통 4점, 6시간 잤고 약 먹었어요. 건조증만 있고 나머진 없어요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
 
@@ -102,7 +102,7 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"));
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyParts"));
 	}
 
 	@Test

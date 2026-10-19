@@ -35,7 +35,7 @@ import tools.jackson.databind.node.ObjectNode;
  * DB 작업은 {@link ChatSessionService}의 짧은 트랜잭션으로 앞뒤에서 처리한다.
  * LLM 호출이 실패하면(CHATBOT_UNAVAILABLE) 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
  *
- * <p>기록 모드에서 고통 지수·수면 시간·약 복용·나타난 증상·특이사항은 서버가 정해진 문장으로 묻고,
+ * <p>기록 모드에서 고통 지수·고통이 있는 부위·수면 시간·약 복용·나타난 증상·특이사항은 서버가 정해진 문장으로 묻고,
  * 화면은 선택지로 답을 받는다({@link #answerChoice}). 선택지 답은 LLM을 거치지 않고 초안에 바로 반영한다.
  * LLM의 질문 문장은 부위나 증상 점수를 되물을 때만 쓴다.
  */
@@ -55,7 +55,7 @@ public class ChatbotService {
 	static final String FINISH_TEXT = "기록을 마칠게요";
 
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
-	private static final Set<String> CHOICE_FIELDS = Set.of("painIndex", "sleepHours", "medication", "skinSigns", "notes");
+	private static final Set<String> CHOICE_FIELDS = Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes");
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -125,7 +125,10 @@ public class ChatbotService {
 			}
 			updates.set(field, jsonMapper.valueToTree(request.value()));
 		}
-		if (draft.apply(updates) != ChatDraft.ApplyResult.OK) {
+		ChatDraft.ApplyResult result = "bodyParts".equals(field) && !request.skipped()
+			? draft.applyBodyParts(updates.path(field))
+			: draft.apply(updates);
+		if (result != ChatDraft.ApplyResult.OK) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
 		}
 		draft.markFollowUp(false);
@@ -161,10 +164,12 @@ public class ChatbotService {
 	/** 대화 내역에 남길 사용자 말. 화면이 버튼을 누르자마자 보여 주는 문장과 같다. */
 	private static String choiceText(String field, boolean skip, ChatDraftResponse draft) {
 		if (skip) {
-			return "notes".equals(field) ? "없어요" : "넘어갈게요";
+			return "notes".equals(field) || "bodyParts".equals(field) ? "없어요" : "넘어갈게요";
 		}
 		return switch (field) {
 			case "painIndex" -> draft.painIndex() + "점";
+			case "bodyParts" -> draft.skinConditions().stream()
+				.map(c -> c.bodyPart().label()).collect(Collectors.joining(", "));
 			case "sleepHours" -> draft.sleepHours().stripTrailingZeros().toPlainString() + "시간";
 			case "medication" -> Boolean.TRUE.equals(draft.medication()) ? "예" : "아니오";
 			default -> draft.skinSigns().isEmpty() ? "없어요"
@@ -254,6 +259,7 @@ public class ChatbotService {
 		}
 		return switch (askingField) {
 			case "painIndex" -> "오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)";
+			case "bodyParts" -> "어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요.";
 			case "symptoms" -> "그 부위의 고통 정도를 0~10점으로 알려 주세요. (0은 없음, 10은 매우 심함)";
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
 			case "medication" -> "오늘 약을 복용하셨나요?";

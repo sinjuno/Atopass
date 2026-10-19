@@ -29,20 +29,22 @@ import tools.jackson.databind.node.ObjectNode;
  * 챗봇이 대화로 모아 가는 기록 초안. 사용자가 말한 값만 담고, 말하지 않은 값은 비워 둔다.
  * 세션에는 JSON으로 저장된다. LLM이 준 값은 {@link #apply}에서 모두 검증한 뒤에만 반영한다.
  *
- * <p>챗봇이 묻는 항목: 고통 지수(필수), 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
- * 부위 기록(부위의 고통 점수와 그 부위에 나타난 증상)과 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
+ * <p>챗봇이 묻는 항목: 고통 지수(필수), 고통이 있는 부위, 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
+ * 고통 지수와 부위는 한 묶음이라, 고통 지수를 받으면 바로 이어서 부위를 묻는다(0점이면 묻지 않는다).
+ * 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
  */
 public final class ChatDraft {
 
 	/** 사용자가 "없어요/넘어갈게요"라고 답해 더 묻지 않을 선택 항목 */
+	static final String SKIP_BODY_PARTS = "bodyParts";
 	static final String SKIP_SLEEP = "sleepHours";
 	static final String SKIP_MEDICATION = "medication";
 	static final String SKIP_SKIN_SIGNS = "skinSigns";
 	static final String SKIP_LIFESTYLE = "lifestyle";
 	static final String SKIP_NOTES = "notes";
 	private static final Set<String> SKIPPABLE = Set.of(
-		SKIP_SLEEP, SKIP_MEDICATION, SKIP_SKIN_SIGNS, SKIP_LIFESTYLE, SKIP_NOTES);
+		SKIP_BODY_PARTS, SKIP_SLEEP, SKIP_MEDICATION, SKIP_SKIN_SIGNS, SKIP_LIFESTYLE, SKIP_NOTES);
 
 	private static final int MIN_SCORE = 0;
 	private static final int MAX_SCORE = 10;
@@ -404,6 +406,31 @@ public final class ChatDraft {
 		return ApplyResult.OK;
 	}
 
+	/**
+	 * 고통 지수 다음에 고른 부위를 반영한다. 고통 지수와 부위는 한 묶음이라, 고른 부위마다 고통 지수를 그 부위의 고통 점수로 넣는다.
+	 * 고통 지수가 없거나 부위 이름이 하나라도 틀리면 아무것도 반영하지 않는다.
+	 */
+	ApplyResult applyBodyParts(JsonNode parts) {
+		if (painIndex == null || parts == null || !parts.isArray() || parts.isEmpty()) {
+			return ApplyResult.INVALID_VALUE;
+		}
+		ChatDraft next = copy();
+		for (JsonNode part : parts) {
+			if (!part.isString()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			BodyPart bodyPart;
+			try {
+				bodyPart = BodyPart.valueOf(part.asString().trim().toUpperCase(Locale.ROOT));
+			} catch (IllegalArgumentException e) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			next.conditions.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class)).put(Symptom.PAIN, painIndex);
+		}
+		commit(next);
+		return ApplyResult.OK;
+	}
+
 	// ── 진행 상황 ──
 
 	/**
@@ -429,6 +456,11 @@ public final class ChatDraft {
 
 	private List<String> pendingOptionalFields() {
 		List<String> pending = new ArrayList<>();
+		// 고통이 없으면(0점) 부위는 묻지 않는다. 사용자가 이미 부위를 말했으면 다시 묻지 않는다.
+		boolean painful = painIndex == null || painIndex > MIN_PAIN_INDEX;
+		if (painful && conditions.isEmpty() && !skipped.contains(SKIP_BODY_PARTS)) {
+			pending.add("bodyParts");
+		}
 		if (sleepHours == null && !skipped.contains(SKIP_SLEEP)) {
 			pending.add("sleepHours");
 		}

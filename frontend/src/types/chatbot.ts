@@ -1,4 +1,4 @@
-import type { RecordInput, SkinSign } from './record';
+import type { BodyPart, RecordInput, SkinSign } from './record';
 
 export type ChatMode = 'RECORD' | 'QUERY';
 
@@ -8,7 +8,7 @@ export interface ChatSession {
 }
 
 /** 아직 입력되지 않은 항목 */
-export type PendingField = 'painIndex' | 'symptoms' | 'sleepHours' | 'medication' | 'skinSigns' | 'notes';
+export type PendingField = 'painIndex' | 'bodyParts' | 'symptoms' | 'sleepHours' | 'medication' | 'skinSigns' | 'notes';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -44,11 +44,13 @@ export interface ChatDraftState {
  */
 export type ChatChoiceRequest =
   | { field: 'painIndex'; value: number }
+  /** 고통이 있는 부위. 고른 부위마다 방금 받은 고통 지수가 그 부위의 점수가 된다 */
+  | { field: 'bodyParts'; value: BodyPart[] }
   | { field: 'sleepHours'; value: number }
   | { field: 'medication'; value: boolean }
   /** 빈 배열이면 "증상 없음" */
   | { field: 'skinSigns'; value: SkinSign[] }
-  /** 넘어가기. 특이사항은 "없어요" */
+  /** 넘어가기. 부위·특이사항은 "없어요" */
   | { field: Exclude<ChoiceField, 'painIndex'>; skip: true };
 
 /** GET·POST /chatbot/consent */

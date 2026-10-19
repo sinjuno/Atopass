@@ -41,7 +41,7 @@ export default function ChatbotPage() {
   const goToSummary = () => navigate(recordPath(recordDate));
 
   // 서버가 정한 항목(askingField)을 선택지로 묻는다. 부위·증상 점수(symptoms)는 글로 답한다.
-  // 첫 화면에서는 고통 지수 버튼과 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
+  // 첫 화면에서는 고통 지수 막대와 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
   // (LLM이 응답하지 못해도 버튼만으로 끝까지 기록할 수 있다)
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
@@ -120,7 +120,12 @@ export default function ChatbotPage() {
       )}
 
       {choiceField && (status === 'ready' || status === 'sending') && (
-        <ChatChoices field={choiceField} onChoose={(c) => void handleChoose(c)} disabled={status !== 'ready'} />
+        <ChatChoices
+          field={choiceField}
+          onChoose={(c) => void handleChoose(c)}
+          disabled={status !== 'ready'}
+          painIndex={painIndex}
+        />
       )}
 
       {requiresConfirmation && (

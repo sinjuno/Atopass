@@ -54,6 +54,7 @@ class ChatRateLimitIntegrationTest extends ApiTestSupport {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer);
 		mockMvc.perform(choice(bearer, session, Map.of("field", "painIndex", "value", 5))).andExpect(status().isOk());
+		mockMvc.perform(choice(bearer, session, Map.of("field", "bodyParts", "skip", true))).andExpect(status().isOk());
 		mockMvc.perform(choice(bearer, session, Map.of("field", "sleepHours", "skip", true))).andExpect(status().isOk());
 
 		for (int i = 1; i <= 3; i++) {

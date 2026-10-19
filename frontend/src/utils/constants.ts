@@ -123,6 +123,7 @@ export const CHAT_SLEEP_HOURS_DEFAULT = 7;
 /** 챗봇 응답 pendingFields → "남은 항목" 표시 문구 */
 export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   painIndex: '고통 지수',
+  bodyParts: '고통 부위',
   symptoms: '부위별 점수',
   sleepHours: '수면 시간',
   medication: '약 복용',
