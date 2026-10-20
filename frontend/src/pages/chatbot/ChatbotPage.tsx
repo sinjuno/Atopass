@@ -5,6 +5,7 @@ import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
 import PageHeader from '@/components/common/PageHeader';
+import BodyMapSummary from '@/components/record/BodyMapSummary';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
 import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
@@ -14,6 +15,9 @@ import { formatKoreanDate, today } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 import { recordPath } from '@/utils/routes';
 
+/** 서버가 기록을 저장·수정하고 총정리를 보여 줄 때 쓰는 문장 (ChatbotService.SAVED, EDIT_SAVED) */
+const SUMMARY_MARKERS = ['오늘의 총정리예요', '지금 기록은 아래와 같아요'];
+
 /** 기록 (챗봇) — /chatbot. 대화형으로 오늘의 피부 기록을 입력한다 */
 export default function ChatbotPage() {
   const navigate = useNavigate();
@@ -22,6 +26,7 @@ export default function ChatbotPage() {
     messages,
     askingField,
     requiresConfirmation,
+    chatDraft,
     painIndex,
     status,
     error,
@@ -48,6 +53,25 @@ export default function ChatbotPage() {
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
   const textLocked = started && choiceField !== null && choiceField !== 'notes';
+
+  // 가장 최근의 일일 총정리(저장·수정 안내) 말풍선 아래에, 부위마다 나타난 증상 개수만큼 칠한 마네킹을 붙인다.
+  // 저장한 뒤에는 고칠 때마다 바로 다시 저장하므로, 지금 초안이 곧 저장된 기록이다
+  const summaryIndex = messages
+    .map((m) => m.role === 'ASSISTANT' && SUMMARY_MARKERS.some((marker) => m.content.includes(marker)))
+    .lastIndexOf(true);
+  const skinConditions = chatDraft?.skinConditions ?? [];
+  const summaryMap =
+    recordId && summaryIndex >= 0 && skinConditions.length > 0
+      ? {
+          index: summaryIndex,
+          content: (
+            <div className="rounded-2xl border border-gray-200 bg-white p-3">
+              <p className="mb-2 text-sm font-semibold text-gray-700">부위별 증상</p>
+              <BodyMapSummary skinConditions={skinConditions} />
+            </div>
+          ),
+        }
+      : undefined;
 
   // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
   const pendingPhotos = draft.photos;
@@ -103,6 +127,7 @@ export default function ChatbotPage() {
             messages={messages}
             typing={status === 'sending'}
             mood={atomiMood(painIndex, requiresConfirmation)}
+            attachment={summaryMap}
           />
         )}
       </div>
@@ -114,6 +139,7 @@ export default function ChatbotPage() {
           key={`${choiceField}:${choiceRound}`}
           field={choiceField}
           onChoose={(c) => void handleChoose(c)}
+          skinSigns={chatDraft?.skinSigns ?? []}
         />
       )}
 

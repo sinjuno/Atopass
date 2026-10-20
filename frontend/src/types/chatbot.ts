@@ -50,7 +50,7 @@ export interface ChatDraftState {
  */
 export type ChatChoiceRequest =
   | { field: 'painIndex'; value: number }
-  /** 고통이 있는 부위. 고른 부위마다 방금 받은 고통 지수가 그 부위의 점수가 된다 */
+  /** 증상이 나타난(고통이 있는) 부위. 고른 부위마다 고통 지수가 그 부위의 점수가, 방금 고른 증상이 그 부위의 증상이 된다 */
   | { field: 'bodyParts'; value: BodyPart[] }
   | { field: 'sleepHours'; value: number }
   | { field: 'medication'; value: boolean }

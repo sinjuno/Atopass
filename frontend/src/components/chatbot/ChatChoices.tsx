@@ -4,7 +4,7 @@ import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
 import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
 import type { BodyPart, SkinSign } from '@/types/record';
-import type { BodyMapCounts } from '@/utils/bodyMap';
+import { sortSkinSigns, type BodyMapCounts } from '@/utils/bodyMap';
 import {
   BODY_MAP_PARTS,
   BODY_PART_LABELS,
@@ -19,6 +19,8 @@ interface Props {
   field: ChoiceField;
   onChoose: (choice: ChatChoiceRequest) => void;
   disabled?: boolean;
+  /** 방금 고른 나타난 증상 — 부위를 고를 때 고른 부위에 이 증상이 들어간다 */
+  skinSigns?: SkinSign[];
 }
 
 const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
@@ -26,13 +28,14 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
 /**
  * 챗봇이 지금 묻는 항목(askingField)의 선택지. 고른 값은 LLM을 거치지 않고 바로 초안에 반영된다.
  * 특이사항은 글로 받으므로 "없어요"만 보여 준다.
- * 고통 지수와 부위는 한 묶음이라, 고통 지수 다음에 바로 마네킹에서 고통이 있는 부위를 고른다.
+ * 고통 지수·증상·부위는 한 묶음이라, 고통 지수 다음에 증상을 고르고, 바로 이어서 마네킹에서 그 증상이 나타난 부위를 고른다.
+ * 고른 부위는 증상 개수만큼 붉게 칠해, 저장될 모습을 미리 보여 준다.
  *
  * 질문이 오면 화면 아래에서 올라오고, 답을 고르면 알아서 내려간 뒤 답을 보낸다. 위의 대화는 계속 보인다.
  * 사용자도 손잡이를 아래로 끌거나 눌러 내려 둘 수 있고, 내려 둔 탭을 위로 끌거나 눌러 다시 올릴 수 있다.
  * 다음 질문의 선택지는 호출부가 key를 바꿔 다시 만들어 올라오게 한다.
  */
-export default function ChatChoices({ field, onChoose, disabled }: Props) {
+export default function ChatChoices({ field, onChoose, disabled, skinSigns }: Props) {
   // open: 올라와 있음 · hiding: 사용자가 내리는 중 · minimized: 내려 둠 · closing: 답을 골라 내려가는 중
   const [mode, setMode] = useState<'open' | 'hiding' | 'minimized' | 'closing'>('open');
   const [closed, setClosed] = useState(false);
@@ -95,7 +98,7 @@ export default function ChatChoices({ field, onChoose, disabled }: Props) {
         </SheetHandle>
         <div className="min-h-0 overflow-y-auto px-3 pb-3">
           {/* 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다 */}
-          <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || mode !== 'open'} />
+          <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || mode !== 'open'} skinSigns={skinSigns} />
         </div>
       </div>
     </>
@@ -152,7 +155,7 @@ function SheetHandle({
   );
 }
 
-function ChoiceBody({ field, onChoose, disabled }: Props) {
+function ChoiceBody({ field, onChoose, disabled, skinSigns = [] }: Props) {
   const [painIndex, setPainIndex] = useState(PAIN_INDEX_MIN);
   const [parts, setParts] = useState<BodyPart[]>([]);
   const [sleepHours, setSleepHours] = useState(CHAT_SLEEP_HOURS_DEFAULT);
@@ -177,8 +180,8 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
         </div>
       );
     case 'bodyParts': {
-      // 고른 부위는 아직 증상이 없으므로(0개) 하얀색에 진한 테두리로 보인다
-      const counts: BodyMapCounts = Object.fromEntries(parts.map((part) => [part, 0]));
+      // 고른 부위에는 방금 고른 증상이 들어가므로, 그 개수만큼 붉게 칠한다 (증상이 없으면 하얀색에 진한 테두리)
+      const counts: BodyMapCounts = Object.fromEntries(parts.map((part) => [part, skinSigns.length]));
       const toggle = (part: BodyPart) =>
         setParts((prev) =>
           prev.includes(part) ? prev.filter((p) => p !== part) : BODY_MAP_PARTS.filter((p) => p === part || prev.includes(p)),
@@ -190,7 +193,18 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
             <BodyMap counts={counts} selected={parts} onSelect={toggle} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch">
-            <p className="text-sm text-gray-500">고통이 있는 부위를 모두 눌러 주세요</p>
+            {skinSigns.length > 0 ? (
+              <p className="text-sm text-gray-500">
+                <span className="font-semibold text-gray-800">
+                  {sortSkinSigns(skinSigns)
+                    .map((sign) => SKIN_SIGN_LABELS[sign])
+                    .join(', ')}
+                </span>
+                {' — 나타난 부위를 모두 눌러 주세요'}
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500">고통이 있는 부위를 모두 눌러 주세요</p>
+            )}
             <p className="flex-1 text-sm text-gray-700">
               {parts.length > 0 ? parts.map((part) => BODY_PART_LABELS[part]).join(', ') : ''}
             </p>

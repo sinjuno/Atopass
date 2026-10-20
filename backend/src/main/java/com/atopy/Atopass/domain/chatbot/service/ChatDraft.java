@@ -39,8 +39,9 @@ import tools.jackson.databind.node.ObjectNode;
  * 챗봇이 대화로 모아 가는 기록 초안. 사용자가 말한 값만 담고, 말하지 않은 값은 비워 둔다.
  * 세션에는 JSON으로 저장된다. LLM이 준 값은 {@link #apply}에서 모두 검증한 뒤에만 반영한다.
  *
- * <p>챗봇이 묻는 항목: 고통 지수(필수), 고통이 있는 부위, 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
- * 고통 지수와 부위는 한 묶음이라, 고통 지수를 받으면 바로 이어서 부위를 묻는다(0점이면 묻지 않는다).
+ * <p>챗봇이 묻는 항목: 고통 지수(필수), 나타난 증상, 그 증상이 나타난 부위, 수면 시간, 약 복용 여부, 특이사항.
+ * 고통 지수·증상·부위는 한 묶음이라, 고통 지수 다음에 증상을, 증상 다음에 바로 부위를 묻는다.
+ * 고른 부위에는 고통 지수가 점수로, 방금 고른 증상이 그 부위의 증상으로 들어간다. (고통이 0점이고 증상도 없으면 부위는 묻지 않는다)
  * 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
  */
@@ -520,7 +521,8 @@ public final class ChatDraft {
 	}
 
 	/**
-	 * 고통 지수 다음에 고른 부위를 반영한다. 고통 지수와 부위는 한 묶음이라, 고른 부위마다 고통 지수를 그 부위의 고통 점수로 넣는다.
+	 * 증상 다음에 고른 부위를 반영한다. 고통 지수·증상·부위는 한 묶음이라, 고른 부위마다 고통 지수를 그 부위의 고통 점수로,
+	 * 방금 고른 증상을 그 부위의 증상으로 넣는다. (예: 홍반·가려움을 고르고 얼굴·왼손을 고르면 두 부위 모두 홍반·가려움)
 	 * 고통 지수가 없거나 부위 이름이 하나라도 틀리면 아무것도 반영하지 않는다.
 	 */
 	ApplyResult applyBodyParts(JsonNode parts) {
@@ -539,6 +541,9 @@ public final class ChatDraft {
 				return ApplyResult.INVALID_VALUE;
 			}
 			next.conditions.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class)).put(Symptom.PAIN, painIndex);
+			if (skinSigns != null && !skinSigns.isEmpty()) {
+				next.conditionSigns.computeIfAbsent(bodyPart, k -> EnumSet.noneOf(SkinSign.class)).addAll(skinSigns);
+			}
 		}
 		commit(next);
 		return ApplyResult.OK;
@@ -569,9 +574,12 @@ public final class ChatDraft {
 
 	private List<String> pendingOptionalFields() {
 		List<String> pending = new ArrayList<>();
-		// 고통이 없으면(0점) 부위는 묻지 않는다. 사용자가 이미 부위를 말했으면 다시 묻지 않는다.
+		if (skinSigns == null && !skipped.contains(SKIP_SKIN_SIGNS)) {
+			pending.add("skinSigns");
+		}
+		// 고통이 없고(0점) 나타난 증상도 없으면 부위는 묻지 않는다. 사용자가 이미 부위를 말했으면 다시 묻지 않는다.
 		boolean painful = painIndex == null || painIndex > MIN_PAIN_INDEX;
-		if (painful && conditions.isEmpty() && !skipped.contains(SKIP_BODY_PARTS)) {
+		if ((painful || hasSkinSigns()) && conditions.isEmpty() && !skipped.contains(SKIP_BODY_PARTS)) {
 			pending.add("bodyParts");
 		}
 		if (sleepHours == null && !skipped.contains(SKIP_SLEEP)) {
@@ -580,13 +588,15 @@ public final class ChatDraft {
 		if (medication == null && !skipped.contains(SKIP_MEDICATION)) {
 			pending.add("medication");
 		}
-		if (skinSigns == null && !skipped.contains(SKIP_SKIN_SIGNS)) {
-			pending.add("skinSigns");
-		}
 		if (notes == null && !skipped.contains(SKIP_NOTES)) {
 			pending.add("notes");
 		}
 		return pending;
+	}
+
+	/** 나타난 증상을 하나 이상 골랐는지 */
+	public boolean hasSkinSigns() {
+		return skinSigns != null && !skinSigns.isEmpty();
 	}
 
 	/**

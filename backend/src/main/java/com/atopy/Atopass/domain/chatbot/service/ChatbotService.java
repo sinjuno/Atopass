@@ -36,7 +36,7 @@ import tools.jackson.databind.node.ObjectNode;
  * DB 작업은 {@link ChatSessionService}의 짧은 트랜잭션으로 앞뒤에서 처리한다.
  * LLM 호출이 실패하면(CHATBOT_UNAVAILABLE) 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
  *
- * <p>기록 모드에서 고통 지수·고통이 있는 부위·수면 시간·약 복용·나타난 증상·특이사항은 서버가 정해진 문장으로 묻고,
+ * <p>기록 모드에서 고통 지수·나타난 증상·그 증상이 나타난 부위·수면 시간·약 복용·특이사항은 서버가 정해진 문장으로 묻고,
  * 화면은 선택지로 답을 받는다({@link #answerChoice}). 선택지 답은 LLM을 거치지 않고 초안에 바로 반영한다.
  * LLM의 질문 문장은 부위나 증상 점수를 되물을 때만 쓴다.
  *
@@ -162,7 +162,7 @@ public class ChatbotService {
 
 	private ChatReplyResponse choiceTurn(TurnContext context, ChatDraft draft, String userText, boolean finished) {
 		boolean ready = draft.readyForConfirmation(finished);
-		String reply = ready ? completion(draft, null) : question(draft.askingField());
+		String reply = ready ? completion(draft, null) : question(draft);
 		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(),
 			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing(), context.recordId());
 		Long recordId = sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, ready,
@@ -244,7 +244,7 @@ public class ChatbotService {
 		} else if (readyForConfirmation) {
 			reply = reply == null || reply.isBlank() ? NO_CHANGE : reply;
 		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
-			reply = question(draft.askingField());
+			reply = question(draft);
 		}
 
 		ChatReplyResponse response = new ChatReplyResponse(reply, understood, draft.pendingFields(),
@@ -283,14 +283,20 @@ public class ChatbotService {
 		return changed + EDIT_SAVED + "\n" + draft.summary();
 	}
 
-	/** 지금 물어볼 항목의 정해진 질문. 선택지로 답하는 항목은 화면에 같은 선택지가 함께 나온다. */
-	private String question(String askingField) {
+	/**
+	 * 지금 물어볼 항목의 정해진 질문. 선택지로 답하는 항목은 화면에 같은 선택지가 함께 나온다.
+	 * 부위는 방금 고른 증상이 있으면 그 증상이 나타난 곳을, 없으면 불편했던 곳을 묻는다.
+	 */
+	private String question(ChatDraft draft) {
+		String askingField = draft.askingField();
 		if (askingField == null) {
 			return CONFIRM;
 		}
 		return switch (askingField) {
 			case "painIndex" -> "오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)";
-			case "bodyParts" -> "어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요.";
+			case "bodyParts" -> draft.hasSkinSigns()
+				? "그 증상이 어느 부위에 나타났나요? 해당하는 부위를 모두 골라 주세요."
+				: "어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요.";
 			case "symptoms" -> "그 부위의 고통 정도를 0~10점으로 알려 주세요. (0은 없음, 10은 매우 심함)";
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
 			case "medication" -> "오늘 약을 복용하셨나요?";

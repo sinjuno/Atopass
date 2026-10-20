@@ -97,11 +97,11 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 6점이고 팔 가려움이 4점이에요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"))
-			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
+			.andExpect(jsonPath("$.data.reply").value("오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요."))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"))
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("ARM"))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4));
@@ -269,13 +269,16 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 질문은_고통_지수_부위_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
+	void 질문은_고통_지수_증상_부위_수면_약_복용_특이사항_순서로_이어진다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
 		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
 		mockMvc.perform(sendMessage(bearer, session, "5점"))
-			.andExpect(jsonPath("$.data.reply").value("어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요."));
+			.andExpect(jsonPath("$.data.reply").value("오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"EDEMA\"]}}");
+		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
+			.andExpect(jsonPath("$.data.reply").value("그 증상이 어느 부위에 나타났나요? 해당하는 부위를 모두 골라 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"conditions\": [{\"bodyPart\": \"FACE\", \"pain\": 5}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "얼굴이요"))
 			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"));
@@ -285,9 +288,6 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
 		mockMvc.perform(sendMessage(bearer, session, "예"))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"EDEMA\"]}}");
-		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
 			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))

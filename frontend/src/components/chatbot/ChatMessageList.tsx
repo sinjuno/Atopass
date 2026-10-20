@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 import AtomiAvatar from '@/components/chatbot/AtomiAvatar';
 import type { ChatMessage } from '@/types/chatbot';
 import type { AtomiMood } from '@/utils/atomiMood';
@@ -8,9 +8,11 @@ interface Props {
   typing?: boolean;
   /** 지금 아토미의 표정 — 가장 최근 챗봇 말풍선에만 보여 주고, 지난 말풍선은 기본 표정이다 */
   mood?: AtomiMood;
+  /** 이 순서의 말풍선 바로 아래에 붙여 보여 줄 내용 (일일 총정리의 부위별 증상 마네킹) */
+  attachment?: { index: number; content: ReactNode };
 }
 
-export default function ChatMessageList({ messages, typing, mood = 'default' }: Props) {
+export default function ChatMessageList({ messages, typing, mood = 'default', attachment }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,9 +31,12 @@ export default function ChatMessageList({ messages, typing, mood = 'default' }: 
         </ChatBubble>
       )}
       {messages.map((m, i) => (
-        <ChatBubble key={`${m.createdAt}-${i}`} role={m.role} mood={i === latestAssistant ? mood : 'default'}>
-          {m.content}
-        </ChatBubble>
+        <Fragment key={`${m.createdAt}-${i}`}>
+          <ChatBubble role={m.role} mood={i === latestAssistant ? mood : 'default'}>
+            {m.content}
+          </ChatBubble>
+          {attachment?.index === i && <div className="ml-12 max-w-[75%]">{attachment.content}</div>}
+        </Fragment>
       ))}
       {typing && (
         <ChatBubble role="ASSISTANT" mood={mood}>
