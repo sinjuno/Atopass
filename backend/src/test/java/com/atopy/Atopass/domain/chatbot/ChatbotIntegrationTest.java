@@ -135,7 +135,9 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
-			.andExpect(jsonPath("$.data.reply").value("입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요."))
+			.andExpect(jsonPath("$.data.reply").value(org.hamcrest.Matchers.allOf(
+				org.hamcrest.Matchers.startsWith("입력하신 내용을 정리했어요.\n- 고통 지수: 4점"),
+				org.hamcrest.Matchers.endsWith("아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요."))))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0));
 	}
 

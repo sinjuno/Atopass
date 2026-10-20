@@ -24,7 +24,6 @@ export default function ChatbotPage() {
     pendingFields,
     askingField,
     requiresConfirmation,
-    editing,
     painIndex,
     status,
     error,
@@ -32,7 +31,7 @@ export default function ChatbotPage() {
     send,
     choose,
     finish,
-    saveEdit,
+    save,
     agree,
     retry,
   } = useChatSession(recordDate);
@@ -77,9 +76,9 @@ export default function ChatbotPage() {
     if (result.closed) void retry();
   };
 
-  // 저장된 기록을 고치는 대화는 챗봇 화면에서 바로 저장한다 (총정리로 가지 않는다)
-  const handleSaveEdit = async () => {
-    const result = await saveEdit(draft.photos);
+  // 처음 기록이든 고치는 대화든 챗봇 화면에서 바로 저장한다 (총정리로 가지 않는다)
+  const handleSave = async () => {
+    const result = await save(draft.photos);
     if (!result.ok) return;
     draft.clearPhotos();
     if (result.failedPhotos.length) draft.addPhotos(result.failedPhotos);
@@ -138,24 +137,14 @@ export default function ChatbotPage() {
 
       {requiresConfirmation && (
         <div className="border-t border-emerald-100 bg-emerald-50 p-3">
-          {editing ? (
-            <button
-              type="button"
-              onClick={() => void handleSaveEdit()}
-              disabled={status !== 'ready'}
-              className="w-full rounded-xl bg-emerald-600 py-3 text-lg font-bold text-white disabled:bg-gray-300"
-            >
-              {status === 'sending' ? '저장 중…' : '저장하기'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={goToSummary}
-              className="w-full rounded-xl bg-emerald-600 py-3 text-lg font-bold text-white"
-            >
-              기록 내용 확인하기
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={status !== 'ready'}
+            className="w-full rounded-xl bg-emerald-600 py-3 text-lg font-bold text-white disabled:bg-gray-300"
+          >
+            {status === 'sending' ? '저장 중…' : '저장하기'}
+          </button>
         </div>
       )}
 
@@ -168,24 +157,9 @@ export default function ChatbotPage() {
 
       {limitReached && (
         <div role="alert" className="border-t border-amber-100 bg-amber-50 p-3">
-          {editing ? (
-            <p className="text-center text-base text-gray-700">
-              오늘 챗봇 이용 한도에 도달했어요. 글로 고치는 것은 잠시 뒤에 다시 말씀해 주세요
-            </p>
-          ) : (
-            <>
-              <p className="mb-2 text-center text-base text-gray-700">
-                오늘 챗봇 이용 한도에 도달했어요. 총정리 화면에서 직접 입력할 수 있어요
-              </p>
-              <button
-                type="button"
-                onClick={goToSummary}
-                className="w-full rounded-xl border border-amber-300 bg-white py-3 text-lg font-bold text-gray-800"
-              >
-                총정리에서 직접 입력하기
-              </button>
-            </>
-          )}
+          <p className="text-center text-base text-gray-700">
+            오늘 챗봇 이용 한도에 도달했어요. 글로 답하는 것은 잠시 뒤에 다시 해 주세요. 선택지 버튼과 저장하기는 계속 쓸 수 있어요
+          </p>
         </div>
       )}
 

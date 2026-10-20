@@ -48,7 +48,6 @@ export function choiceText(choice: ChatChoiceRequest): string {
 }
 
 const FINISH_TEXT = '기록을 마칠게요';
-const EDIT_SAVED_TEXT = '수정한 내용을 저장했어요. 더 바꿀 내용이 있으면 언제든 말씀해 주세요.';
 
 /**
  * 기록(RECORD) 모드 챗봇 세션.
@@ -57,7 +56,7 @@ const EDIT_SAVED_TEXT = '수정한 내용을 저장했어요. 더 바꿀 내용�
  * - 그날 기록이 이미 저장되어 있으면 서버가 그 기록을 불러온 수정 세션을 열고, 첫 메시지로 수정할 내용을 묻는다
  * - 응답의 pendingFields / askingField / requiresConfirmation 상태를 노출
  * - 글(send), 선택지(choose), 기록 마치기(finish) 모두 같은 방식으로 한 턴을 주고받는다
- * - 기록을 고치는 대화(editing)는 확인 단계에서 총정리로 가지 않고 saveEdit으로 챗봇 화면에서 바로 저장한다
+ * - 확인 단계에서 총정리로 가지 않고 save로 챗봇 화면에서 바로 저장한다 (처음 기록이면 새로 만들고, 고치는 대화면 수정)
  */
 export function useChatSession(recordDate: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -224,11 +223,11 @@ export function useChatSession(recordDate: string) {
   const finish = useCallback(() => runTurn(FINISH_TEXT, (id) => chatbotApi.finish(id)), [runTurn]);
 
   /**
-   * 기록을 고치는 대화에서 지금 초안으로 저장된 기록을 수정한다. 총정리 화면으로 가지 않는다.
-   * 대화 중에 붙인 사진도 함께 올리고, 올리지 못한 사진을 돌려준다.
-   * 저장하면 세션이 닫히므로, 대화는 그대로 두고 수정한 기록을 다시 고칠 수 있는 새 세션을 연다.
+   * 지금 초안을 기록으로 저장한다. 처음 기록이면 새로 만들고, 저장된 기록을 고치는 대화면 그 기록을 수정한다.
+   * 총정리 화면으로 가지 않는다. 대화 중에 붙인 사진도 함께 올리고, 올리지 못한 사진을 돌려준다.
+   * 저장하면 세션이 닫히므로, 대화는 그대로 두고 저장한 기록을 다시 고칠 수 있는 새 세션을 연다.
    */
-  const saveEdit = useCallback(
+  const save = useCallback(
     async (photos: File[]): Promise<{ ok: boolean; failedPhotos: File[] }> => {
       if (!sessionId || !draft) return { ok: false, failedPhotos: photos };
       setStatus('sending');
@@ -245,9 +244,10 @@ export function useChatSession(recordDate: string) {
             failedPhotos.push(file);
           }
         }
+        const savedText = editing ? '수정한 내용을 저장했어요.' : '오늘 기록을 저장했어요.';
         const saved = failedPhotos.length
-          ? `수정한 내용을 저장했어요. 사진 ${failedPhotos.length}장은 올리지 못했어요. 다시 붙여 주세요.`
-          : EDIT_SAVED_TEXT;
+          ? `${savedText} 사진 ${failedPhotos.length}장은 올리지 못했어요. 다시 붙여 주세요.`
+          : `${savedText} 더 바꿀 내용이 있으면 언제든 말씀해 주세요.`;
         setMessages((prev) => [...prev, { role: 'ASSISTANT', content: saved, createdAt: new Date().toISOString() }]);
         await openSession(true);
         return { ok: true, failedPhotos };
@@ -262,7 +262,7 @@ export function useChatSession(recordDate: string) {
         return { ok: false, failedPhotos: photos };
       }
     },
-    [sessionId, draft, recordDate, openSession, start],
+    [sessionId, draft, editing, recordDate, openSession, start],
   );
 
   return {
@@ -271,7 +271,6 @@ export function useChatSession(recordDate: string) {
     pendingFields,
     askingField,
     requiresConfirmation,
-    editing,
     painIndex,
     status,
     error,
@@ -279,7 +278,7 @@ export function useChatSession(recordDate: string) {
     send,
     choose,
     finish,
-    saveEdit,
+    save,
     agree,
     retry: start,
   };

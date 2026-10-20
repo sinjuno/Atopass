@@ -80,7 +80,9 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist())
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
-			.andExpect(jsonPath("$.data.reply").value("입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요."));
+			.andExpect(jsonPath("$.data.reply").value(
+				"입력하신 내용을 정리했어요.\n- 고통 지수: 6점\n- 얼굴: 고통 6점\n- 왼손: 고통 6점\n- 수면 시간: 7.5시간\n- 약 복용: 아니오\n- 나타난 증상: 홍반, 건조증"
+					+ "\n\n이대로 저장하려면 아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요."));
 
 		assertThat(llm.callCount()).isZero();
 		// 대화 내역에는 고른 값이 사람이 읽는 말로 남는다.

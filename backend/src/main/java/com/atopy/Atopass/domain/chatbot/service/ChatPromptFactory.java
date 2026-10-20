@@ -38,8 +38,6 @@ class ChatPromptFactory {
 		[기록 수정] 오늘 기록은 이미 저장되어 있고, 위 초안이 저장된 내용입니다. 사용자는 바꿀 내용을 말합니다.
 		- 사용자가 값을 바꾸면 바뀐 값만 updates에 넣고, reply로 무엇을 바꿨는지 한 문장으로 알려 줍니다. (예: "수면 시간을 8시간으로 바꿨어요.")
 		- 바꿀 내용이 없다고 하면 updates는 비우고 finished를 true로 합니다.
-		- 나타난 증상을 지워 달라고 하면 removeSkinSigns에 증상 이름을, 부위를 빼 달라고 하면 removeBodyParts에 부위 이름을 넣습니다.
-		  (예: "가려움은 없어졌어요" → {"removeSkinSigns": ["ITCHING"]}, "얼굴은 빼 주세요" → {"removeBodyParts": ["FACE"]})
 		- 특이사항을 지워 달라고 하면 notes를 ""로 넣습니다. 특이사항을 바꾸면 사용자가 쓴 새 문장 전체를 notes에 넣습니다.
 		""";
 
@@ -88,6 +86,9 @@ class ChatPromptFactory {
 			5. 수면, 약 복용, 특이사항에 대해 사용자가 "모르겠어요", "넘어갈게요"처럼 답하면 skipped에 sleepHours, medication, notes 중 해당하는 것을 넣습니다.
 			   나타난 증상이 하나도 없다고 하면 skinSigns를 []로 넣고, 답하지 않겠다고 하면 skipped에 skinSigns를 넣습니다. 특이사항이 없다고 하면 skipped에 notes를 넣습니다.
 			6. 사용자가 그만하겠다거나 바로 저장하겠다고 하면 finished를 true로 합니다.
+			   이미 말한 값을 고치면 새 값을 updates에 넣습니다. 나타난 증상을 지워 달라고 하면 removeSkinSigns에 증상 이름을,
+			   부위를 빼 달라고 하면 removeBodyParts에 부위 이름을 넣습니다.
+			   (예: "가려움은 없어졌어요" → {"removeSkinSigns": ["ITCHING"]}, "얼굴은 빼 주세요" → {"removeBodyParts": ["FACE"]})
 			7. 기록과 관련 없는 말이거나 이해할 수 없으면 understood를 false로 하고, reply로 정중하게 다시 물어봅니다.
 			8. 사용자가 부위를 말했지만 그 부위의 고통 점수를 말하지 않았다면, 반드시 다음 문장으로 묻습니다.
 			   "{부위}의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?" (예: "얼굴의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")

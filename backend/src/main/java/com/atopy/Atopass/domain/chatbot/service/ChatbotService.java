@@ -50,8 +50,8 @@ public class ChatbotService {
 	static final String NOT_UNDERSTOOD = "죄송해요, 잘 이해하지 못했어요. 다시 한 번 말씀해 주시겠어요?";
 	static final String SCORE_OUT_OF_RANGE = "점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
-	static final String CONFIRM = "입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요.";
-	static final String EDIT_CONFIRM = "이대로 저장하려면 아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요.";
+	static final String CONFIRM = "입력하신 내용을 정리했어요.";
+	static final String SAVE_GUIDE = "이대로 저장하려면 아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요.";
 	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
 	static final String FINISH_TEXT = "기록을 마칠게요";
 
@@ -254,16 +254,16 @@ public class ChatbotService {
 	}
 
 	/**
-	 * 확인 단계 안내. 저장된 기록을 고치는 중이면 총정리로 가지 않고 챗봇 화면에서 바로 저장하므로,
-	 * 무엇을 바꿨는지(LLM의 답)와 저장될 내용을 함께 보여 준다.
+	 * 확인 단계 안내. 총정리로 가지 않고 챗봇 화면에서 바로 저장하므로, 저장될 내용을 대화에 함께 보여 준다.
+	 * 저장된 기록을 고치는 중이면 무엇을 바꿨는지(LLM의 답)도 먼저 알려 준다.
 	 */
 	private static String confirmation(ChatDraft draft, String llmReply) {
-		if (!draft.editing()) {
-			return CONFIRM;
+		String head = CONFIRM;
+		if (draft.editing()) {
+			String changed = llmReply == null || llmReply.isBlank() ? "" : llmReply.trim() + "\n";
+			head = changed + "지금 내용은 아래와 같아요.";
 		}
-		String changed = llmReply == null || llmReply.isBlank() ? "" : llmReply.trim() + "\n";
-		return changed + "지금 내용은 아래와 같아요.\n" + draft.summary()
-			+ "\n\n" + EDIT_CONFIRM;
+		return head + "\n" + draft.summary() + "\n\n" + SAVE_GUIDE;
 	}
 
 	/** 지금 물어볼 항목의 정해진 질문. 선택지로 답하는 항목은 화면에 같은 선택지가 함께 나온다. */
