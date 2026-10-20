@@ -114,7 +114,7 @@ export default function ChatbotPage() {
             disabled={status !== 'ready'}
             className="text-sm font-semibold text-emerald-700 underline underline-offset-2 disabled:opacity-40"
           >
-            남은 항목 건너뛰고 기록 마치기
+            {pendingFields.length > 0 ? '남은 항목 건너뛰고 기록 마치기' : '기록 마치기'}
           </button>
         </div>
       )}

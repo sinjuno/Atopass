@@ -48,7 +48,8 @@ const FINISH_TEXT = '기록을 마칠게요';
 /**
  * 기록(RECORD) 모드 챗봇 세션.
  * - 들어올 때 이용 동의부터 확인하고, 동의 전에는 세션을 만들지 않는다
- * - 날짜별 sessionId가 있으면 대화 내역과 진행 상태(초안 조회 API)를 복원, 없으면 새 세션 생성
+ * - 세션을 요청하면 서버가 같은 날짜의 열린 세션을 돌려주므로, 대화 내역과 진행 상태(초안 조회 API)를 복원한다
+ * - 그날 기록이 이미 저장되어 있으면 서버가 그 기록을 불러온 수정 세션을 열고, 첫 메시지로 수정할 내용을 묻는다
  * - 응답의 pendingFields / askingField / requiresConfirmation 상태를 노출
  * - 글(send), 선택지(choose), 기록 마치기(finish) 모두 같은 방식으로 한 턴을 주고받는다
  */
@@ -76,41 +77,20 @@ export function useChatSession(recordDate: string) {
         return;
       }
 
-      const saved = chatSessionStore.get(recordDate);
-      if (saved) {
-        try {
-          const [{ messages }, state] = await Promise.all([
-            chatbotApi.getMessages(saved),
-            chatbotApi.getDraft(saved),
-          ]);
-          setSessionId(saved);
-          setMessages(messages);
-          setPendingFields(state.pendingFields);
-          setAskingField(state.askingField);
-          setRequiresConfirmation(state.requiresConfirmation);
-          setPainIndex(state.draft.painIndex ?? null);
-          setStatus('ready');
-          return;
-        } catch (e) {
-          if (isApiError(e, 'SESSION_CLOSED')) {
-            // 이미 기록으로 저장된 대화 — 저장된 기록은 총정리 화면에서 본다
-            chatSessionStore.clear(recordDate);
-            setStatus('closed');
-            return;
-          }
-          // 세션이 만료(30일 보존)되었거나 없으면 새로 만든다
-          if (!isApiError(e, 'SESSION_NOT_FOUND')) throw e;
-          chatSessionStore.clear(recordDate);
-        }
-      }
+      // 서버가 이 날짜에 이어 쓸 세션을 정한다 — 열려 있던 대화는 그대로, 저장된 기록이 있으면 그 기록을 고치는 세션.
+      // 그사이 총정리에서 기록을 고쳤으면 예전 초안 대신 새 세션을 주므로, 보관해 둔 sessionId를 그대로 믿지 않는다.
       const session = await chatbotApi.createSession('RECORD');
       chatSessionStore.set(recordDate, session.sessionId);
+      const [{ messages }, state] = await Promise.all([
+        chatbotApi.getMessages(session.sessionId),
+        chatbotApi.getDraft(session.sessionId),
+      ]);
       setSessionId(session.sessionId);
-      setMessages([]);
-      setPendingFields([]);
-      setAskingField('painIndex');
-      setRequiresConfirmation(false);
-      setPainIndex(null);
+      setMessages(messages);
+      setPendingFields(state.pendingFields);
+      setAskingField(state.askingField);
+      setRequiresConfirmation(state.requiresConfirmation);
+      setPainIndex(state.draft.painIndex ?? null);
       setStatus('ready');
     } catch (e) {
       if (isApiError(e, 'CONSENT_REQUIRED')) {

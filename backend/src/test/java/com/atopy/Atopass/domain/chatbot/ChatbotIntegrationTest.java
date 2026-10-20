@@ -458,6 +458,97 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk());
 	}
 
+	// ── 저장된 기록 고치기 ──
+
+	@Test
+	void 그날_기록이_있으면_저장된_내용을_불러와_수정할_내용이_있는지_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		String first = createSession(bearer, "RECORD");
+		saveRecord(bearer, first, saveBody(today, true, Map.of("pain", 4), 6)).andExpect(status().isCreated());
+
+		String second = createSession(bearer, "RECORD");
+
+		assertThat(second).isNotEqualTo(first);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + second + "/messages").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages.length()").value(1))
+			.andExpect(jsonPath("$.data.messages[0].role").value("ASSISTANT"))
+			.andExpect(jsonPath("$.data.messages[0].content").value(org.hamcrest.Matchers.allOf(
+				org.hamcrest.Matchers.containsString("오늘 기록이 이미 저장되어 있어요."),
+				org.hamcrest.Matchers.containsString("- 팔: 고통 4점"),
+				org.hamcrest.Matchers.containsString("- 수면 시간: 6시간"),
+				org.hamcrest.Matchers.containsString("수정할 내용이 있나요?"))));
+		// 저장된 값이 초안으로 들어오고, 빈 항목을 다시 묻지 않는다.
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + second + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0))
+			.andExpect(jsonPath("$.data.askingField").value("painIndex"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
+		// 나갔다 들어와도 같은 수정 세션을 이어서 쓴다.
+		assertThat(createSession(bearer, "RECORD")).isEqualTo(second);
+	}
+
+	@Test
+	void 수정_세션에서_바꾼_내용을_저장하면_기존_기록을_수정한다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		String first = createSession(bearer, "RECORD");
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		((Map<String, Object>) body.get("record")).put("painIndex", 5);
+		String created = saveRecord(bearer, first, body).andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.askingField").doesNotExist())
+			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
+		llm.enqueue("{\"understood\": true, \"reply\": \"수면 시간을 8시간으로 바꿨어요.\", "
+			+ "\"updates\": {\"sleepHours\": 8}, \"finished\": false, \"followUp\": false}");
+		mockMvc.perform(sendMessage(bearer, session, "잠은 8시간 잤어요"))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.reply").value(
+				"수면 시간을 8시간으로 바꿨어요.\n더 바꿀 내용이 있으면 말씀해 주세요. 없으면 아래 버튼을 눌러 확인하고 저장해 주세요."));
+		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
+
+		Map<String, Object> edited = saveBody(today, true, Map.of("pain", 4), 8);
+		((Map<String, Object>) edited.get("record")).put("painIndex", 5);
+		saveRecord(bearer, session, edited)
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.recordId").value(recordId));
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.painIndex").value(5));
+	}
+
+	@Test
+	void 총정리에서_기록을_고치거나_지우면_열려_있던_세션을_닫고_새로_연다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		String chatting = createSession(bearer, "RECORD");
+
+		// 챗봇 대화 중에 총정리에서 직접 기록을 만들면, 다시 들어올 때 그 기록을 고치는 세션이 열린다.
+		Map<String, Object> direct = new LinkedHashMap<>((Map<String, Object>) saveBody(today, true, Map.of("pain", 3), 7).get("record"));
+		direct.put("recordDate", today);
+		String created = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), direct))
+			.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+		String editing = createSession(bearer, "RECORD");
+		assertThat(editing).isNotEqualTo(chatting);
+		mockMvc.perform(sendMessage(bearer, chatting, "아까 하던 거"))
+			.andExpect(jsonPath("$.error.code").value("SESSION_CLOSED"));
+
+		// 기록을 지우면 빈 세션으로 새로 시작한다.
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.delete("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(status().is2xxSuccessful());
+		String fresh = createSession(bearer, "RECORD");
+		assertThat(fresh).isNotEqualTo(editing);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + fresh + "/messages").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages").isEmpty());
+	}
+
 	@Test
 	void 저장할_내용이_규칙에_어긋나면_일반_기록_생성과_같은_오류를_준다() throws Exception {
 		String bearer = newMemberBearer();
@@ -587,6 +678,11 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String bearer, String session, String message) {
 		return withJson(post("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer),
 			Map.of("message", message));
+	}
+
+	private org.springframework.test.web.servlet.ResultActions saveRecord(
+		String bearer, String session, Map<String, Object> body) throws Exception {
+		return mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer), body));
 	}
 
 	private Map<String, Object> saveBody(String date, boolean confirmed, Map<String, Object> symptoms, int sleepHours) {

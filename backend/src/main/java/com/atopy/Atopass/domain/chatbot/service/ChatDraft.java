@@ -6,9 +6,12 @@ import com.atopy.Atopass.domain.record.dto.response.SkinConditionResponse;
 import com.atopy.Atopass.domain.record.dto.response.SymptomsResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
+import com.atopy.Atopass.domain.record.entity.SkinCondition;
+import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.entity.SleepScore;
 import com.atopy.Atopass.domain.record.entity.Symptom;
+import com.atopy.Atopass.domain.record.entity.SymptomScore;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -20,6 +23,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -71,9 +76,43 @@ public final class ChatDraft {
 	private final Set<String> skipped = new LinkedHashSet<>();
 	/** 챗봇이 부위나 증상 점수를 되물은 상태. 사용자가 글로 답해야 하므로 선택지 대신 입력창을 연다. */
 	private boolean followUp;
+	/** 이미 저장된 기록을 불러와 고치는 중. 빈 항목을 차례로 묻지 않고, 사용자가 바꿀 내용을 말하길 기다린다. */
+	private boolean editing;
 
 	public static ChatDraft empty() {
 		return new ChatDraft();
+	}
+
+	/**
+	 * 저장된 기록을 고치기 위한 초안. 기록에 없는 선택 항목은 건너뛴 것으로 두어 다시 묻지 않는다.
+	 * 기록의 하루 증상에는 부위 증상이 합쳐져 있으므로, 부위 증상을 빼고 직접 고른 증상만 남긴다.
+	 */
+	public static ChatDraft fromRecord(SkinRecord record) {
+		ChatDraft draft = new ChatDraft();
+		Set<SkinSign> partSigns = EnumSet.noneOf(SkinSign.class);
+		for (SkinCondition condition : record.getConditions()) {
+			Map<Symptom, Integer> scores = new EnumMap<>(Symptom.class);
+			for (SymptomScore score : condition.getScores()) {
+				scores.put(score.getSymptom(), score.getScore());
+			}
+			draft.conditions.put(condition.getBodyPart(), scores);
+			if (!condition.getSkinSigns().isEmpty()) {
+				draft.conditionSigns.put(condition.getBodyPart(), EnumSet.copyOf(condition.getSkinSigns()));
+				partSigns.addAll(condition.getSkinSigns());
+			}
+		}
+		draft.painIndex = record.getPainIndex();
+		draft.sleepHours = record.getSleepHours();
+		draft.medication = record.getMedication();
+		Set<SkinSign> dailySigns = EnumSet.noneOf(SkinSign.class);
+		record.getSkinSigns().stream().filter(sign -> !partSigns.contains(sign)).forEach(dailySigns::add);
+		draft.skinSigns = dailySigns;
+		draft.alcohol = record.getAlcohol();
+		draft.outdoorActivity = record.getOutdoorActivity();
+		draft.notes = record.getNotes();
+		draft.skipped.addAll(SKIPPABLE);
+		draft.editing = true;
+		return draft;
 	}
 
 	// ── 저장·복원 ──
@@ -116,6 +155,9 @@ public final class ChatDraft {
 		skipped.forEach(skippedNode::add);
 		if (followUp) {
 			root.put("followUp", true);
+		}
+		if (editing) {
+			root.put("editing", true);
 		}
 		return mapper.writeValueAsString(root);
 	}
@@ -173,6 +215,7 @@ public final class ChatDraft {
 				}
 			}
 			draft.followUp = root.path("followUp").asBoolean(false);
+			draft.editing = root.path("editing").asBoolean(false);
 		} catch (RuntimeException e) {
 			return new ChatDraft();
 		}
@@ -333,6 +376,11 @@ public final class ChatDraft {
 		return SKIPPABLE.contains(field);
 	}
 
+	/** 저장된 기록을 고치는 중인지 */
+	public boolean editing() {
+		return editing;
+	}
+
 	/** 이번 응답이 부위나 증상 점수를 되묻는 질문인지 기록한다. 다음 턴이 성공하면 다시 정해진다. */
 	void markFollowUp(boolean followUp) {
 		this.followUp = followUp;
@@ -480,6 +528,45 @@ public final class ChatDraft {
 			notes);
 	}
 
+	/** 사람이 읽는 초안 요약. 기록된 항목만 한 줄씩 보여 준다. (예: "- 고통 지수: 6점") */
+	public String summary() {
+		StringJoiner lines = new StringJoiner("\n");
+		if (painIndex != null) {
+			lines.add("- 고통 지수: " + painIndex + "점");
+		}
+		conditions.entrySet().stream()
+			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
+			.forEach(e -> {
+				Integer pain = e.getValue().get(Symptom.PAIN);
+				Set<SkinSign> signs = conditionSigns.getOrDefault(e.getKey(), Set.of());
+				StringBuilder line = new StringBuilder("- " + e.getKey().label());
+				if (pain != null) {
+					line.append(": 고통 ").append(pain).append("점");
+				}
+				if (!signs.isEmpty()) {
+					line.append(pain != null ? ", " : ": ").append(labels(signs));
+				}
+				lines.add(line);
+			});
+		if (sleepHours != null) {
+			lines.add("- 수면 시간: " + sleepHours.stripTrailingZeros().toPlainString() + "시간");
+		}
+		if (medication != null) {
+			lines.add("- 약 복용: " + (medication ? "예" : "아니오"));
+		}
+		if (skinSigns != null) {
+			lines.add("- 나타난 증상: " + (skinSigns.isEmpty() ? "없음" : labels(skinSigns)));
+		}
+		if (notes != null) {
+			lines.add("- 특이사항: " + notes);
+		}
+		return lines.toString();
+	}
+
+	private static String labels(Set<SkinSign> signs) {
+		return signs.stream().sorted().map(SkinSign::label).collect(Collectors.joining(", "));
+	}
+
 	/** LLM에게 현재 초안을 알려 주기 위한 사람이 읽는 JSON */
 	public String toPromptJson(JsonMapper mapper) {
 		return toJson(mapper);
@@ -507,6 +594,7 @@ public final class ChatDraft {
 		copy.notes = notes;
 		copy.skipped.addAll(skipped);
 		copy.followUp = followUp;
+		copy.editing = editing;
 		return copy;
 	}
 
@@ -525,6 +613,7 @@ public final class ChatDraft {
 		skipped.clear();
 		skipped.addAll(next.skipped);
 		followUp = next.followUp;
+		editing = next.editing;
 	}
 
 }

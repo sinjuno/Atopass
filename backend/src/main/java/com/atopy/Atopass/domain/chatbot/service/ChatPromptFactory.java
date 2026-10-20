@@ -33,6 +33,14 @@ class ChatPromptFactory {
 		SkinSign.XEROSIS, "건조해요, 당겨요, 하얗게 일어나요, 각질이 생겨요",
 		SkinSign.ITCHING, "가려워요, 간지러워요"));
 
+	/** 저장된 기록을 고칠 때 덧붙이는 안내 */
+	static final String EDITING_GUIDE = """
+		[기록 수정] 오늘 기록은 이미 저장되어 있고, 위 초안이 저장된 내용입니다. 사용자는 바꿀 내용을 말합니다.
+		- 사용자가 값을 바꾸면 바뀐 값만 updates에 넣고, reply로 무엇을 바꿨는지 한 문장으로 알려 줍니다. (예: "수면 시간을 8시간으로 바꿨어요.")
+		- 바꿀 내용이 없다고 하면 updates는 비우고 finished를 true로 합니다.
+		- 나타난 증상이나 부위를 지워 달라고 하면 updates는 비우고, reply로 "증상이나 부위를 지우는 것은 다음 확인 화면에서 할 수 있어요."라고 안내합니다.
+		""";
+
 	private final JsonMapper jsonMapper;
 
 	/** 기록 모드: 사용자의 말에서 값을 뽑아 초안을 채우고, 빠진 정보만 되묻는다. */
@@ -66,6 +74,7 @@ class ChatPromptFactory {
 			[오늘 날짜] %s
 			[현재까지 모은 초안] %s
 			[아직 입력되지 않은 항목] %s
+			%s
 
 			[규칙]
 			1. 초안에 이미 있는 정보는 다시 묻지 않습니다. 빠진 정보만 질문합니다.
@@ -87,7 +96,8 @@ class ChatPromptFactory {
 			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false, "followUp": false}
 			부위 기록은 conditions에 부위, 고통 점수, 그 부위의 증상을 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위의 고통 점수로 넣습니다.
 			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "pain": 8, "skinSigns": ["ITCHING", "ERYTHEMA"]}]}, "finished": false, "followUp": false}
-			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields());
+			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields(),
+				draft.editing() ? EDITING_GUIDE : "");
 	}
 
 	/** 증상 목록을 "- XEROSIS 건조증 (피부가 건조하고 … / 건조해요, 당겨요 …)" 줄들로 만든다. */

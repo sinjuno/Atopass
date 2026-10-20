@@ -51,6 +51,7 @@ public class ChatbotService {
 	static final String SCORE_OUT_OF_RANGE = "점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String CONFIRM = "입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요.";
+	static final String EDIT_CONFIRM = "더 바꿀 내용이 있으면 말씀해 주세요. 없으면 아래 버튼을 눌러 확인하고 저장해 주세요.";
 	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
 	static final String FINISH_TEXT = "기록을 마칠게요";
 
@@ -223,7 +224,8 @@ public class ChatbotService {
 			String message = reply == null ? NOT_UNDERSTOOD : reply;
 			reply = failCount >= EXAMPLE_AFTER_FAILURES ? message + EXAMPLE : message;
 		} else if (readyForConfirmation) {
-			reply = CONFIRM;
+			// 저장된 기록을 고치는 중이면 무엇을 바꿨는지(LLM의 답) 먼저 알려 준다.
+			reply = draft.editing() && reply != null ? reply + "\n" + EDIT_CONFIRM : CONFIRM;
 		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
 			reply = question(draft.askingField());
 		}
