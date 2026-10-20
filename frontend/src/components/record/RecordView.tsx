@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BodyPart, PhotoRef, RecordInput } from '@/types/record';
-import { allSkinSigns, bodyMapScores } from '@/utils/bodyMap';
+import { allSkinSigns, bodyMapSignCounts } from '@/utils/bodyMap';
 import {
   BODY_PART_LABELS,
   EMPTY_TEXT,
@@ -28,9 +28,9 @@ function painTone(score: number) {
 /** 저장된 하루 기록 보기 (읽기 전용) */
 export default function RecordView({ record, recordId, photos }: Props) {
   const [selectedPart, setSelectedPart] = useState<BodyPart | null>(null);
-  // 예전 부위(팔·다리)로 남긴 기록도 해당하는 마네킹 부위에 칠한다
-  const partScores = bodyMapScores(record.skinConditions, { withLegacy: true });
-  const selectedScore = selectedPart ? partScores[selectedPart] : undefined;
+  // 예전 부위(팔·다리)로 남긴 기록도 해당하는 마네킹 부위에 칠한다. 색은 나타난 증상 개수에 비례한다
+  const partCounts = bodyMapSignCounts(record.skinConditions, { withLegacy: true });
+  const selectedCount = selectedPart ? partCounts[selectedPart] : undefined;
   const selectedSigns = record.skinConditions.find((c) => c.bodyPart === selectedPart)?.skinSigns ?? [];
   // 부위마다 고른 증상을 합친 그날의 증상 (예: 목 홍반, 왼손 진물/딱지 → 홍반, 진물/딱지)
   const skinSigns = allSkinSigns(record);
@@ -63,9 +63,9 @@ export default function RecordView({ record, recordId, photos }: Props) {
         </div>
       </div>
 
-      <Section title="부위별 고통 점수·증상">
+      <Section title="고통 부위·증상">
         <div className="rounded-xl border border-gray-200 p-4">
-          <BodyMap scores={partScores} selected={selectedPart} onSelect={setSelectedPart} />
+          <BodyMap counts={partCounts} selected={selectedPart} onSelect={setSelectedPart} />
           <div className="mt-3">
             <BodyMapLegend />
           </div>
@@ -73,15 +73,16 @@ export default function RecordView({ record, recordId, photos }: Props) {
             {selectedPart ? (
               <>
                 <span className="font-semibold text-gray-800">{BODY_PART_LABELS[selectedPart]}</span>{' '}
-                <span className={selectedScore === undefined ? 'text-gray-400' : 'font-bold text-gray-900'}>
-                  {selectedScore === undefined ? EMPTY_TEXT : `${selectedScore}점`}
-                </span>
-                {selectedSigns.length > 0 && (
-                  <span className="text-gray-700"> · {selectedSigns.map((sign) => SKIN_SIGN_LABELS[sign]).join(', ')}</span>
+                {selectedCount === undefined ? (
+                  <span className="text-gray-400">{EMPTY_TEXT}</span>
+                ) : selectedSigns.length > 0 ? (
+                  <span className="text-gray-700">{selectedSigns.map((sign) => SKIN_SIGN_LABELS[sign]).join(', ')}</span>
+                ) : (
+                  <span className="text-gray-500">나타난 증상 없음</span>
                 )}
               </>
             ) : (
-              <span className="text-sm text-gray-500">부위를 누르면 고통 점수와 증상을 볼 수 있어요.</span>
+              <span className="text-sm text-gray-500">부위를 누르면 나타난 증상을 볼 수 있어요.</span>
             )}
           </p>
         </div>

@@ -4,6 +4,7 @@ import { ApiError } from '@/apis/client';
 import PageHeader from '@/components/common/PageHeader';
 import DailyConditionEditor from '@/components/record/DailyConditionEditor';
 import LifestyleEditor from '@/components/record/LifestyleEditor';
+import PainIndexSlider from '@/components/record/PainIndexSlider';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import RecordView from '@/components/record/RecordView';
 import SavedPhotoList from '@/components/record/SavedPhotoList';
@@ -12,7 +13,7 @@ import SkinConditionEditor from '@/components/record/SkinConditionEditor';
 import { useDailyRecord, type DailyRecordMode } from '@/hooks/useDailyRecord';
 import { useRecordDraft } from '@/hooks/useRecordDraft';
 import type { RecordInput } from '@/types/record';
-import { CHAT_NOTES_MAX_LENGTH, NOTES_MAX_LENGTH, PHOTO_ACCEPT } from '@/utils/constants';
+import { CHAT_NOTES_MAX_LENGTH, NOTES_MAX_LENGTH, PART_PAIN_SYMPTOM, PHOTO_ACCEPT } from '@/utils/constants';
 import { formatKoreanDate, isValidDateString } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 
@@ -92,7 +93,7 @@ function RecordSummary({ date }: { date: string }) {
     setFieldErrors({});
     // RecordRequest: 부위별 증상과 고통 지수 중 하나 이상 필요
     if (form.skinConditions.length === 0 && form.painIndex == null) {
-      setFieldErrors({ painIndex: '고통 지수를 고르거나 증상이 있었던 부위를 추가해 주세요.' });
+      setFieldErrors({ painIndex: '고통 지수를 골라 주세요.' });
       return;
     }
     setSaving(true);
@@ -130,6 +131,14 @@ function RecordSummary({ date }: { date: string }) {
     }
   };
 
+  // 고통 지수와 부위는 한 묶음이라, 고통 지수를 바꾸면 기록한 부위의 고통 점수도 같이 바뀐다
+  const setPainIndex = (painIndex: number) =>
+    setForm({
+      ...form,
+      painIndex,
+      skinConditions: form.skinConditions.map((c) => ({ ...c, symptoms: { [PART_PAIN_SYMPTOM]: painIndex } })),
+    });
+
   const handleAddPhotos = (files: File[]) => {
     const err = validatePhotos(files, photos.length + draft.photos.length);
     if (err) setMessage(err);
@@ -150,25 +159,28 @@ function RecordSummary({ date }: { date: string }) {
       />
       <p className="bg-gray-50 px-4 py-2 text-sm text-gray-600">{MODE_LABEL[mode]}</p>
 
+      <Section title="고통 지수·고통 부위">
+        <div className="flex flex-col gap-4">
+          <PainIndexSlider value={form.painIndex ?? null} onChange={setPainIndex} />
+          <SkinConditionEditor
+            value={form.skinConditions}
+            painIndex={form.painIndex ?? null}
+            onChange={(skinConditions) => setForm({ ...form, skinConditions })}
+          />
+        </div>
+        <FieldError errors={fieldErrors} prefix="painIndex" />
+        <FieldError errors={fieldErrors} prefix="skinConditions" />
+      </Section>
+
       <Section title="오늘의 상태">
         <DailyConditionEditor
-          painIndex={form.painIndex}
           medication={form.medication}
           skinSigns={form.skinSigns}
           skinConditions={form.skinConditions}
           onChange={(next) => setForm({ ...form, ...next })}
         />
-        <FieldError errors={fieldErrors} prefix="painIndex" />
         <FieldError errors={fieldErrors} prefix="medication" />
         <FieldError errors={fieldErrors} prefix="skinSigns" />
-      </Section>
-
-      <Section title="부위별 고통 점수·증상">
-        <SkinConditionEditor
-          value={form.skinConditions}
-          onChange={(skinConditions) => setForm({ ...form, skinConditions })}
-        />
-        <FieldError errors={fieldErrors} prefix="skinConditions" />
       </Section>
 
       <Section title="수면·생활">

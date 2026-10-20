@@ -41,14 +41,20 @@ export default function ChatbotPage() {
   const goToSummary = () => navigate(recordPath(recordDate));
 
   // 서버가 정한 항목(askingField)을 선택지로 묻는다. 부위·증상 점수(symptoms)는 글로 답한다.
-  // 첫 화면에서는 고통 지수 버튼과 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
+  // 첫 화면에서는 고통 지수 막대와 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
   // (LLM이 응답하지 못해도 버튼만으로 끝까지 기록할 수 있다)
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
   const textLocked = started && choiceField !== null && choiceField !== 'notes';
+  // 부위를 고르는 동안에는 마네킹에 집중하도록 남은 항목과 "기록 마치기"를 숨긴다
+  const pickingParts = choiceField === 'bodyParts';
   const canFinish =
-    started && !requiresConfirmation && !pendingFields.includes('painIndex') && !pendingFields.includes('symptoms');
+    started &&
+    !requiresConfirmation &&
+    !pickingParts &&
+    !pendingFields.includes('painIndex') &&
+    !pendingFields.includes('symptoms');
 
   // 이 날짜의 대화가 이미 기록으로 저장됐으면 총정리(수정)로 보낸다
   useEffect(() => {
@@ -86,7 +92,8 @@ export default function ChatbotPage() {
         right={<span className="text-base text-gray-500">{formatKoreanDate(recordDate)}</span>}
       />
 
-      <div className="flex-1 overflow-y-auto">
+      {/* 아래 선택지 칸이 길어도 대화가 가려지지 않도록 최소 높이를 둔다 */}
+      <div className="min-h-32 flex-1 overflow-y-auto">
         {status === 'loading' && <p className="p-6 text-center text-gray-500">대화를 준비하고 있어요…</p>}
         {status === 'error' ? (
           <div className="p-6 text-center">
@@ -104,7 +111,7 @@ export default function ChatbotPage() {
         )}
       </div>
 
-      {!requiresConfirmation && <PendingFieldList fields={pendingFields} />}
+      {!requiresConfirmation && !pickingParts && <PendingFieldList fields={pendingFields} />}
 
       {canFinish && (
         <div className="flex justify-end px-3 pb-1">

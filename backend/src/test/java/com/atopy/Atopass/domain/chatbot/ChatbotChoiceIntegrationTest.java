@@ -28,6 +28,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 
 	private static final String AUTH = HttpHeaders.AUTHORIZATION;
 	private static final String PAIN_QUESTION = "오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)";
+	private static final String BODY_PARTS_QUESTION = "어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요.";
 	private static final String SLEEP_QUESTION = "어젯밤 몇 시간 주무셨나요?";
 
 	@Autowired
@@ -56,6 +57,13 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
+			.andExpect(jsonPath("$.data.askingField").value("bodyParts"))
+			.andExpect(jsonPath("$.data.reply").value(BODY_PARTS_QUESTION));
+		// 고통 지수와 부위는 한 묶음이라, 고른 부위에는 고통 지수가 그 부위의 점수로 들어간다.
+		mockMvc.perform(choice(bearer, session, "bodyParts", List.of("FACE", "LEFT_HAND")))
+			.andExpect(jsonPath("$.data.draft.skinConditions.length()").value(2))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("FACE"))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(6))
 			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
 			.andExpect(jsonPath("$.data.reply").value(SLEEP_QUESTION));
 		mockMvc.perform(choice(bearer, session, "sleepHours", 7.5))
@@ -77,12 +85,13 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		assertThat(llm.callCount()).isZero();
 		// 대화 내역에는 고른 값이 사람이 읽는 말로 남는다.
 		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
-			.andExpect(jsonPath("$.data.messages.length()").value(10))
+			.andExpect(jsonPath("$.data.messages.length()").value(12))
 			.andExpect(jsonPath("$.data.messages[0].content").value("6점"))
-			.andExpect(jsonPath("$.data.messages[2].content").value("7.5시간"))
-			.andExpect(jsonPath("$.data.messages[4].content").value("아니오"))
-			.andExpect(jsonPath("$.data.messages[6].content").value("홍반, 건조증"))
-			.andExpect(jsonPath("$.data.messages[8].content").value("없어요"));
+			.andExpect(jsonPath("$.data.messages[2].content").value("얼굴, 왼손"))
+			.andExpect(jsonPath("$.data.messages[4].content").value("7.5시간"))
+			.andExpect(jsonPath("$.data.messages[6].content").value("아니오"))
+			.andExpect(jsonPath("$.data.messages[8].content").value("홍반, 건조증"))
+			.andExpect(jsonPath("$.data.messages[10].content").value("없어요"));
 		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist());
@@ -94,6 +103,9 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		mockMvc.perform(choice(bearer, session, "painIndex", 3));
 
+		mockMvc.perform(skip(bearer, session, "bodyParts"))
+			.andExpect(jsonPath("$.data.draft.skinConditions").isEmpty())
+			.andExpect(jsonPath("$.data.askingField").value("sleepHours"));
 		mockMvc.perform(skip(bearer, session, "sleepHours"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").doesNotExist())
 			.andExpect(jsonPath("$.data.askingField").value("medication"));
@@ -104,8 +116,9 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.askingField").value("notes"));
 
 		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
-			.andExpect(jsonPath("$.data.messages[2].content").value("넘어갈게요"))
-			.andExpect(jsonPath("$.data.messages[6].content").value("없어요"));
+			.andExpect(jsonPath("$.data.messages[2].content").value("없어요"))
+			.andExpect(jsonPath("$.data.messages[4].content").value("넘어갈게요"))
+			.andExpect(jsonPath("$.data.messages[8].content").value("없어요"));
 	}
 
 	@Test
@@ -130,6 +143,9 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(withJson(post(url(session, "choices")).header(AUTH, bearer), Map.of("field", "painIndex")))
 			.andExpect(status().isBadRequest());
 		mockMvc.perform(choice(bearer, session, "painIndex", 4));
+		mockMvc.perform(choice(bearer, session, "bodyParts", List.of("NOSE"))).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "bodyParts", List.of())).andExpect(status().isBadRequest());
+		mockMvc.perform(skip(bearer, session, "bodyParts"));
 		mockMvc.perform(choice(bearer, session, "sleepHours", 25)).andExpect(status().isBadRequest());
 		mockMvc.perform(skip(bearer, session, "sleepHours"));
 		mockMvc.perform(choice(bearer, session, "medication", "yes")).andExpect(status().isBadRequest());
@@ -141,7 +157,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.skinSigns").doesNotExist())
 			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
 		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
-			.andExpect(jsonPath("$.data.messages.length()").value(6));
+			.andExpect(jsonPath("$.data.messages.length()").value(8));
 	}
 
 	@Test
@@ -151,6 +167,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(skip(bearer, session, "painIndex")).andExpect(status().isBadRequest());
 
 		mockMvc.perform(choice(bearer, session, "painIndex", 5));
+		mockMvc.perform(skip(bearer, session, "bodyParts"));
 		mockMvc.perform(skip(bearer, session, "sleepHours"));
 		mockMvc.perform(skip(bearer, session, "medication"));
 		mockMvc.perform(skip(bearer, session, "skinSigns"));
@@ -164,8 +181,8 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"reply\": \"약은 드셨어요?\", \"updates\": {\"painIndex\": 5}}");
 
 		mockMvc.perform(sendMessage(bearer, session, "오늘은 5점 정도예요"))
-			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
-			.andExpect(jsonPath("$.data.reply").value(SLEEP_QUESTION));
+			.andExpect(jsonPath("$.data.askingField").value("bodyParts"))
+			.andExpect(jsonPath("$.data.reply").value(BODY_PARTS_QUESTION));
 	}
 
 	@Test
@@ -217,7 +234,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(post(url(session, "finish")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist())
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"));
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyParts"));
 
 		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.messages[4].content").value("기록을 마칠게요"));

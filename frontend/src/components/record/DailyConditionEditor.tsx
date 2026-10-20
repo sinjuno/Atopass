@@ -1,15 +1,13 @@
 import type { SkinCondition, SkinSign } from '@/types/record';
 import { allSkinSigns } from '@/utils/bodyMap';
-import { EMPTY_TEXT, PAIN_INDEX_MAX, PAIN_INDEX_MIN, SKIN_SIGN_LABELS } from '@/utils/constants';
+import { SKIN_SIGN_LABELS } from '@/utils/constants';
 
 interface Value {
-  painIndex: number | null;
   medication: boolean | null;
   skinSigns: SkinSign[];
 }
 
 interface Props {
-  painIndex: number | null | undefined;
   medication: boolean | null | undefined;
   /** 부위 없이 고른 증상(예전 기록·챗봇). 부위마다 고른 증상은 skinConditions에 있다 */
   skinSigns: SkinSign[] | null | undefined;
@@ -17,14 +15,13 @@ interface Props {
   onChange: (next: Value) => void;
 }
 
-const PAIN_INDEXES = Array.from({ length: PAIN_INDEX_MAX - PAIN_INDEX_MIN + 1 }, (_, i) => PAIN_INDEX_MIN + i);
 /**
- * 고통 지수(0~10) + 약 복용 여부(예/아니오) + 나타난 증상.
+ * 약 복용 여부(예/아니오) + 나타난 증상. 고통 지수는 부위와 한 묶음으로 따로 받는다.
  * 나타난 증상은 부위별 기록에서 고른 증상을 모두 합쳐 보여 준다(예: 목 홍반, 왼손 진물/딱지 → 홍반, 각질).
  * 부위 없이 남은 증상(예전 기록·챗봇)은 여기서 지울 수 있다.
  */
-export default function DailyConditionEditor({ painIndex, medication, skinSigns, skinConditions, onChange }: Props) {
-  const current: Value = { painIndex: painIndex ?? null, medication: medication ?? null, skinSigns: skinSigns ?? [] };
+export default function DailyConditionEditor({ medication, skinSigns, skinConditions, onChange }: Props) {
+  const current: Value = { medication: medication ?? null, skinSigns: skinSigns ?? [] };
   const shownSigns = allSkinSigns({ skinConditions, skinSigns: current.skinSigns });
 
   const removeDailySign = (sign: SkinSign) =>
@@ -32,22 +29,6 @@ export default function DailyConditionEditor({ painIndex, medication, skinSigns,
 
   return (
     <div className="flex flex-col gap-5">
-      <label className="flex items-center justify-between gap-3">
-        <span className="text-base text-gray-700">고통 지수</span>
-        <select
-          value={current.painIndex ?? ''}
-          onChange={(e) => onChange({ ...current, painIndex: e.target.value === '' ? null : Number(e.target.value) })}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-base"
-        >
-          <option value="">{EMPTY_TEXT}</option>
-          {PAIN_INDEXES.map((n) => (
-            <option key={n} value={n}>
-              {n}점
-            </option>
-          ))}
-        </select>
-      </label>
-
       <fieldset className="flex items-center justify-between gap-3">
         <legend className="sr-only">약 복용 여부</legend>
         <span className="text-base text-gray-700">약 복용</span>
@@ -78,7 +59,7 @@ export default function DailyConditionEditor({ painIndex, medication, skinSigns,
       <div>
         <p className="mb-2 text-base text-gray-700">나타난 증상</p>
         {shownSigns.length === 0 ? (
-          <p className="text-sm text-gray-400">아래 부위별 기록에서 부위를 누르고 증상을 골라 주세요.</p>
+          <p className="text-sm text-gray-400">위 마네킹에서 부위를 누르고 증상을 골라 주세요.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {shownSigns.map((sign) => {

@@ -1,8 +1,8 @@
 import type { BodyPart, SkinCondition, SkinSign } from '@/types/record';
-import { BODY_MAP_PARTS, SCORE_MAX, SKIN_SIGN_LABELS } from '@/utils/constants';
-import { bodyPartScore } from '@/utils/recordScore';
+import { BODY_MAP_PARTS, SKIN_SIGN_LABELS } from '@/utils/constants';
 
-export type BodyMapScores = Partial<Record<BodyPart, number>>;
+/** 기록한 마네킹 부위마다 나타난 증상 개수. 기록하지 않은 부위는 키가 없다 */
+export type BodyMapCounts = Partial<Record<BodyPart, number>>;
 
 /** 예전 부위를 마네킹 부위로 옮겨 칠할 때 쓰는 대응표 */
 const LEGACY_PART_MAP: Partial<Record<BodyPart, BodyPart[]>> = {
@@ -17,22 +17,21 @@ const LEGACY_PART_MAP: Partial<Record<BodyPart, BodyPart[]>> = {
 export const isBodyMapPart = (part: BodyPart) => BODY_MAP_PARTS.includes(part);
 
 /**
- * 마네킹 부위별 고통 점수. 부위에 증상이 여러 개 기록돼 있으면(예전 기록) 평균을 쓴다.
- * withLegacy면 예전 부위(팔·다리 등)도 대응하는 마네킹 부위에 칠한다 — 한 부위에 겹치면 높은 점수.
+ * 마네킹 부위별 나타난 증상 개수.
+ * withLegacy면 예전 부위(팔·다리 등)도 대응하는 마네킹 부위에 칠한다 — 한 부위에 겹치면 많은 쪽.
  */
-export function bodyMapScores(skinConditions: SkinCondition[], { withLegacy = false } = {}): BodyMapScores {
-  const scores: BodyMapScores = {};
+export function bodyMapSignCounts(skinConditions: SkinCondition[], { withLegacy = false } = {}): BodyMapCounts {
+  const counts: BodyMapCounts = {};
   for (const condition of skinConditions) {
-    const score = bodyPartScore(condition);
-    if (score === null) continue;
+    const count = new Set(condition.skinSigns ?? []).size;
     const targets = isBodyMapPart(condition.bodyPart)
       ? [condition.bodyPart]
       : withLegacy
         ? (LEGACY_PART_MAP[condition.bodyPart] ?? [])
         : [];
-    for (const part of targets) scores[part] = Math.max(scores[part] ?? 0, score);
+    for (const part of targets) counts[part] = Math.max(counts[part] ?? 0, count);
   }
-  return scores;
+  return counts;
 }
 
 const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
@@ -60,14 +59,17 @@ export const dailyOnlySkinSigns = (record: { skinConditions?: SkinCondition[]; s
   return sortSkinSigns((record.skinSigns ?? []).filter((sign) => !fromParts.has(sign)));
 };
 
-/** 기록 안 한 부위와 0점 부위 색 — 고통이 없으면 색을 칠하지 않는다 */
+/** 기록하지 않은 부위 색 */
 export const BODY_MAP_EMPTY_COLOR = '#e5e7eb';
 
-/** 고통 점수 색: 1점은 아주 연한 분홍, 10점은 진한 빨강 — 점수가 높을수록 붉어진다. 0점·기록 없음은 무색 */
-export function painColor(score: number | undefined): string {
-  if (score === undefined || score <= 0) return BODY_MAP_EMPTY_COLOR;
-  const t = Math.min((score - 1) / (SCORE_MAX - 1), 1);
-  const saturation = 80 + t * 5;
-  const lightness = 88 - t * 47;
-  return `hsl(0 ${saturation}% ${lightness}%)`;
+/** 증상 개수의 최대값 — 증상 7가지가 모두 나타나면 가장 붉다 */
+export const SIGN_COUNT_MAX = SKIN_SIGN_ORDER.length;
+
+/**
+ * 증상 개수 색: 0개는 하얀색, 많아질수록 붉어져 7개가 모두 나타나면 새빨간색. 기록하지 않은 부위는 회색.
+ */
+export function signCountColor(count: number | undefined): string {
+  if (count === undefined) return BODY_MAP_EMPTY_COLOR;
+  const t = Math.min(Math.max(count, 0) / SIGN_COUNT_MAX, 1);
+  return `hsl(0 100% ${100 - t * 50}%)`;
 }

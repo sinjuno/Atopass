@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import type { ChatChoiceRequest, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
-import { SKIN_SIGN_LABELS } from '@/utils/constants';
+import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
 /**
@@ -25,10 +25,14 @@ const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
 
 /** 선택지 답을 대화에 남길 문장 — 서버가 대화 내역에 저장하는 문장과 같다 */
 export function choiceText(choice: ChatChoiceRequest): string {
-  if ('skip' in choice) return choice.field === 'notes' ? '없어요' : '넘어갈게요';
+  if ('skip' in choice) return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
   switch (choice.field) {
     case 'painIndex':
       return `${choice.value}점`;
+    case 'bodyParts':
+      return BODY_MAP_PARTS.filter((part) => choice.value.includes(part))
+        .map((part) => BODY_PART_LABELS[part])
+        .join(', ');
     case 'sleepHours':
       return `${choice.value}시간`;
     case 'medication':

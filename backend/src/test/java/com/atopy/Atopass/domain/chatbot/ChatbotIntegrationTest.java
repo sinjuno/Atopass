@@ -127,7 +127,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			 "updates": {"painIndex": 4}}""");
 		llm.enqueue("""
 			{"understood": true, "reply": "다른 건요?",
-			 "updates": {"sleepHours": 6, "medication": false, "skinSigns": [], "skipped": ["notes"]}}""");
+			 "updates": {"sleepHours": 6, "medication": false, "skinSigns": [], "skipped": ["bodyParts", "notes"]}}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 4점"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
@@ -149,7 +149,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 3점이고 그만할게요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"));
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyParts"));
 	}
 
 	@Test
@@ -266,12 +266,15 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 질문은_고통_지수_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
+	void 질문은_고통_지수_부위_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
 		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
 		mockMvc.perform(sendMessage(bearer, session, "5점"))
+			.andExpect(jsonPath("$.data.reply").value("어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"conditions\": [{\"bodyPart\": \"FACE\", \"pain\": 5}]}}");
+		mockMvc.perform(sendMessage(bearer, session, "얼굴이요"))
 			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"sleepHours\": 8}}");
 		mockMvc.perform(sendMessage(bearer, session, "8시간"))

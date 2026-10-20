@@ -1,12 +1,13 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { BodyPart } from '@/types/record';
-import { painColor, type BodyMapScores } from '@/utils/bodyMap';
+import { BODY_MAP_EMPTY_COLOR, SIGN_COUNT_MAX, signCountColor, type BodyMapCounts } from '@/utils/bodyMap';
 import { BODY_PART_LABELS } from '@/utils/constants';
 
 interface Props {
-  scores: BodyMapScores;
-  /** 고른 부위 — 테두리로 표시 */
-  selected?: BodyPart | null;
+  /** 기록한 부위마다 나타난 증상 개수 — 많을수록 붉게 칠한다 */
+  counts: BodyMapCounts;
+  /** 고른 부위 — 진한 테두리로 표시. 여러 곳을 고를 때는 배열로 넘긴다 */
+  selected?: BodyPart | readonly BodyPart[] | null;
   /** 부위를 눌렀을 때 */
   onSelect: (part: BodyPart) => void;
 }
@@ -61,19 +62,25 @@ const LIMBS: BodyPart[] = [
 const FRONT_ORDER: BodyPart[] = [...LIMBS, 'TRUNK', 'GROIN', 'NECK', 'FACE'];
 const BACK_ORDER: BodyPart[] = [...LIMBS, 'BACK'];
 
-/** 뒷면을 앞면 오른쪽에 좌우를 뒤집어 놓는다 — 그림 가로 200 + 간격 30 */
-const BACK_TRANSFORM = 'translate(430 0) scale(-1 1)';
+type Side = 'front' | 'back';
+const SIDE_LABELS: Record<Side, string> = { front: '앞', back: '뒤' };
+
+/** 뒷면은 앞면 그림을 좌우로 뒤집어 그린다 — 그림 가로 200 */
+const BACK_TRANSFORM = 'translate(200 0) scale(-1 1)';
 const DECORATION = { fill: '#f3f4f6', stroke: '#d1d5db', strokeWidth: 1.5 };
 
 /**
- * 사람 모양 마네킹(앞면·뒷면). 부위 색은 고통 점수가 높을수록 붉고, 낮을수록 연하다(0점·기록 없음은 무색).
+ * 사람 모양 마네킹. 앞·뒤 버튼으로 앞모습과 뒷모습을 바꿔 본다.
+ * 부위 색은 나타난 증상이 많을수록 붉다(0개는 하얀색, 7개는 새빨간색, 기록 없음은 회색).
  * 부위를 누르면 고른다. 팔·다리·손·발·목은 앞뒤 어느 쪽을 눌러도 같은 부위다.
  */
-export default function BodyMap({ scores, selected, onSelect }: Props) {
+export default function BodyMap({ counts, selected, onSelect }: Props) {
+  const [side, setSide] = useState<Side>('front');
+  const selectedParts: readonly BodyPart[] = selected == null ? [] : typeof selected === 'string' ? [selected] : selected;
   const renderPart = (part: BodyPart, side: 'front' | 'back') => {
-    const score = scores[part];
-    const label = `${BODY_PART_LABELS[part]} ${score === undefined ? '기록 없음' : `${score}점`}`;
-    const isSelected = selected === part;
+    const count = counts[part];
+    const label = `${BODY_PART_LABELS[part]} ${count === undefined ? '기록 없음' : `증상 ${count}개`}`;
+    const isSelected = selectedParts.includes(part);
     const select = () => onSelect(part);
     return (
       <g
@@ -89,8 +96,9 @@ export default function BodyMap({ scores, selected, onSelect }: Props) {
             select();
           }
         }}
-        fill={painColor(score)}
-        stroke={isSelected ? '#111827' : '#ffffff'}
+        fill={signCountColor(count)}
+        // 기록한 부위는 하얀색(증상 0개)이어도 보이도록 회색 테두리를 두른다
+        stroke={isSelected ? '#111827' : count === undefined ? '#ffffff' : '#9ca3af'}
         strokeWidth={isSelected ? 3 : 1.5}
         className="cursor-pointer outline-none transition-[fill] hover:opacity-85 focus-visible:opacity-75"
       >
@@ -101,46 +109,66 @@ export default function BodyMap({ scores, selected, onSelect }: Props) {
   };
 
   return (
-    <svg viewBox="0 0 430 400" className="mx-auto h-auto w-full max-w-[380px]" role="group" aria-label="부위별 고통 점수 마네킹">
-      <g fill="#9ca3af" fontSize="11" textAnchor="middle">
-        <text x="24" y="14">오른쪽</text>
-        <text x="176" y="14">왼쪽</text>
-        <text x="254" y="14">왼쪽</text>
-        <text x="406" y="14">오른쪽</text>
-      </g>
-      <g fill="#4b5563" fontSize="13" fontWeight="600" textAnchor="middle">
-        <text x="100" y="14">앞</text>
-        <text x="330" y="14">뒤</text>
-      </g>
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex rounded-full bg-gray-100 p-1" role="group" aria-label="앞모습·뒷모습">
+        {(Object.keys(SIDE_LABELS) as Side[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            aria-pressed={side === s}
+            onClick={() => setSide(s)}
+            className={`min-h-9 rounded-full px-4 text-base ${
+              side === s ? 'bg-white font-semibold text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            {SIDE_LABELS[s]}
+          </button>
+        ))}
+      </div>
 
-      <g>{FRONT_ORDER.map((part) => renderPart(part, 'front'))}</g>
+      <svg
+        viewBox="0 0 200 400"
+        className="h-auto w-full max-w-[190px]"
+        role="group"
+        aria-label={`부위별 증상 마네킹 ${SIDE_LABELS[side]}모습`}
+      >
+        {/* 앞모습은 마주 보는 그림이라 사람의 오른쪽이 화면 왼쪽에, 뒷모습은 그 반대다 */}
+        <g fill="#9ca3af" fontSize="11" textAnchor="middle">
+          <text x="24" y="14">{side === 'front' ? '오른쪽' : '왼쪽'}</text>
+          <text x="176" y="14">{side === 'front' ? '왼쪽' : '오른쪽'}</text>
+        </g>
 
-      <g transform={BACK_TRANSFORM}>
-        {BACK_ORDER.map((part) => renderPart(part, 'back'))}
-        {/* 엉덩이·뒤통수는 고르는 부위가 아니라 모양만 그린다 */}
-        <g {...DECORATION}>{GROIN_SHAPE}</g>
-        {renderPart('NECK', 'back')}
-        <g {...DECORATION}>{HEAD_SHAPE}</g>
-      </g>
-    </svg>
+        {side === 'front' ? (
+          <g>{FRONT_ORDER.map((part) => renderPart(part, 'front'))}</g>
+        ) : (
+          <g transform={BACK_TRANSFORM}>
+            {BACK_ORDER.map((part) => renderPart(part, 'back'))}
+            {/* 엉덩이·뒤통수는 고르는 부위가 아니라 모양만 그린다 */}
+            <g {...DECORATION}>{GROIN_SHAPE}</g>
+            {renderPart('NECK', 'back')}
+            <g {...DECORATION}>{HEAD_SHAPE}</g>
+          </g>
+        )}
+      </svg>
+    </div>
   );
 }
 
-/** 색 범례: 0점·기록 없음(무색) / 1점(연함) → 10점(붉음) */
+/** 색 범례: 기록 없음(회색) / 증상 0개(하얀색) → 7개(새빨간색) */
 export function BodyMapLegend() {
   return (
     <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-3 rounded-sm" style={{ background: painColor(0) }} />
-        0점·기록 없음
+        <span className="inline-block h-3 w-3 rounded-sm" style={{ background: BODY_MAP_EMPTY_COLOR }} />
+        기록 없음
       </span>
       <span className="flex items-center gap-1.5">
-        1점
+        증상 0개
         <span
-          className="inline-block h-3 w-20 rounded-sm"
-          style={{ background: `linear-gradient(to right, ${painColor(1)}, ${painColor(5)}, ${painColor(10)})` }}
+          className="inline-block h-3 w-20 rounded-sm border border-gray-300"
+          style={{ background: `linear-gradient(to right, ${signCountColor(0)}, ${signCountColor(SIGN_COUNT_MAX)})` }}
         />
-        10점
+        {SIGN_COUNT_MAX}개
       </span>
     </div>
   );

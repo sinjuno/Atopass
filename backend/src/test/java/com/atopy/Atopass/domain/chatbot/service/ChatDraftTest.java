@@ -25,7 +25,7 @@ class ChatDraftTest {
 		ChatDraft draft = ChatDraft.empty();
 
 		assertThat(draft.pendingFields())
-			.containsExactly("painIndex", "sleepHours", "medication", "skinSigns", "notes");
+			.containsExactly("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes");
 		assertThat(draft.requiredSatisfied()).isFalse();
 		assertThat(draft.readyForConfirmation(true)).isFalse();
 	}
@@ -38,7 +38,7 @@ class ChatDraftTest {
 
 		assertThat(draft.toResponse().painIndex()).isEqualTo(6);
 		assertThat(draft.requiredSatisfied()).isTrue();
-		assertThat(draft.pendingFields()).containsExactly("sleepHours", "medication", "skinSigns", "notes");
+		assertThat(draft.pendingFields()).containsExactly("bodyParts", "sleepHours", "medication", "skinSigns", "notes");
 	}
 
 	@Test
@@ -187,14 +187,14 @@ class ChatDraftTest {
 		assertThat(draft.toResponse().lifestyle().alcohol()).isTrue();
 		assertThat(draft.toResponse().lifestyle().outdoorActivity()).isEqualTo(OutdoorActivity.MEDIUM);
 		assertThat(draft.toResponse().notes()).isEqualTo("평소보다 오래 걸었음");
-		assertThat(draft.pendingFields()).containsExactly("painIndex", "sleepHours", "medication", "skinSigns");
+		assertThat(draft.pendingFields()).containsExactly("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns");
 	}
 
 	@Test
 	void 건너뛴_선택_항목은_더_묻지_않고_확인_단계로_넘어갈_수_있다() {
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
-			{"painIndex": 3, "skipped": ["sleepHours", "medication", "skinSigns", "notes", "unknown"]}"""));
+			{"painIndex": 3, "skipped": ["bodyParts", "sleepHours", "medication", "skinSigns", "notes", "unknown"]}"""));
 
 		assertThat(draft.pendingFields()).isEmpty();
 		assertThat(draft.readyForConfirmation(false)).isTrue();
@@ -266,10 +266,41 @@ class ChatDraftTest {
 		assertThat(draft.askingField()).isEqualTo("painIndex");
 
 		draft.apply(json("{\"painIndex\": 6, \"medication\": true}"));
+		assertThat(draft.askingField()).isEqualTo("bodyParts");
+
+		draft.apply(json("{\"skipped\": [\"bodyParts\"]}"));
 		assertThat(draft.askingField()).isEqualTo("sleepHours");
 
 		draft.apply(json("{\"skipped\": [\"sleepHours\", \"notes\"], \"skinSigns\": []}"));
 		assertThat(draft.askingField()).isNull();
+	}
+
+	@Test
+	void 고통_지수_다음에는_부위를_묻고_고른_부위에는_고통_지수가_점수로_들어간다() {
+		ChatDraft draft = ChatDraft.empty();
+		// 고통 지수가 없으면 부위를 반영하지 않는다.
+		assertThat(draft.applyBodyParts(json("[\"FACE\"]"))).isEqualTo(ApplyResult.INVALID_VALUE);
+
+		draft.apply(json("{\"painIndex\": 7}"));
+		assertThat(draft.askingField()).isEqualTo("bodyParts");
+
+		assertThat(draft.applyBodyParts(json("[\"FACE\", \"NOSE\"]"))).isEqualTo(ApplyResult.INVALID_VALUE);
+		assertThat(draft.applyBodyParts(json("[]"))).isEqualTo(ApplyResult.INVALID_VALUE);
+		assertThat(draft.conditions()).isEmpty();
+
+		assertThat(draft.applyBodyParts(json("[\"FACE\", \"left_hand\"]"))).isEqualTo(ApplyResult.OK);
+		assertThat(draft.conditions()).containsOnlyKeys(BodyPart.FACE, BodyPart.LEFT_HAND);
+		assertThat(draft.conditions().get(BodyPart.FACE)).containsEntry(Symptom.PAIN, 7);
+		assertThat(draft.askingField()).isEqualTo("sleepHours");
+	}
+
+	@Test
+	void 고통_지수가_0점이면_부위를_묻지_않는다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 0}"));
+
+		assertThat(draft.pendingFields()).doesNotContain("bodyParts");
+		assertThat(draft.askingField()).isEqualTo("sleepHours");
 	}
 
 	@Test
