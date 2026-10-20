@@ -360,6 +360,42 @@ public final class ChatDraft {
 			next.notes = text.isEmpty() ? null : text;
 		}
 
+		// 저장된 기록을 고칠 때 "가려움은 없어졌어요", "얼굴은 빼 주세요"처럼 지우는 말을 받는다.
+		JsonNode removeSigns = updates.path("removeSkinSigns");
+		if (present(removeSigns)) {
+			if (!removeSigns.isArray()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			for (JsonNode item : removeSigns) {
+				SkinSign sign;
+				try {
+					sign = SkinSign.valueOf(item.asString().trim().toUpperCase(Locale.ROOT));
+				} catch (IllegalArgumentException e) {
+					return ApplyResult.INVALID_VALUE;
+				}
+				if (next.skinSigns != null) {
+					next.skinSigns.remove(sign);
+				}
+				next.conditionSigns.values().forEach(signsOfPart -> signsOfPart.remove(sign));
+			}
+		}
+		JsonNode removeParts = updates.path("removeBodyParts");
+		if (present(removeParts)) {
+			if (!removeParts.isArray()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			for (JsonNode item : removeParts) {
+				BodyPart part;
+				try {
+					part = BodyPart.valueOf(item.asString().trim().toUpperCase(Locale.ROOT));
+				} catch (IllegalArgumentException e) {
+					return ApplyResult.INVALID_VALUE;
+				}
+				next.conditions.remove(part);
+				next.conditionSigns.remove(part);
+			}
+		}
+
 		JsonNode skippedNode = updates.path("skipped");
 		if (skippedNode.isArray()) {
 			for (JsonNode item : skippedNode) {

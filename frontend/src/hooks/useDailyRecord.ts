@@ -10,7 +10,6 @@ import { chatSessionStore } from './useRecordDraft';
 /**
  * - edit: 이미 저장된 기록 → PUT /records/{id}
  * - chatDraft: 챗봇 세션의 초안(GET /chatbot/sessions/{id}/draft)으로 채움 → POST /chatbot/sessions/{id}/records (confirmed: true)
- *   저장된 기록을 챗봇으로 고친 경우도 여기에 해당한다 (recordId가 있고, 서버가 그 기록을 수정한다)
  * - new: 기록도 세션도 없음 → 직접 입력, POST /records
  */
 export type DailyRecordMode = 'edit' | 'chatDraft' | 'new';
@@ -34,17 +33,14 @@ const emptyRecord = (recordDate: string): RecordInput => ({
 async function loadChatDraft(sessionId: string) {
   return chatbotApi
     .getDraft(sessionId)
-    .then(({ draft, requiresConfirmation }) => ({
-      requiresConfirmation,
-      form: {
-        skinConditions: draft.skinConditions ?? [],
-        painIndex: draft.painIndex ?? null,
-        sleepHours: draft.sleepHours ?? null,
-        medication: draft.medication ?? null,
-        skinSigns: draft.skinSigns ?? [],
-        lifestyle: draft.lifestyle ?? null,
-        notes: draft.notes ?? null,
-      },
+    .then(({ draft }) => ({
+      skinConditions: draft.skinConditions ?? [],
+      painIndex: draft.painIndex ?? null,
+      sleepHours: draft.sleepHours ?? null,
+      medication: draft.medication ?? null,
+      skinSigns: draft.skinSigns ?? [],
+      lifestyle: draft.lifestyle ?? null,
+      notes: draft.notes ?? null,
     }))
     .catch((e: unknown) => {
       if (e instanceof ApiError && e.code === 'SESSION_CLOSED') return 'closed' as const;
@@ -66,6 +62,19 @@ export function useDailyRecord(recordDate: string) {
     setError(null);
     try {
       const summary = await recordApi.findByDate(recordDate);
+      if (summary) {
+        const detail = await recordApi.getDetail(summary.recordId);
+        const { recordId, photos, sleepScore: _s, createdAt: _c, updatedAt: _u, ...input } = detail;
+        setMode('edit');
+        setRecordId(recordId);
+        // 서버의 하루 증상에는 부위 증상이 합쳐져 있다 — 부위 증상을 빼 두어야 부위에서 지운 증상이 다시 저장되지 않는다
+        setForm({ ...input, skinSigns: dailyOnlySkinSigns(input) });
+        setPhotos(photos ?? []);
+        return;
+      }
+
+      setRecordId(null);
+      setPhotos([]);
       const sessionId = chatSessionStore.get(recordDate);
       const draft = sessionId ? await loadChatDraft(sessionId) : null;
       if (draft === 'closed') {
@@ -74,29 +83,9 @@ export function useDailyRecord(recordDate: string) {
         await load();
         return;
       }
-
-      if (summary) {
-        const detail = await recordApi.getDetail(summary.recordId);
-        const { recordId, photos, sleepScore: _s, createdAt: _c, updatedAt: _u, ...input } = detail;
-        setRecordId(recordId);
-        setPhotos(photos ?? []);
-        // 챗봇에서 저장된 기록을 고치고 "기록 내용 확인하기"까지 왔으면, 고친 내용을 확인·저장하게 한다
-        if (draft?.requiresConfirmation) {
-          setMode('chatDraft');
-          setForm({ recordDate, ...draft.form });
-          return;
-        }
-        setMode('edit');
-        // 서버의 하루 증상에는 부위 증상이 합쳐져 있다 — 부위 증상을 빼 두어야 부위에서 지운 증상이 다시 저장되지 않는다
-        setForm({ ...input, skinSigns: dailyOnlySkinSigns(input) });
-        return;
-      }
-
-      setRecordId(null);
-      setPhotos([]);
       if (draft) {
         setMode('chatDraft');
-        setForm({ recordDate, ...draft.form });
+        setForm({ recordDate, ...draft });
       } else {
         if (sessionId) chatSessionStore.clear(recordDate);
         setMode('new');

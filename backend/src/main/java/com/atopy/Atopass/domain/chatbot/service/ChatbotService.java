@@ -51,7 +51,7 @@ public class ChatbotService {
 	static final String SCORE_OUT_OF_RANGE = "점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String CONFIRM = "입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요.";
-	static final String EDIT_CONFIRM = "더 바꿀 내용이 있으면 말씀해 주세요. 없으면 아래 버튼을 눌러 확인하고 저장해 주세요.";
+	static final String EDIT_CONFIRM = "이대로 저장하려면 아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요.";
 	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
 	static final String FINISH_TEXT = "기록을 마칠게요";
 
@@ -155,9 +155,9 @@ public class ChatbotService {
 
 	private ChatReplyResponse choiceTurn(TurnContext context, ChatDraft draft, String userText, boolean finished) {
 		boolean ready = draft.readyForConfirmation(finished);
-		String reply = ready ? CONFIRM : question(draft.askingField());
-		ChatReplyResponse response = new ChatReplyResponse(
-			reply, true, draft.pendingFields(), ready ? null : draft.askingField(), ready, draft.toResponse());
+		String reply = ready ? confirmation(draft, null) : question(draft.askingField());
+		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(),
+			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing());
 		sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, ready, true);
 		return response;
 	}
@@ -192,7 +192,7 @@ public class ChatbotService {
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, state.draftJson());
 		boolean ready = state.confirmationReady();
 		return new ChatDraftStateResponse(
-			draft.toResponse(), draft.pendingFields(), ready ? null : draft.askingField(), ready);
+			draft.toResponse(), draft.pendingFields(), ready ? null : draft.askingField(), ready, draft.editing());
 	}
 
 	/**
@@ -229,14 +229,13 @@ public class ChatbotService {
 			String message = reply == null ? NOT_UNDERSTOOD : reply;
 			reply = failCount >= EXAMPLE_AFTER_FAILURES ? message + EXAMPLE : message;
 		} else if (readyForConfirmation) {
-			// 저장된 기록을 고치는 중이면 무엇을 바꿨는지(LLM의 답) 먼저 알려 준다.
-			reply = draft.editing() && reply != null ? reply + "\n" + EDIT_CONFIRM : CONFIRM;
+			reply = confirmation(draft, reply);
 		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
 			reply = question(draft.askingField());
 		}
 
 		ChatReplyResponse response = new ChatReplyResponse(reply, understood, draft.pendingFields(),
-			readyForConfirmation ? null : draft.askingField(), readyForConfirmation, draft.toResponse());
+			readyForConfirmation ? null : draft.askingField(), readyForConfirmation, draft.toResponse(), draft.editing());
 		return new Outcome(response, draft.toJson(jsonMapper), failCount);
 	}
 
@@ -250,8 +249,21 @@ public class ChatbotService {
 		int failCount = understood ? 0 : context.failCount() + 1;
 		String reply = understood ? text
 			: (failCount >= EXAMPLE_AFTER_FAILURES ? NOT_UNDERSTOOD + " 예: \"이번 주 가려움은 어땠어?\"" : NOT_UNDERSTOOD);
-		ChatReplyResponse response = new ChatReplyResponse(reply, understood, List.of(), null, false, null);
+		ChatReplyResponse response = new ChatReplyResponse(reply, understood, List.of(), null, false, null, false);
 		return new Outcome(response, context.draftJson(), failCount);
+	}
+
+	/**
+	 * 확인 단계 안내. 저장된 기록을 고치는 중이면 총정리로 가지 않고 챗봇 화면에서 바로 저장하므로,
+	 * 무엇을 바꿨는지(LLM의 답)와 저장될 내용을 함께 보여 준다.
+	 */
+	private static String confirmation(ChatDraft draft, String llmReply) {
+		if (!draft.editing()) {
+			return CONFIRM;
+		}
+		String changed = llmReply == null || llmReply.isBlank() ? "" : llmReply.trim() + "\n";
+		return changed + "지금 내용은 아래와 같아요.\n" + draft.summary()
+			+ "\n\n" + EDIT_CONFIRM;
 	}
 
 	/** 지금 물어볼 항목의 정해진 질문. 선택지로 답하는 항목은 화면에 같은 선택지가 함께 나온다. */

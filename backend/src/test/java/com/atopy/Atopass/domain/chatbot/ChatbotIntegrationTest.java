@@ -511,8 +511,10 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.reply").value(
-				"수면 시간을 8시간으로 바꿨어요.\n더 바꿀 내용이 있으면 말씀해 주세요. 없으면 아래 버튼을 눌러 확인하고 저장해 주세요."));
+				"수면 시간을 8시간으로 바꿨어요.\n지금 내용은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 고통 4점\n- 수면 시간: 8시간\n- 나타난 증상: 없음"
+					+ "\n\n이대로 저장하려면 아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요."));
 		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
 
 		Map<String, Object> edited = saveBody(today, true, Map.of("pain", 4), 8);
@@ -523,6 +525,28 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.sleepHours").value(8.0))
 			.andExpect(jsonPath("$.data.painIndex").value(5));
+	}
+
+	@Test
+	void 수정_세션에서는_증상과_부위를_글로_지울_수_있다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		Map<String, Object> record = (Map<String, Object>) body.get("record");
+		record.put("painIndex", 5);
+		record.put("skinSigns", List.of("ITCHING", "XEROSIS"));
+		saveRecord(bearer, createSession(bearer, "RECORD"), body).andExpect(status().isCreated());
+
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.editing").value(true));
+		llm.enqueue("{\"understood\": true, \"reply\": \"가려움과 팔을 뺐어요.\", "
+			+ "\"updates\": {\"removeSkinSigns\": [\"ITCHING\"], \"removeBodyParts\": [\"ARM\"]}}");
+		mockMvc.perform(sendMessage(bearer, session, "가려움은 없어졌고 팔은 빼 주세요"))
+			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(1))
+			.andExpect(jsonPath("$.data.draft.skinSigns[0]").value("XEROSIS"))
+			.andExpect(jsonPath("$.data.draft.skinConditions").isEmpty())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
 	}
 
 	@Test

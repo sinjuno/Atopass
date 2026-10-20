@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
-import type { ChatChoiceRequest, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
+import { photoApi } from '@/apis/photo';
+import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
 import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
 /**
  * - consent: 외부 LLM 이용 동의가 필요함 (동의 팝업 표시)
- * - closed: 이 날짜의 대화는 이미 기록으로 저장됨 (총정리로 이동)
  */
-export type ChatStatus = 'loading' | 'consent' | 'ready' | 'sending' | 'error' | 'closed';
+export type ChatStatus = 'loading' | 'consent' | 'ready' | 'sending' | 'error';
 
 interface SendResult {
   ok: boolean;
-  /** SESSION_CLOSED — 이미 저장된 기록이라 총정리로 이동해야 함 */
+  /** SESSION_CLOSED — 다른 탭 등에서 이미 저장된 대화. 저장된 기록을 고치는 대화로 다시 연다 */
   closed?: boolean;
   /** CHAT_LIMIT_EXCEEDED — 최근 24시간 이용 한도 도달, 총정리에서 직접 입력하도록 안내 */
   limitReached?: boolean;
@@ -48,6 +48,7 @@ export function choiceText(choice: ChatChoiceRequest): string {
 }
 
 const FINISH_TEXT = '기록을 마칠게요';
+const EDIT_SAVED_TEXT = '수정한 내용을 저장했어요. 더 바꿀 내용이 있으면 언제든 말씀해 주세요.';
 
 /**
  * 기록(RECORD) 모드 챗봇 세션.
@@ -56,6 +57,7 @@ const FINISH_TEXT = '기록을 마칠게요';
  * - 그날 기록이 이미 저장되어 있으면 서버가 그 기록을 불러온 수정 세션을 열고, 첫 메시지로 수정할 내용을 묻는다
  * - 응답의 pendingFields / askingField / requiresConfirmation 상태를 노출
  * - 글(send), 선택지(choose), 기록 마치기(finish) 모두 같은 방식으로 한 턴을 주고받는다
+ * - 기록을 고치는 대화(editing)는 확인 단계에서 총정리로 가지 않고 saveEdit으로 챗봇 화면에서 바로 저장한다
  */
 export function useChatSession(recordDate: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export function useChatSession(recordDate: string) {
   const [pendingFields, setPendingFields] = useState<PendingField[]>([]);
   const [askingField, setAskingField] = useState<PendingField | null>(null);
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
+  const [draft, setDraft] = useState<ChatDraft | null>(null);
+  const [editing, setEditing] = useState(false);
   // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
   const [painIndex, setPainIndex] = useState<number | null>(null);
   const [status, setStatus] = useState<ChatStatus>('loading');
@@ -70,6 +74,32 @@ export function useChatSession(recordDate: string) {
   // 한도에 도달해도 대화 내역·초안 조회는 되므로 status는 그대로 두고 안내만 띄운다
   const [limitReached, setLimitReached] = useState(false);
   const startedRef = useRef(false);
+
+  /**
+   * 서버가 이 날짜에 이어 쓸 세션을 정한다 — 열려 있던 대화는 그대로, 저장된 기록이 있으면 그 기록을 고치는 세션.
+   * 그사이 총정리에서 기록을 고쳤으면 예전 초안 대신 새 세션을 주므로, 보관해 둔 sessionId를 그대로 믿지 않는다.
+   * keepMessages면 지금 보이는 대화를 그대로 두고 진행 상태만 새 세션으로 바꾼다 (챗봇에서 저장한 직후).
+   */
+  const openSession = useCallback(
+    async (keepMessages = false) => {
+      const session = await chatbotApi.createSession('RECORD');
+      chatSessionStore.set(recordDate, session.sessionId);
+      const [{ messages }, state] = await Promise.all([
+        chatbotApi.getMessages(session.sessionId),
+        chatbotApi.getDraft(session.sessionId),
+      ]);
+      setSessionId(session.sessionId);
+      if (!keepMessages) setMessages(messages);
+      setPendingFields(state.pendingFields);
+      setAskingField(state.askingField);
+      setRequiresConfirmation(state.requiresConfirmation);
+      setDraft(state.draft);
+      setEditing(state.editing);
+      setPainIndex(state.draft.painIndex ?? null);
+      setStatus('ready');
+    },
+    [recordDate],
+  );
 
   const start = useCallback(async () => {
     setStatus('loading');
@@ -81,21 +111,7 @@ export function useChatSession(recordDate: string) {
         return;
       }
 
-      // 서버가 이 날짜에 이어 쓸 세션을 정한다 — 열려 있던 대화는 그대로, 저장된 기록이 있으면 그 기록을 고치는 세션.
-      // 그사이 총정리에서 기록을 고쳤으면 예전 초안 대신 새 세션을 주므로, 보관해 둔 sessionId를 그대로 믿지 않는다.
-      const session = await chatbotApi.createSession('RECORD');
-      chatSessionStore.set(recordDate, session.sessionId);
-      const [{ messages }, state] = await Promise.all([
-        chatbotApi.getMessages(session.sessionId),
-        chatbotApi.getDraft(session.sessionId),
-      ]);
-      setSessionId(session.sessionId);
-      setMessages(messages);
-      setPendingFields(state.pendingFields);
-      setAskingField(state.askingField);
-      setRequiresConfirmation(state.requiresConfirmation);
-      setPainIndex(state.draft.painIndex ?? null);
-      setStatus('ready');
+      await openSession();
     } catch (e) {
       if (isApiError(e, 'CONSENT_REQUIRED')) {
         setStatus('consent');
@@ -104,7 +120,7 @@ export function useChatSession(recordDate: string) {
       setError(e instanceof Error ? e.message : '대화를 시작하지 못했어요.');
       setStatus('error');
     }
-  }, [recordDate]);
+  }, [openSession]);
 
   useEffect(() => {
     // StrictMode 개발 환경에서 세션이 두 번 생성되지 않도록
@@ -142,6 +158,8 @@ export function useChatSession(recordDate: string) {
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
         setRequiresConfirmation(res.requiresConfirmation);
+        setDraft(res.draft);
+        setEditing(res.editing);
         setPainIndex(res.draft?.painIndex ?? null);
         setStatus('ready');
         setLimitReached(false);
@@ -157,7 +175,7 @@ export function useChatSession(recordDate: string) {
         setStatus('ready');
         if (isApiError(e, 'SESSION_CLOSED')) {
           chatSessionStore.clear(recordDate);
-          setError('이미 저장된 기록이에요. 총정리 화면으로 이동할게요.');
+          setError('이미 저장된 기록이에요. 저장된 내용을 다시 불러올게요.');
           return { ok: false, closed: true };
         }
         if (isApiError(e, 'CHAT_LIMIT_EXCEEDED')) {
@@ -191,6 +209,8 @@ export function useChatSession(recordDate: string) {
           setPendingFields(state.pendingFields);
           setAskingField(state.askingField);
           setRequiresConfirmation(state.requiresConfirmation);
+          setDraft(state.draft);
+          setEditing(state.editing);
           setPainIndex(state.draft.painIndex ?? null);
         } catch {
           // 다시 맞추지 못해도 오류 문구는 이미 보여 주고 있다
@@ -203,12 +223,55 @@ export function useChatSession(recordDate: string) {
 
   const finish = useCallback(() => runTurn(FINISH_TEXT, (id) => chatbotApi.finish(id)), [runTurn]);
 
+  /**
+   * 기록을 고치는 대화에서 지금 초안으로 저장된 기록을 수정한다. 총정리 화면으로 가지 않는다.
+   * 대화 중에 붙인 사진도 함께 올리고, 올리지 못한 사진을 돌려준다.
+   * 저장하면 세션이 닫히므로, 대화는 그대로 두고 수정한 기록을 다시 고칠 수 있는 새 세션을 연다.
+   */
+  const saveEdit = useCallback(
+    async (photos: File[]): Promise<{ ok: boolean; failedPhotos: File[] }> => {
+      if (!sessionId || !draft) return { ok: false, failedPhotos: photos };
+      setStatus('sending');
+      setError(null);
+      try {
+        const { sleepScore: _s, ...rest } = draft;
+        const record = { ...rest, skinConditions: rest.skinConditions ?? [], skinSigns: rest.skinSigns ?? [] };
+        const { recordId } = await chatbotApi.saveRecord(sessionId, { recordDate, confirmed: true, record });
+        const failedPhotos: File[] = [];
+        for (const file of photos) {
+          try {
+            await photoApi.upload(recordId, file);
+          } catch {
+            failedPhotos.push(file);
+          }
+        }
+        const saved = failedPhotos.length
+          ? `수정한 내용을 저장했어요. 사진 ${failedPhotos.length}장은 올리지 못했어요. 다시 붙여 주세요.`
+          : EDIT_SAVED_TEXT;
+        setMessages((prev) => [...prev, { role: 'ASSISTANT', content: saved, createdAt: new Date().toISOString() }]);
+        await openSession(true);
+        return { ok: true, failedPhotos };
+      } catch (e) {
+        setStatus('ready');
+        if (isApiError(e, 'SESSION_CLOSED')) {
+          // 다른 탭에서 이미 저장했으면 저장된 내용으로 다시 불러온다
+          await start();
+          return { ok: false, failedPhotos: photos };
+        }
+        setError(e instanceof Error ? e.message : '저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        return { ok: false, failedPhotos: photos };
+      }
+    },
+    [sessionId, draft, recordDate, openSession, start],
+  );
+
   return {
     sessionId,
     messages,
     pendingFields,
     askingField,
     requiresConfirmation,
+    editing,
     painIndex,
     status,
     error,
@@ -216,6 +279,7 @@ export function useChatSession(recordDate: string) {
     send,
     choose,
     finish,
+    saveEdit,
     agree,
     retry: start,
   };

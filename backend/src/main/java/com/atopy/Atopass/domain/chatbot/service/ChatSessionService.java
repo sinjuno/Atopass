@@ -99,7 +99,7 @@ public class ChatSessionService {
 	/** 수정 세션의 첫 인사. 저장된 내용을 보여 주고 바꿀 내용이 있는지 묻는다. */
 	private static String editGreeting(ChatDraft draft) {
 		String ask = draft.requiredSatisfied()
-			? "수정할 내용이 있나요? 바꿀 내용을 말씀해 주세요. 없으면 아래 '기록 마치기'를 눌러 주세요."
+			? "수정할 내용이 있나요? 바꿀 내용을 글로 말씀해 주세요. (예: 잠은 8시간 잤어요, 가려움은 없어졌어요)"
 			: "수정할 내용이 있나요? 먼저 오늘 피부 때문에 느낀 고통을 0~10 중에서 골라 주세요.";
 		return "오늘 기록이 이미 저장되어 있어요.\n" + draft.summary() + "\n\n" + ask;
 	}

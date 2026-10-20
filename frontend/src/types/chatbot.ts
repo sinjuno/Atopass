@@ -28,6 +28,8 @@ export interface SendMessageResponse {
   requiresConfirmation: boolean;
   /** 지금까지 모은 초안. 질의 모드에서는 null */
   draft: ChatDraft | null;
+  /** 이미 저장된 그날 기록을 고치는 대화. 확인 단계에서 총정리로 가지 않고 챗봇 화면에서 바로 저장한다 */
+  editing: boolean;
 }
 
 /** GET /chatbot/sessions/{sessionId}/draft — 저장된(닫힌) 세션이면 409 SESSION_CLOSED */
@@ -36,6 +38,7 @@ export interface ChatDraftState {
   pendingFields: PendingField[];
   askingField: PendingField | null;
   requiresConfirmation: boolean;
+  editing: boolean;
 }
 
 /**
