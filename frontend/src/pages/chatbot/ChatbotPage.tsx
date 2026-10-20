@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import ChatChoices from '@/components/chatbot/ChatChoices';
 import ChatInput from '@/components/chatbot/ChatInput';
@@ -30,8 +30,8 @@ export default function ChatbotPage() {
     limitReached,
     send,
     choose,
-    finish,
-    save,
+    recordId,
+    uploadPhotos,
     agree,
     retry,
   } = useChatSession(recordDate);
@@ -48,14 +48,18 @@ export default function ChatbotPage() {
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
   const textLocked = started && choiceField !== null && choiceField !== 'notes';
-  // 부위를 고르는 동안에는 마네킹에 집중하도록 남은 항목과 "기록 마치기"를 숨긴다
+  // 부위를 고르는 동안에는 마네킹에 집중하도록 남은 항목을 숨긴다
   const pickingParts = choiceField === 'bodyParts';
-  const canFinish =
-    started &&
-    !requiresConfirmation &&
-    !pickingParts &&
-    !pendingFields.includes('painIndex') &&
-    !pendingFields.includes('symptoms');
+
+  // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
+  const pendingPhotos = draft.photos;
+  useEffect(() => {
+    if (!recordId || pendingPhotos.length === 0) return;
+    draft.clearPhotos();
+    void uploadPhotos(pendingPhotos).then((failed) => {
+      if (failed.length) draft.addPhotos(failed);
+    });
+  }, [recordId, pendingPhotos]);
 
   // 다른 탭 등에서 이 대화가 이미 저장됐으면(closed) 총정리로 보내지 않고, 저장된 기록을 고치는 대화로 다시 연다
   const handleSubmit = async (text: string) => {
@@ -69,19 +73,6 @@ export default function ChatbotPage() {
   const handleChoose = async (choice: ChatChoiceRequest) => {
     const result = await choose(choice);
     if (result.closed) void retry();
-  };
-
-  const handleFinish = async () => {
-    const result = await finish();
-    if (result.closed) void retry();
-  };
-
-  // 처음 기록이든 고치는 대화든 챗봇 화면에서 바로 저장한다 (총정리로 가지 않는다)
-  const handleSave = async () => {
-    const result = await save(draft.photos);
-    if (!result.ok) return;
-    draft.clearPhotos();
-    if (result.failedPhotos.length) draft.addPhotos(result.failedPhotos);
   };
 
   const handleAttach = (files: File[]) => {
@@ -118,35 +109,11 @@ export default function ChatbotPage() {
 
       {!requiresConfirmation && !pickingParts && <PendingFieldList fields={pendingFields} />}
 
-      {canFinish && (
-        <div className="flex justify-end px-3 pb-1">
-          <button
-            type="button"
-            onClick={() => void handleFinish()}
-            disabled={status !== 'ready'}
-            className="text-sm font-semibold text-emerald-700 underline underline-offset-2 disabled:opacity-40"
-          >
-            {pendingFields.length > 0 ? '남은 항목 건너뛰고 기록 마치기' : '기록 마치기'}
-          </button>
-        </div>
-      )}
 
       {choiceField && (status === 'ready' || status === 'sending') && (
         <ChatChoices field={choiceField} onChoose={(c) => void handleChoose(c)} disabled={status !== 'ready'} />
       )}
 
-      {requiresConfirmation && (
-        <div className="border-t border-emerald-100 bg-emerald-50 p-3">
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={status !== 'ready'}
-            className="w-full rounded-xl bg-emerald-600 py-3 text-lg font-bold text-white disabled:bg-gray-300"
-          >
-            {status === 'sending' ? '저장 중…' : '저장하기'}
-          </button>
-        </div>
-      )}
 
       {(draft.photos.length > 0 || photoError) && (
         <div className="border-t border-gray-100 px-3 pt-3">
@@ -158,7 +125,7 @@ export default function ChatbotPage() {
       {limitReached && (
         <div role="alert" className="border-t border-amber-100 bg-amber-50 p-3">
           <p className="text-center text-base text-gray-700">
-            오늘 챗봇 이용 한도에 도달했어요. 글로 답하는 것은 잠시 뒤에 다시 해 주세요. 선택지 버튼과 저장하기는 계속 쓸 수 있어요
+            오늘 챗봇 이용 한도에 도달했어요. 글로 답하는 것은 잠시 뒤에 다시 해 주세요. 선택지 버튼은 계속 쓸 수 있어요
           </p>
         </div>
       )}

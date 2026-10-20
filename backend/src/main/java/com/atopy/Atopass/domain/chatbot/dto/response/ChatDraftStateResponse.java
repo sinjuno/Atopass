@@ -11,6 +11,7 @@ public record ChatDraftStateResponse(
 	List<String> pendingFields,
 	String askingField,
 	boolean requiresConfirmation,
-	boolean editing
+	boolean editing,
+	Long recordId
 ) {
 }

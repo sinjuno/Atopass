@@ -15,4 +15,8 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, String
 	Optional<ChatSession> findFirstByMemberIdAndRecordDateAndModeAndClosedFalseOrderByCreatedAtDesc(
 		Long memberId, LocalDate recordDate, ChatMode mode);
 
+	/** 같은 날짜·모드의 가장 최근 세션 (닫힌 세션 포함) */
+	Optional<ChatSession> findFirstByMemberIdAndRecordDateAndModeOrderByCreatedAtDesc(
+		Long memberId, LocalDate recordDate, ChatMode mode);
+
 }

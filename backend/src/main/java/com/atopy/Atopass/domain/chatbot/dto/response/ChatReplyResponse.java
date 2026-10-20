@@ -10,7 +10,8 @@ import java.util.List;
  * @param askingField          지금 묻는 항목. 화면은 이 값에 맞춰 선택지를 보여 준다. 묻는 것이 없거나 질의 모드면 null
  * @param requiresConfirmation true이면 기록 초안을 확인(일일 총정리)하는 단계로 넘어간다.
  * @param draft                지금까지 모은 기록 초안. 질의 모드에서는 null
- * @param editing              이미 저장된 그날 기록을 고치는 대화인지. true이면 확인 단계에서 챗봇 화면에서 바로 저장한다.
+ * @param editing              그날 기록이 이미 저장되어, 이제 글로 고치면 바로 저장되는 대화인지
+ * @param recordId             이 대화로 저장한(또는 고치는) 기록의 ID. 아직 저장 전이면 null
  */
 public record ChatReplyResponse(
 	String reply,
@@ -19,6 +20,13 @@ public record ChatReplyResponse(
 	String askingField,
 	boolean requiresConfirmation,
 	ChatDraftResponse draft,
-	boolean editing
+	boolean editing,
+	Long recordId
 ) {
+
+	/** 기록을 저장한 뒤 그 ID를 붙인다. */
+	public ChatReplyResponse withRecordId(Long id) {
+		return new ChatReplyResponse(reply, understood, pendingFields, askingField, requiresConfirmation, draft,
+			id != null || editing, id);
+	}
 }

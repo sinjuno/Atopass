@@ -1,6 +1,10 @@
 package com.atopy.Atopass.domain.chatbot.service;
 
 import com.atopy.Atopass.domain.chatbot.dto.response.ChatDraftResponse;
+import com.atopy.Atopass.domain.record.dto.request.LifestyleRequest;
+import com.atopy.Atopass.domain.record.dto.request.RecordRequest;
+import com.atopy.Atopass.domain.record.dto.request.SkinConditionRequest;
+import com.atopy.Atopass.domain.record.dto.request.SymptomsRequest;
 import com.atopy.Atopass.domain.record.dto.response.LifestyleResponse;
 import com.atopy.Atopass.domain.record.dto.response.SkinConditionResponse;
 import com.atopy.Atopass.domain.record.dto.response.SymptomsResponse;
@@ -14,6 +18,7 @@ import com.atopy.Atopass.domain.record.entity.Symptom;
 import com.atopy.Atopass.domain.record.entity.SymptomScore;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -417,6 +422,30 @@ public final class ChatDraft {
 	/** 저장된 기록을 고치는 중인지 */
 	public boolean editing() {
 		return editing;
+	}
+
+	/** 기록을 저장했으므로 이제부터는 빈 항목을 묻지 않고 고칠 내용을 받는다. */
+	void startEditing() {
+		this.editing = true;
+		skipped.addAll(SKIPPABLE);
+	}
+
+	/** 기록 내용(초안 값)이 같은지. 진행 상태(건너뜀·되묻기)는 비교하지 않는다. */
+	boolean sameContent(ChatDraft other) {
+		return toResponse().equals(other.toResponse());
+	}
+
+	/** 일반 기록 저장과 같은 형식으로 바꾼다. */
+	public RecordRequest toRecordRequest(LocalDate recordDate) {
+		List<SkinConditionRequest> list = conditions.entrySet().stream()
+			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
+			.map(e -> new SkinConditionRequest(e.getKey(), new SymptomsRequest(e.getValue().get(Symptom.PAIN)),
+				List.copyOf(conditionSigns.getOrDefault(e.getKey(), EnumSet.noneOf(SkinSign.class)))))
+			.toList();
+		LifestyleRequest lifestyle = alcohol == null && outdoorActivity == null
+			? null : new LifestyleRequest(alcohol, outdoorActivity);
+		return new RecordRequest(recordDate, list, painIndex, sleepHours, medication,
+			skinSigns == null ? List.of() : List.copyOf(skinSigns), lifestyle, notes);
 	}
 
 	/** 이번 응답이 부위나 증상 점수를 되묻는 질문인지 기록한다. 다음 턴이 성공하면 다시 정해진다. */

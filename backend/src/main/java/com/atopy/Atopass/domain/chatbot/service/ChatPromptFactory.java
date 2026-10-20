@@ -37,7 +37,7 @@ class ChatPromptFactory {
 	static final String EDITING_GUIDE = """
 		[기록 수정] 오늘 기록은 이미 저장되어 있고, 위 초안이 저장된 내용입니다. 사용자는 바꿀 내용을 말합니다.
 		- 사용자가 값을 바꾸면 바뀐 값만 updates에 넣고, reply로 무엇을 바꿨는지 한 문장으로 알려 줍니다. (예: "수면 시간을 8시간으로 바꿨어요.")
-		- 바꿀 내용이 없다고 하면 updates는 비우고 finished를 true로 합니다.
+		- 바꿀 내용이 없다고 하면 updates는 비우고 finished를 true로 하고, reply로 짧게 인사합니다. (예: "알겠어요. 오늘 하루도 수고 많으셨어요!")
 		- 특이사항을 지워 달라고 하면 notes를 ""로 넣습니다. 특이사항을 바꾸면 사용자가 쓴 새 문장 전체를 notes에 넣습니다.
 		""";
 

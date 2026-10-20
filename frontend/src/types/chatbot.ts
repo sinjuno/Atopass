@@ -24,12 +24,14 @@ export interface SendMessageResponse {
   pendingFields: PendingField[];
   /** 지금 묻는 항목 — 이 값에 맞춰 선택지를 보여 준다. symptoms(부위·증상 점수)는 글로 답한다. 확인 단계면 null */
   askingField: PendingField | null;
-  /** true면 일일 총정리(확인) 단계로 이동 */
+  /** true면 물어볼 항목이 끝나 그날 기록이 저장됨 (일일 총정리와 인사가 reply로 온다) */
   requiresConfirmation: boolean;
   /** 지금까지 모은 초안. 질의 모드에서는 null */
   draft: ChatDraft | null;
-  /** 이미 저장된 그날 기록을 고치는 대화. 확인 단계에서 총정리로 가지 않고 챗봇 화면에서 바로 저장한다 */
+  /** 그날 기록이 이미 저장되어, 이제 글로 고치면 바로 저장되는 대화 */
   editing: boolean;
+  /** 이 대화로 저장한(또는 고치는) 기록. 아직 저장 전이면 null */
+  recordId: number | null;
 }
 
 /** GET /chatbot/sessions/{sessionId}/draft — 저장된(닫힌) 세션이면 409 SESSION_CLOSED */
@@ -39,6 +41,7 @@ export interface ChatDraftState {
   askingField: PendingField | null;
   requiresConfirmation: boolean;
   editing: boolean;
+  recordId: number | null;
 }
 
 /**

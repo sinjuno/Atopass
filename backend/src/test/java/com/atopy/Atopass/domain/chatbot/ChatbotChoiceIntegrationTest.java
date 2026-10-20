@@ -80,9 +80,14 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist())
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
+			.andExpect(jsonPath("$.data.editing").value(true))
+			.andExpect(jsonPath("$.data.recordId").isNumber())
 			.andExpect(jsonPath("$.data.reply").value(
-				"입력하신 내용을 정리했어요.\n- 고통 지수: 6점\n- 얼굴: 고통 6점\n- 왼손: 고통 6점\n- 수면 시간: 7.5시간\n- 약 복용: 아니오\n- 나타난 증상: 홍반, 건조증"
-					+ "\n\n이대로 저장하려면 아래 '저장하기'를 눌러 주세요. 더 바꿀 내용이 있으면 말씀해 주세요."));
+				"오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 고통 지수: 6점\n- 얼굴: 고통 6점\n- 왼손: 고통 6점\n- 수면 시간: 7.5시간\n- 약 복용: 아니오\n- 나타난 증상: 홍반, 건조증"
+					+ "\n\n오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요."));
+		// 마지막 항목에 답하면 저장 버튼 없이 그날 기록이 바로 저장된다.
+		mockMvc.perform(get("/api/v1/records").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.content[0].painIndex").value(6));
 
 		assertThat(llm.callCount()).isZero();
 		// 대화 내역에는 고른 값이 사람이 읽는 말로 남는다.
@@ -236,7 +241,8 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(post(url(session, "finish")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist())
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyParts"));
+			.andExpect(jsonPath("$.data.recordId").isNumber())
+			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
 
 		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.messages[4].content").value("기록을 마칠게요"));

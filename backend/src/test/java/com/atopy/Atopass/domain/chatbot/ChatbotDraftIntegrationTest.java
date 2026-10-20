@@ -102,7 +102,8 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("bodyParts"));
+			.andExpect(jsonPath("$.data.recordId").isNumber())
+			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
 	}
 
 	@Test

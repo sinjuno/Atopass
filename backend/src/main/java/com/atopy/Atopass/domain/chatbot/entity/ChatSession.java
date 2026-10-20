@@ -91,4 +91,14 @@ public class ChatSession extends BaseTimeEntity {
 		this.closed = true;
 	}
 
+	/** 저장 뒤에도 그날 대화를 이어 가도록 다시 연다. */
+	public void reopen() {
+		this.closed = false;
+	}
+
+	/** 이 대화로 만든(또는 고치는) 기록. 이후 저장은 이 기록을 수정한다. */
+	public void startEditing(Long recordId) {
+		this.editingRecordId = recordId;
+	}
+
 }
