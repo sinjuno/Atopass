@@ -50,16 +50,10 @@ public class ChatSessionService {
 		List<ChatTurn> history, LocalDate today, String queryContext) {
 	}
 
-	/**
-	 * 같은 날짜·모드에 열려 있는 세션이 있으면 그것을 다시 쓴다.
-	 * 기록 모드인데 오늘 기록이 이미 있으면 409 RECORD_ALREADY_EXISTS다. 대화로 다시 기록해도 저장할 수 없기 때문이다.
-	 */
+	/** 같은 날짜·모드에 열려 있는 세션이 있으면 그것을 다시 쓴다. */
 	@Transactional
 	public ChatSession open(Long memberId, ChatMode mode) {
 		LocalDate today = LocalDate.now(clock);
-		if (mode == ChatMode.RECORD && recordRepository.existsByMemberIdAndRecordDate(memberId, today)) {
-			throw new BusinessException(ErrorCode.RECORD_ALREADY_EXISTS);
-		}
 		return sessionRepository
 			.findFirstByMemberIdAndRecordDateAndModeAndClosedFalseOrderByCreatedAtDesc(memberId, today, mode)
 			.orElseGet(() -> sessionRepository.save(
@@ -111,7 +105,6 @@ public class ChatSessionService {
 	/**
 	 * 초안 상태를 조회한다. 기록을 저장해 닫힌 세션이면 초안이 더는 의미가 없으므로 SESSION_CLOSED,
 	 * 질의 모드 세션에는 초안이 없으므로 INVALID_INPUT으로 처리한다.
-	 * 대화하는 사이 같은 날짜의 기록을 직접 저장했으면 이 초안으로는 저장할 수 없으므로 RECORD_ALREADY_EXISTS다.
 	 */
 	public DraftState draftState(Long memberId, String sessionId) {
 		ChatSession session = findOwned(memberId, sessionId);
@@ -120,9 +113,6 @@ public class ChatSessionService {
 		}
 		if (session.getMode() != ChatMode.RECORD) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "질의 모드 대화에는 기록 초안이 없습니다.");
-		}
-		if (recordRepository.existsByMemberIdAndRecordDate(memberId, session.getRecordDate())) {
-			throw new BusinessException(ErrorCode.RECORD_ALREADY_EXISTS);
 		}
 		return new DraftState(session.getDraft(), session.isConfirmationReady());
 	}
