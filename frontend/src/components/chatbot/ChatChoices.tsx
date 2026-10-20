@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
+import SleepHoursSlider from '@/components/record/SleepHoursSlider';
 import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
 import type { BodyPart, SkinSign } from '@/types/record';
 import type { BodyMapCounts } from '@/utils/bodyMap';
@@ -8,7 +9,6 @@ import {
   BODY_MAP_PARTS,
   BODY_PART_LABELS,
   CHAT_SLEEP_HOURS_DEFAULT,
-  CHAT_SLEEP_HOURS_OPTIONS,
   PAIN_INDEX_MIN,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
@@ -90,24 +90,14 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
     }
     case 'sleepHours':
       return (
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={sleepHours}
-            onChange={(e) => setSleepHours(Number(e.target.value))}
-            disabled={disabled}
-            aria-label="수면 시간"
-            className="min-h-11 flex-1 rounded-xl border border-gray-300 bg-white px-3 text-base"
-          >
-            {CHAT_SLEEP_HOURS_OPTIONS.map((h) => (
-              <option key={h} value={h}>
-                {h}시간
-              </option>
-            ))}
-          </select>
-          <ChoiceButton onClick={() => onChoose({ field, value: sleepHours })} disabled={disabled} primary>
-            확인
-          </ChoiceButton>
-          {skip}
+        <div className="flex flex-col gap-2">
+          <SleepHoursSlider value={sleepHours} onChange={setSleepHours} disabled={disabled} />
+          <div className="flex gap-2">
+            <ChoiceButton onClick={() => onChoose({ field, value: sleepHours })} disabled={disabled} primary wide>
+              확인
+            </ChoiceButton>
+            {skip}
+          </div>
         </div>
       );
     case 'medication':
