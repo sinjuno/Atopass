@@ -635,25 +635,20 @@ public final class ChatDraft {
 			notes);
 	}
 
-	/** 사람이 읽는 초안 요약. 기록된 항목만 한 줄씩 보여 준다. (예: "- 고통 지수: 6점") */
+	/**
+	 * 사람이 읽는 초안 요약(챗봇의 일일 총정리). 기록된 항목만 한 줄씩 보여 준다. (예: "- 고통 지수: 6점")
+	 * 고통 지수는 한 줄로 따로 두고, 부위 줄에는 부위 고통 점수 없이 그 부위에 나타난 증상만 보여 준다. (예: "- 얼굴: 홍반, 건조증")
+	 */
 	public String summary() {
 		StringJoiner lines = new StringJoiner("\n");
 		if (painIndex != null) {
 			lines.add("- 고통 지수: " + painIndex + "점");
 		}
-		conditions.entrySet().stream()
-			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
-			.forEach(e -> {
-				Integer pain = e.getValue().get(Symptom.PAIN);
-				Set<SkinSign> signs = conditionSigns.getOrDefault(e.getKey(), Set.of());
-				StringBuilder line = new StringBuilder("- " + e.getKey().label());
-				if (pain != null) {
-					line.append(": 고통 ").append(pain).append("점");
-				}
-				if (!signs.isEmpty()) {
-					line.append(pain != null ? ", " : ": ").append(labels(signs));
-				}
-				lines.add(line);
+		conditions.keySet().stream()
+			.sorted(Comparator.comparingInt(Enum::ordinal))
+			.forEach(bodyPart -> {
+				Set<SkinSign> signs = conditionSigns.getOrDefault(bodyPart, Set.of());
+				lines.add("- " + bodyPart.label() + ": " + (signs.isEmpty() ? "증상 없음" : labels(signs)));
 			});
 		if (sleepHours != null) {
 			lines.add("- 수면 시간: " + sleepHours.stripTrailingZeros().toPlainString() + "시간");

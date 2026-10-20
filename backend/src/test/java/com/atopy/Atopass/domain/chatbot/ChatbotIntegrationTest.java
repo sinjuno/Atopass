@@ -482,7 +482,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].role").value("ASSISTANT"))
 			.andExpect(jsonPath("$.data.messages[0].content").value(org.hamcrest.Matchers.allOf(
 				org.hamcrest.Matchers.containsString("오늘 기록이 이미 저장되어 있어요."),
-				org.hamcrest.Matchers.containsString("- 팔: 고통 4점"),
+				org.hamcrest.Matchers.containsString("- 팔: 증상 없음"),
 				org.hamcrest.Matchers.containsString("- 수면 시간: 6시간"),
 				org.hamcrest.Matchers.containsString("수정할 내용이 있나요?"))));
 		// 저장된 값이 초안으로 들어오고, 빈 항목을 다시 묻지 않는다.
@@ -518,7 +518,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.recordId").value(recordId))
 			.andExpect(jsonPath("$.data.reply").value(
-				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 고통 4점\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
 		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
 		// 글로 고치면 저장 버튼 없이 바로 기존 기록이 수정된다.
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
