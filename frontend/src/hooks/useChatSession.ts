@@ -68,6 +68,8 @@ export function useChatSession(recordDate: string) {
   const [recordId, setRecordId] = useState<number | null>(null);
   // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
   const [painIndex, setPainIndex] = useState<number | null>(null);
+  // 가장 최근 응답에서 말을 알아들었는지. 알아듣지 못했을 때만 아토미가 고민하는 표정을 짓는다
+  const [understood, setUnderstood] = useState(true);
   const [status, setStatus] = useState<ChatStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   // 한도에 도달해도 대화 내역·초안 조회는 되므로 status는 그대로 두고 안내만 띄운다
@@ -148,6 +150,7 @@ export function useChatSession(recordDate: string) {
       const userMessage: ChatMessage = { role: 'USER', content: text, createdAt: new Date().toISOString() };
       setMessages((prev) => [...prev, userMessage]);
       setStatus('sending');
+      setUnderstood(true);
       setError(null);
       try {
         const res = await request(sessionId);
@@ -163,6 +166,7 @@ export function useChatSession(recordDate: string) {
         recordIdRef.current = res.recordId;
         setRecordId(res.recordId);
         setPainIndex(res.draft?.painIndex ?? null);
+        setUnderstood(res.understood);
         setStatus('ready');
         setLimitReached(false);
         return { ok: true };
@@ -256,6 +260,7 @@ export function useChatSession(recordDate: string) {
     askingField,
     requiresConfirmation,
     painIndex,
+    understood,
     status,
     error,
     limitReached,

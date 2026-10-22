@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { ApiError } from '@/apis/client';
 import { authApi } from '@/apis/auth';
+import heroImage from '@/assets/atomi/hero.png';
 import TextField from '@/components/common/TextField';
 import { getErrorMessage, getFieldErrors } from '@/utils/errorMessage';
 
@@ -103,13 +104,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center bg-[#f5f5f5] p-6">
-      <div className="mb-8 text-center">
-        <p className="text-3xl font-extrabold text-brand-600">Atopass</p>
-        <p className="mt-2 text-gray-500">매일의 피부 기록을 쉽고 꾸준하게</p>
-      </div>
+    <div className="min-h-dvh bg-gradient-to-b from-brand-100 via-brand-50 to-[#f5f5f5]">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center p-6">
+      {/* 아토미가 카드 윗선에 걸쳐 있어, 카드와 한 덩어리로 보인다 */}
+      <div className="relative mt-16">
+        <img
+          src={heroImage}
+          alt="웃고 있는 아토미"
+          className="absolute -top-16 left-1/2 z-10 h-32 w-32 -translate-x-1/2 rounded-full object-cover ring-8 ring-white"
+        />
+      <div className="rounded-3xl bg-white px-6 pb-6 pt-20 shadow-card">
+        <div className="mb-6 text-center">
+          <p className="text-3xl font-extrabold text-brand-600">Atopass</p>
+          <p className="mt-2 text-gray-500">매일의 피부 기록을 쉽고 꾸준하게</p>
+        </div>
 
-      <div className="rounded-3xl bg-white p-6 shadow-card">
         <div role="tablist" aria-label="로그인 또는 회원가입" className="mb-6 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
           {(['login', 'signup'] as const).map((tab) => (
             <button
@@ -184,6 +193,8 @@ export default function LoginPage() {
         </button>
         </form>
       </div>
+      </div>
+    </div>
     </div>
   );
 }

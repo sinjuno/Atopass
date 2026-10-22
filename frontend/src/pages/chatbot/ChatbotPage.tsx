@@ -24,6 +24,7 @@ export default function ChatbotPage() {
     askingField,
     requiresConfirmation,
     painIndex,
+    understood,
     status,
     error,
     limitReached,
@@ -112,7 +113,7 @@ export default function ChatbotPage() {
           <ChatMessageList
             messages={messages}
             typing={status === 'sending'}
-            mood={atomiMood(painIndex, requiresConfirmation)}
+            mood={atomiMood(painIndex, requiresConfirmation, understood)}
           />
         )}
       </div>
