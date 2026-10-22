@@ -57,11 +57,9 @@ export default function ChatbotPage() {
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
-  const textLocked = started && choiceField !== null && choiceField !== 'notes' && !choicesMinimized;
-  // 고통 지수·수면 시간 막대를 쓰는 동안은 어차피 글로 답하지 않으므로 아래 입력창을 숨긴다.
+  // 선택지로 답하는 동안은 어차피 글로 답하지 않으므로 아래 입력창 자체를 숨긴다.
   // 선택지를 내려 두면(choicesMinimized) 다시 보인다. 특이사항은 글로 적어야 하므로 숨기지 않는다.
-  const hideInputForSlider =
-    (choiceField === 'painIndex' || choiceField === 'sleepHours') && !choicesMinimized;
+  const hideInput = started && choiceField !== null && choiceField !== 'notes' && !choicesMinimized;
 
   // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
   const pendingPhotos = draft.photos;
@@ -153,14 +151,13 @@ export default function ChatbotPage() {
         </p>
       )}
 
-      {!hideInputForSlider && (
+      {!hideInput && (
         <ChatInput
           value={input}
           onChange={setInput}
           onSubmit={handleSubmit}
           onAttachPhotos={handleAttach}
           disabled={status !== 'ready'}
-          textLocked={textLocked}
         />
       )}
 
