@@ -63,10 +63,27 @@ class ReportHtmlBuilderTest {
 	}
 
 	@Test
-	void 고통_지수를_기록한_날이_없으면_고통_지수_행을_넣지_않는다() {
+	void 고통_지수를_기록한_날이_없으면_고통_지수_행과_그래프를_넣지_않는다() {
 		String html = builder.build(ReportSamples.content(false, "메모", List.of()));
 
-		assertThat(html).doesNotContain("고통 지수 (기간 평균·최고)");
+		assertThat(html).doesNotContain("고통 지수 (기간 평균·최고)").doesNotContain("기간 고통 지수 그래프");
+	}
+
+	@Test
+	void 고통_지수를_기록했으면_오른쪽_위에_기간_고통_지수_그래프를_넣는다() {
+		LocalDate start = LocalDate.of(2026, 3, 1);
+		List<DayEntry> days = List.of(
+			new DayEntry(start, new EnumMap<>(BodyPart.class), null, null, null, null, List.of(), 2, null, List.of()));
+		ReportContent content = new ReportContent(start, start.plusDays(30), start.plusDays(31), 1, false,
+			List.of(), days, new ReportContent.LifestyleSummary(null, 0, 0, 0, Map.of()));
+
+		String html = builder.build(content);
+
+		assertThat(html)
+			.contains("<td class=\"header-chart\">")
+			.contains("기간 고통 지수 (0~10)")
+			.contains("alt=\"기간 고통 지수 그래프\" src=\"data:image/png;base64,")
+			.contains("03.01").contains("03.31");
 	}
 
 	@Test
