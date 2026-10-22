@@ -1,6 +1,5 @@
 package com.atopy.Atopass.domain.report.service;
 
-import com.atopy.Atopass.domain.record.dto.response.DailyCheckResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
@@ -65,18 +64,8 @@ record ReportContent(
 		/** 약 복용 여부. 기록하지 않았으면 null */
 		Boolean medication,
 		/** 나타난 증상. 없으면 빈 목록 */
-		List<SkinSign> skinSigns,
-		/** 하루 점검 (피부 상태, 가려움, 수면 방해, 보습제, 연고·약, 연결 질문 답). 없으면 null */
-		DailyCheckResponse dailyCheck
+		List<SkinSign> skinSigns
 	) {
-
-		/** 하루 점검이 없는 하루 기록 */
-		DayEntry(LocalDate date, Map<BodyPart, Map<Symptom, Integer>> conditions, BigDecimal sleepHours,
-			Boolean alcohol, OutdoorActivity outdoorActivity, String notes, List<ReportPhoto> photos,
-			Integer painIndex, Boolean medication, List<SkinSign> skinSigns) {
-			this(date, conditions, sleepHours, alcohol, outdoorActivity, notes, photos, painIndex, medication, skinSigns,
-				null);
-		}
 
 		/** 고통 지수·약 복용·나타난 증상이 없는 하루 기록 */
 		DayEntry(LocalDate date, Map<BodyPart, Map<Symptom, Integer>> conditions, BigDecimal sleepHours,
