@@ -53,11 +53,12 @@ class ChatPromptFactory {
 			   이 항목들은 앱이 정해진 문장과 선택지 버튼으로 직접 묻습니다. 당신은 사용자가 글로 쓴 말에서 값을 뽑습니다.
 			1. 고통 지수(painIndex): 오늘 피부 때문에 느낀 고통의 정도. 0~10 정수 (0은 없음, 10은 매우 심함, 사용자가 느끼는 주관적인 정도).
 			   사용자가 숫자를 말하지 않았다면 점수를 정하지 말고, 0~10 중 몇 점인지 물어보세요.
-			2. 고통이 있는 부위(bodyParts): 고통 지수와 한 묶음으로, 고통 지수 바로 다음에 앱이 부위 선택지로 묻습니다(0점이면 묻지 않습니다).
+			2. 나타난 증상(skinSigns): 아래 [증상 목록] 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
+			3. 증상이 나타난 부위(bodyParts): 고통 지수·증상과 한 묶음으로, 증상 바로 다음에 앱이 부위 선택지로 묻습니다
+			   (고통이 0점이고 증상도 없으면 묻지 않습니다). 앱은 고른 부위마다 고통 지수와 방금 고른 증상을 함께 넣습니다.
 			   사용자가 글로 부위를 말하면 아래 부위 기록(conditions)에 넣습니다. 부위가 없다고 하면 skipped에 bodyParts를 넣습니다.
-			3. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
-			4. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
-			5. 나타난 증상(skinSigns): 아래 [증상 목록] 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
+			4. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
+			5. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
 			6. 특이사항(notes): 평소와 다른 점을 자유롭게 500자 이내로. 사용자가 쓴 문장을 고치지 말고 그대로 넣습니다.
 
 			[증상 목록] 이름(뜻을 쉬운 말로 / 사용자가 흔히 하는 말)
@@ -96,6 +97,7 @@ class ChatPromptFactory {
 			9. reply가 부위나 부위의 고통 점수를 되묻는 질문이면 followUp을 true로 합니다. 그 밖의 항목은 앱이 묻으므로 followUp은 false입니다.
 			10. 사용자가 증상이나 용어의 뜻을 물으면(예: "태선화가 뭐야?") [증상 목록]의 쉬운 말을 바탕으로 한두 문장으로 쉽게 설명하고,
 			    updates는 비우고 explain을 true로 합니다. 설명 뒤에 질문은 덧붙이지 않습니다(앱이 이어서 묻습니다). 진단이나 치료 조언은 하지 않습니다.
+			    물은 것이 [증상 목록]의 증상이면 sign에 그 증상 이름을 넣습니다. 앱이 그 증상의 예시 사진을 보여 줘도 되는지 이어서 묻습니다.
 
 			[출력 형식]
 			설명이나 코드블록 없이 아래 형태의 JSON 객체 하나만 출력합니다.
@@ -104,7 +106,7 @@ class ChatPromptFactory {
 			부위 기록은 conditions에 부위, 고통 점수, 그 부위의 증상을 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위의 고통 점수로 넣습니다.
 			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "pain": 8, "skinSigns": ["ITCHING", "ERYTHEMA"]}]}, "finished": false, "followUp": false}
 			용어의 뜻을 물었을 때는 이렇게 답합니다.
-			{"understood": true, "reply": "태선화는 오래 긁어서 피부가 두꺼워지고 거칠어지는 것을 말해요.", "updates": {}, "finished": false, "followUp": false, "explain": true}
+			{"understood": true, "reply": "태선화는 오래 긁어서 피부가 두꺼워지고 거칠어지는 것을 말해요.", "updates": {}, "finished": false, "followUp": false, "explain": true, "sign": "LICHENIFICATION"}
 			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields(),
 				draft.editing() ? EDITING_GUIDE : "");
 	}

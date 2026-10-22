@@ -1,5 +1,7 @@
 package com.atopy.Atopass.domain.chatbot.service;
 
+import com.atopy.Atopass.domain.record.entity.SkinSign;
+import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -21,9 +23,10 @@ class ChatReplyParser {
 	 * @param finished   사용자가 입력을 마치려 하는지
 	 * @param followUp   reply가 부위나 증상 점수를 되묻는 질문인지
 	 * @param explain    사용자가 증상 같은 용어의 뜻을 물어서 reply가 설명인지 (기록은 바뀌지 않는다)
+	 * @param sign       설명한 것이 증상이면 그 증상. 모르는 이름이거나 없으면 null
 	 */
 	record ModelOutput(boolean understood, String reply, JsonNode updates, boolean finished, boolean followUp,
-		boolean explain) {
+		boolean explain, SkinSign sign) {
 	}
 
 	private final JsonMapper jsonMapper;
@@ -50,9 +53,21 @@ class ChatReplyParser {
 			boolean finished = root.path("finished").isBoolean() && root.path("finished").booleanValue();
 			boolean followUp = root.path("followUp").isBoolean() && root.path("followUp").booleanValue();
 			boolean explain = root.path("explain").isBoolean() && root.path("explain").booleanValue();
-			return Optional.of(new ModelOutput(understood, reply, updates, finished, followUp, explain));
+			return Optional.of(new ModelOutput(understood, reply, updates, finished, followUp, explain,
+				sign(root.path("sign"))));
 		} catch (RuntimeException e) {
 			return Optional.empty();
+		}
+	}
+
+	private static SkinSign sign(JsonNode node) {
+		if (!node.isString()) {
+			return null;
+		}
+		try {
+			return SkinSign.valueOf(node.asString().trim().toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException e) {
+			return null;
 		}
 	}
 

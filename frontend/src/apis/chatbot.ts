@@ -9,7 +9,7 @@ import type {
   SaveChatRecordRequest,
   SendMessageResponse,
 } from '@/types/chatbot';
-import type { RecordCreated } from '@/types/record';
+import type { RecordCreated, SkinSign } from '@/types/record';
 import { client, unwrap } from './client';
 
 export const chatbotApi = {
@@ -42,6 +42,15 @@ export const chatbotApi = {
   /** 세션의 현재 초안과 진행 상태 (새로고침 뒤 복원용) */
   getDraft: (sessionId: string) =>
     client.get<ApiSuccess<ChatDraftState>>(`/chatbot/sessions/${sessionId}/draft`).then(unwrap),
+
+  /**
+   * 증상 예시 사진. 사용자가 보여 달라고 답한 뒤에만 부른다.
+   * 인증이 필요해 img src로 직접 못 쓴다 — blob으로 받아 object URL로 표시
+   */
+  getSkinSignImageUrl: async (sign: SkinSign) => {
+    const res = await client.get<Blob>(`/chatbot/skin-signs/${sign}/image`, { responseType: 'blob' });
+    return URL.createObjectURL(res.data);
+  },
 
   /** confirmed: true일 때만 저장된다 */
   saveRecord: (sessionId: string, body: SaveChatRecordRequest) =>
