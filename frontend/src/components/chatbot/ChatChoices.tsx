@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type AnimationEvent, type ReactNode } from
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
-import type { AskingField, ChatChoiceRequest, ChatChoiceSpec, PendingField } from '@/types/chatbot';
-import type { BodyPart } from '@/types/record';
+import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
+import type { BodyPart, SkinSign } from '@/types/record';
 import type { BodyMapCounts } from '@/utils/bodyMap';
 import {
   BODY_MAP_PARTS,
@@ -11,28 +11,30 @@ import {
   CHAT_SLEEP_HOURS_DEFAULT,
   PAIN_INDEX_MIN,
   PENDING_FIELD_LABELS,
+  SKIN_SIGN_DESCRIPTIONS,
+  SKIN_SIGN_LABELS,
 } from '@/utils/constants';
 
 interface Props {
-  field: AskingField;
-  /** 서버가 정해 준 선택지. 막대·마네킹처럼 화면이 따로 그리는 항목이면 null */
-  spec: ChatChoiceSpec | null;
+  field: ChoiceField;
   onChoose: (choice: ChatChoiceRequest) => void;
   disabled?: boolean;
   /** 선택지를 내려 두면 true. 호출부가 글 입력을 열고 닫는 데 쓴다 */
   onMinimizedChange?: (minimized: boolean) => void;
 }
 
+const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
+
 /**
  * 챗봇이 지금 묻는 항목(askingField)의 선택지. 고른 값은 LLM을 거치지 않고 바로 초안에 반영된다.
- * 고통 지수·가려움 정도·수면 시간은 막대, 부위는 마네킹으로 고르고, 그 밖의 항목(연결 질문 포함)은 서버가 준 선택지 버튼이다.
- * 특이사항과 연결 질문을 직접 적는 단계는 글로 받으므로 "없어요/넘어가기"만 보여 준다.
+ * 특이사항은 글로 받으므로 "없어요"만 보여 준다.
+ * 고통 지수와 부위는 한 묶음이라, 고통 지수 다음에 바로 마네킹에서 고통이 있는 부위를 고른다.
  *
  * 질문이 오면 화면 아래에서 올라오고, 답을 고르면 알아서 내려간 뒤 답을 보낸다. 위의 대화는 계속 보인다.
  * 사용자도 손잡이를 아래로 끌거나 눌러 내려 둘 수 있고, 내려 둔 탭을 위로 끌거나 눌러 다시 올릴 수 있다.
  * 다음 질문의 선택지는 호출부가 key를 바꿔 다시 만들어 올라오게 한다.
  */
-export default function ChatChoices({ field, spec, onChoose, disabled, onMinimizedChange }: Props) {
+export default function ChatChoices({ field, onChoose, disabled, onMinimizedChange }: Props) {
   // open: 올라와 있음 · hiding: 사용자가 내리는 중 · minimized: 내려 둠 · closing: 답을 골라 내려가는 중
   const [mode, setMode] = useState<'open' | 'hiding' | 'minimized' | 'closing'>('open');
   const [closed, setClosed] = useState(false);
@@ -61,7 +63,7 @@ export default function ChatChoices({ field, spec, onChoose, disabled, onMinimiz
 
   if (closed) return null;
 
-  const label = spec?.label ?? PENDING_FIELD_LABELS[field as PendingField] ?? '답';
+  const label = PENDING_FIELD_LABELS[field];
 
   return (
     <>
@@ -100,7 +102,7 @@ export default function ChatChoices({ field, spec, onChoose, disabled, onMinimiz
         </SheetHandle>
         <div className="min-h-0 overflow-y-auto px-3 pb-3">
           {/* 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다 */}
-          <ChoiceBody key={field} field={field} spec={spec} onChoose={pick} disabled={disabled || mode !== 'open'} />
+          <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || mode !== 'open'} />
         </div>
       </div>
     </>
@@ -157,10 +159,11 @@ function SheetHandle({
   );
 }
 
-function ChoiceBody({ field, spec, onChoose, disabled }: Props) {
-  const [score, setScore] = useState(PAIN_INDEX_MIN);
+function ChoiceBody({ field, onChoose, disabled }: Props) {
+  const [painIndex, setPainIndex] = useState(PAIN_INDEX_MIN);
   const [parts, setParts] = useState<BodyPart[]>([]);
   const [sleepHours, setSleepHours] = useState(CHAT_SLEEP_HOURS_DEFAULT);
+  const [signs, setSigns] = useState<SkinSign[]>([]);
 
   const skip = field !== 'painIndex' && field !== 'bodyParts' && field !== 'notes' && (
     <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled} subtle>
@@ -170,23 +173,14 @@ function ChoiceBody({ field, spec, onChoose, disabled }: Props) {
 
   switch (field) {
     case 'painIndex':
-    case 'itchScore':
       return (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <PainIndexSlider
-                value={score}
-                onChange={setScore}
-                disabled={disabled}
-                label={PENDING_FIELD_LABELS[field]}
-              />
-            </div>
-            <ChoiceButton onClick={() => onChoose({ field, value: score })} disabled={disabled} primary>
-              확인
-            </ChoiceButton>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <PainIndexSlider value={painIndex} onChange={setPainIndex} disabled={disabled} />
           </div>
-          {skip && <div className="flex justify-end">{skip}</div>}
+          <ChoiceButton onClick={() => onChoose({ field, value: painIndex })} disabled={disabled} primary>
+            확인
+          </ChoiceButton>
         </div>
       );
     case 'bodyParts': {
@@ -199,7 +193,7 @@ function ChoiceBody({ field, spec, onChoose, disabled }: Props) {
       // 핸드폰에서도 누르기 쉽도록 마네킹을 카드에 크게 띄우고, 고른 부위와 버튼은 그 아래에 둔다
       return (
         <div className="flex flex-col gap-3">
-          <p className="text-center text-base font-semibold text-gray-800">불편한 부위를 모두 눌러 주세요</p>
+          <p className="text-center text-base font-semibold text-gray-800">고통이 있는 부위를 모두 눌러 주세요</p>
           <div className="rounded-2xl bg-white p-4 shadow-card">
             <BodyMap counts={counts} selected={parts} onSelect={toggle} maxWidth={170} />
           </div>
@@ -229,6 +223,59 @@ function ChoiceBody({ field, spec, onChoose, disabled }: Props) {
           </div>
         </div>
       );
+    case 'medication':
+      return (
+        <div className="flex gap-2" role="group" aria-label="약 복용">
+          <ChoiceButton onClick={() => onChoose({ field, value: true })} disabled={disabled} wide>
+            예
+          </ChoiceButton>
+          <ChoiceButton onClick={() => onChoose({ field, value: false })} disabled={disabled} wide>
+            아니오
+          </ChoiceButton>
+          {skip}
+        </div>
+      );
+    case 'skinSigns': {
+      const toggle = (sign: SkinSign) =>
+        setSigns((prev) =>
+          prev.includes(sign) ? prev.filter((s) => s !== sign) : SKIN_SIGNS.filter((s) => s === sign || prev.includes(s)),
+        );
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="나타난 증상">
+            {SKIN_SIGNS.map((sign) => {
+              const selected = signs.includes(sign);
+              return (
+                <button
+                  key={sign}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => toggle(sign)}
+                  disabled={disabled}
+                  className={`flex min-h-11 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left ${
+                    selected ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-gray-300 bg-white text-gray-700'
+                  }`}
+                >
+                  <span className={`text-base ${selected ? 'font-semibold' : ''}`}>{SKIN_SIGN_LABELS[sign]}</span>
+                  <span className={`text-sm leading-snug ${selected ? 'text-brand-700' : 'text-gray-500'}`}>
+                    {SKIN_SIGN_DESCRIPTIONS[sign]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-2">
+            <ChoiceButton onClick={() => onChoose({ field, value: signs })} disabled={disabled || signs.length === 0} primary wide>
+              {signs.length > 0 ? `${signs.length}개 선택 완료` : '선택 완료'}
+            </ChoiceButton>
+            <ChoiceButton onClick={() => onChoose({ field, value: [] })} disabled={disabled}>
+              없어요
+            </ChoiceButton>
+            {skip}
+          </div>
+        </div>
+      );
+    }
     case 'notes':
       return (
         <div className="flex items-center justify-between gap-2">
@@ -239,84 +286,6 @@ function ChoiceBody({ field, spec, onChoose, disabled }: Props) {
         </div>
       );
   }
-
-  if (!spec) return null;
-  if (spec.text) {
-    return (
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm text-gray-500">아래 입력창에 적어 주세요</span>
-        {skip}
-      </div>
-    );
-  }
-  if (spec.multiple) return <MultiChoice field={field} spec={spec} onChoose={onChoose} disabled={disabled} skip={skip} />;
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2" role="group" aria-label={spec.label}>
-        {spec.options.map((option) => (
-          <ChoiceButton key={option} onClick={() => onChoose({ field, value: option })} disabled={disabled}>
-            {option}
-          </ChoiceButton>
-        ))}
-      </div>
-      {skip && <div className="flex justify-end">{skip}</div>}
-    </div>
-  );
-}
-
-/** 여러 개 고르기 (예: 피부 모양). "하나도 없음" 버튼(예: 괜찮음)은 빈 배열로 보낸다 */
-function MultiChoice({
-  field,
-  spec,
-  onChoose,
-  disabled,
-  skip,
-}: {
-  field: AskingField;
-  spec: ChatChoiceSpec;
-  onChoose: (choice: ChatChoiceRequest) => void;
-  disabled?: boolean;
-  skip: ReactNode;
-}) {
-  const [picked, setPicked] = useState<string[]>([]);
-  const toggle = (option: string) =>
-    setPicked((prev) =>
-      prev.includes(option) ? prev.filter((o) => o !== option) : spec.options.filter((o) => o === option || prev.includes(o)),
-    );
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label={spec.label}>
-        {spec.options.map((option) => {
-          const selected = picked.includes(option);
-          return (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => toggle(option)}
-              disabled={disabled}
-              className={`min-h-11 rounded-xl border px-3 py-2 text-left text-base ${
-                selected ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-700'
-              }`}
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex gap-2">
-        <ChoiceButton onClick={() => onChoose({ field, value: picked })} disabled={disabled || picked.length === 0} primary wide>
-          {picked.length > 0 ? `${picked.length}개 선택 완료` : '선택 완료'}
-        </ChoiceButton>
-        {spec.noneLabel && (
-          <ChoiceButton onClick={() => onChoose({ field, value: [] })} disabled={disabled}>
-            {spec.noneLabel}
-          </ChoiceButton>
-        )}
-        {skip}
-      </div>
-    </div>
-  );
 }
 
 function ChoiceButton({
