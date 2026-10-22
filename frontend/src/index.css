@@ -94,14 +94,25 @@ textarea:focus {
   }
 }
 
-/* 기록 완료 화면: 캐릭터 둘레에서 색종이 조각이 톡 튀어나오며 자리 잡는다 */
-@keyframes confetti-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.2);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* 기록 완료 화면: 화면이 부드럽게 나타나고, 원 게이지가 한 바퀴 차오르고, 버튼을 누르면 부드럽게 사라진다 */
+@keyframes record-complete-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
+@keyframes record-complete-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.98); }
+}
+@keyframes ring-fill {
+  from { stroke-dashoffset: var(--ring-length); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

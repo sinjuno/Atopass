@@ -1,3 +1,4 @@
+import { useState, type CSSProperties } from 'react';
 import defaultImage from '@/assets/atomi/default.png';
 
 interface Props {
@@ -7,67 +8,114 @@ interface Props {
   onContinue: () => void;
 }
 
-const CONFETTI = [
-  { top: '8%', left: '18%', size: 10, color: '#7a9cf6', shape: 'circle', delay: '0ms' },
-  { top: '14%', left: '78%', size: 8, color: '#f6b35c', shape: 'rect', delay: '80ms' },
-  { top: '30%', left: '10%', size: 7, color: '#5ecf9a', shape: 'circle', delay: '140ms' },
-  { top: '26%', left: '86%', size: 9, color: '#f28b82', shape: 'rect', delay: '40ms' },
-  { top: '46%', left: '6%', size: 6, color: '#f6b35c', shape: 'circle', delay: '200ms' },
-  { top: '42%', left: '92%', size: 7, color: '#7a9cf6', shape: 'circle', delay: '120ms' },
-] as const;
+/** 원 게이지 크기. 둘레만큼 선을 숨겨 두었다가 한 바퀴 그린다 */
+const RING_SIZE = 144;
+const RING_STROKE = 8;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+/** 사라지는 시간(ms). index.css의 record-complete-out과 맞춘다 */
+const LEAVE_MS = 260;
 
-/** 챗봇에서 그날 기록을 처음 다 마쳤을 때 한 번 뜨는 완료 축하 화면 */
+/**
+ * 챗봇에서 그날 기록을 처음 다 마쳤을 때 한 번 뜨는 완료 화면.
+ * 화면이 부드럽게 나타나고 아토미 둘레의 원 게이지가 한 바퀴 차오르면, 체크 표시와 함께 버튼이 아래에서 올라온다.
+ * 버튼을 누르면 화면이 부드럽게 사라진 뒤에 다음 동작을 한다.
+ */
 export default function RecordCompleteOverlay({ onConfirm, onContinue }: Props) {
+  // 게이지가 다 차기 전에는 버튼을 숨겨 둔다. 사라지는 중에는 다시 누를 수 없게 한다.
+  const [filled, setFilled] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  const leave = (next: () => void) => {
+    if (leaving) return;
+    setLeaving(true);
+    window.setTimeout(next, LEAVE_MS);
+  };
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="record-complete-title"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f5f7fb] px-6"
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--atopass-bg)] px-6 ${
+        leaving
+          ? 'animate-[record-complete-out_260ms_ease-in_forwards]'
+          : 'animate-[record-complete-in_320ms_ease-out_backwards]'
+      }`}
     >
-      <div className="relative mb-6 flex size-32 items-center justify-center">
-        {CONFETTI.map((c, i) => (
-          <span
-            key={i}
-            aria-hidden="true"
-            className="absolute animate-[confetti-pop_500ms_ease-out_backwards] motion-reduce:animate-none"
-            style={{
-              top: c.top,
-              left: c.left,
-              width: c.size,
-              height: c.size,
-              backgroundColor: c.color,
-              borderRadius: c.shape === 'circle' ? '9999px' : '2px',
-              animationDelay: c.delay,
-            }}
+      <div className="relative mb-7" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <svg aria-hidden="true" width={RING_SIZE} height={RING_SIZE} className="-rotate-90">
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke="var(--color-brand-100)"
+            strokeWidth={RING_STROKE}
           />
-        ))}
-        <div className="flex size-28 items-center justify-center rounded-full bg-brand-100">
-          <img src={defaultImage} alt="웃고 있는 아토미" className="size-20 object-contain" />
+          <circle
+            cx={RING_SIZE / 2}
+            cy={RING_SIZE / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke="var(--color-brand-600)"
+            strokeWidth={RING_STROKE}
+            strokeLinecap="round"
+            strokeDasharray={RING_LENGTH}
+            style={{ '--ring-length': `${RING_LENGTH}px` } as CSSProperties}
+            className="animate-[ring-fill_1100ms_cubic-bezier(0.65,0,0.35,1)_250ms_both]"
+            onAnimationEnd={() => setFilled(true)}
+          />
+        </svg>
+        <div className="absolute inset-3 flex items-center justify-center rounded-full bg-brand-50">
+          <img
+            src={defaultImage}
+            alt="웃고 있는 아토미"
+            className="size-20 animate-[pop-in_420ms_cubic-bezier(0.34,1.56,0.64,1)_150ms_backwards] object-contain"
+          />
         </div>
+        {filled && (
+          <span
+            aria-hidden="true"
+            className="absolute bottom-1 right-1 flex size-9 animate-[pop-in_360ms_cubic-bezier(0.34,1.56,0.64,1)] items-center justify-center rounded-full bg-brand-600 text-lg font-bold text-white ring-4 ring-[var(--atopass-bg)]"
+          >
+            ✓
+          </span>
+        )}
       </div>
 
-      <h2 id="record-complete-title" className="text-xl font-bold text-gray-900">
+      <h2
+        id="record-complete-title"
+        className="animate-[fade-up_420ms_ease-out_200ms_backwards] text-xl font-bold text-gray-900"
+      >
         피부 기록이 완료되었어요!
       </h2>
-      <p className="mt-2 text-center text-base text-gray-500">
+      <p className="mt-2 animate-[fade-up_420ms_ease-out_320ms_backwards] text-center text-base text-gray-500">
         소중한 기록이
         <br />
         건강한 변화를 만들어가요.
       </p>
 
-      <div className="mt-8 flex w-full max-w-xs flex-col gap-2.5">
+      {/* 자리를 미리 잡아 두어, 버튼이 나타날 때 위 내용이 밀리지 않게 한다 */}
+      <div
+        aria-hidden={!filled}
+        className={`mt-8 flex w-full max-w-xs flex-col gap-2.5 transition-all duration-500 ease-out ${
+          filled ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
+        }`}
+      >
         <button
           type="button"
-          onClick={onConfirm}
-          className="rounded-2xl bg-brand-600 py-3.5 text-lg font-bold text-white shadow-[0_8px_20px_rgba(76,116,224,0.28)]"
+          tabIndex={filled ? 0 : -1}
+          onClick={() => leave(onConfirm)}
+          className="rounded-2xl bg-brand-600 py-3.5 text-lg font-bold text-white transition-transform active:scale-[0.97]"
         >
           확인
         </button>
         <button
           type="button"
-          onClick={onContinue}
-          className="rounded-2xl border border-gray-200 bg-white py-3.5 text-lg font-bold text-gray-700"
+          tabIndex={filled ? 0 : -1}
+          onClick={() => leave(onContinue)}
+          className="rounded-2xl border border-gray-200 bg-white py-3.5 text-lg font-bold text-gray-700 transition-transform active:scale-[0.97]"
         >
           다른 기록하기
         </button>
