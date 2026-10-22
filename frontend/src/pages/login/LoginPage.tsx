@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ApiError } from "@/apis/client";
 import { authApi } from "@/apis/auth";
 import heroImage from "@/assets/atomi/hero.png";
@@ -45,11 +45,19 @@ function validate(mode: Mode, values: FormValues): FieldErrors {
   return errors;
 }
 
+/**
+ * 시작 화면 — /login. 처음에는 아토미와 로그인·회원가입 버튼만 보여 주고, 누르면 그 탭이 열린 입력 화면으로 넘어간다.
+ * 어느 화면인지는 주소(?mode=login|signup)에 두어 브라우저 뒤로 가기로 시작 화면에 돌아올 수 있게 한다.
+ */
 export default function LoginPage() {
   const navigate = useNavigate();
-  const from = (useLocation().state as { from?: string } | null)?.from ?? "/";
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const modeParam = searchParams.get("mode");
+  const mode: Mode | null =
+    modeParam === "login" || modeParam === "signup" ? modeParam : null;
 
-  const [mode, setMode] = useState<Mode>("login");
   const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -58,8 +66,12 @@ export default function LoginPage() {
 
   const isSignup = mode === "signup";
 
-  const switchMode = (next: Mode) => {
-    setMode(next);
+  /** 시작 화면(null)·로그인·회원가입 사이를 옮긴다. 로그인 뒤 돌아갈 곳(from)은 그대로 넘긴다 */
+  const switchMode = (next: Mode | null, { replace = false } = {}) => {
+    setSearchParams(next ? { mode: next } : {}, {
+      replace,
+      state: location.state,
+    });
     setFieldErrors({});
     setFormError(null);
     setNotice(null);
@@ -77,6 +89,7 @@ export default function LoginPage() {
     event.preventDefault();
     if (submitting) return;
 
+    if (!mode) return;
     const errors = validate(mode, values);
     setFieldErrors(errors);
     setFormError(null);
@@ -101,7 +114,7 @@ export default function LoginPage() {
     } catch (error) {
       if (signedUp) {
         // 가입은 됐는데 자동 로그인만 실패한 경우: 다시 가입하지 않도록 로그인 탭으로 보낸다.
-        switchMode("login");
+        switchMode("login", { replace: true });
         setNotice("가입이 완료됐어요. 로그인해 주세요.");
       } else if (
         error instanceof ApiError &&
@@ -118,6 +131,42 @@ export default function LoginPage() {
       setSubmitting(false);
     }
   };
+
+  if (!mode) {
+    return (
+      <div className="min-h-dvh bg-gradient-to-b from-brand-100 via-brand-50 to-[#f5f5f5]">
+        <div className="mx-auto flex min-h-dvh max-w-md flex-col p-6">
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <img
+              src={heroImage}
+              alt="웃고 있는 아토미"
+              className="mb-6 h-40 w-40 rounded-full object-cover ring-8 ring-white"
+            />
+            <p className="text-3xl font-extrabold text-brand-600">Atopass</p>
+            <p className="mt-2 text-gray-500">
+              매일의 피부 기록을 쉽고 꾸준하게
+            </p>
+          </div>
+          <div className="flex flex-col gap-2.5 pb-4">
+            <button
+              type="button"
+              onClick={() => switchMode("login")}
+              className="rounded-3xl bg-brand-600 py-3.5 text-lg font-bold text-white"
+            >
+              로그인
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode("signup")}
+              className="rounded-3xl border border-gray-200 bg-white py-3.5 text-lg font-bold text-gray-700"
+            >
+              회원가입
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-brand-100 via-brand-50 to-[#f5f5f5]">
@@ -148,7 +197,7 @@ export default function LoginPage() {
                   type="button"
                   role="tab"
                   aria-selected={mode === tab}
-                  onClick={() => switchMode(tab)}
+                  onClick={() => switchMode(tab, { replace: true })}
                   className={`rounded-lg py-2.5 font-bold ${mode === tab ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
                 >
                   {tab === "login" ? "로그인" : "회원가입"}
