@@ -41,6 +41,7 @@ async function loadChatDraft(sessionId: string) {
       skinSigns: draft.skinSigns ?? [],
       lifestyle: draft.lifestyle ?? null,
       notes: draft.notes ?? null,
+      dailyCheck: draft.dailyCheck ?? null,
     }))
     .catch((e: unknown) => {
       if (e instanceof ApiError && e.code === 'SESSION_CLOSED') return 'closed' as const;

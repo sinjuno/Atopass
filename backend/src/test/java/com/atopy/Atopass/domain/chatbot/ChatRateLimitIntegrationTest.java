@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.atopy.Atopass.support.ApiTestSupport;
 import com.atopy.Atopass.support.FakeChatModelClient;
 import com.atopy.Atopass.support.FakeLlmConfig;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,16 +54,16 @@ class ChatRateLimitIntegrationTest extends ApiTestSupport {
 	void 선택지_답은_한도에_세지_않고_한도에_도달해도_보낼_수_있다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer);
+		mockMvc.perform(choice(bearer, session, Map.of("field", "skinTrend", "skip", true))).andExpect(status().isOk());
+		mockMvc.perform(choice(bearer, session, Map.of("field", "itchScore", "skip", true))).andExpect(status().isOk());
 		mockMvc.perform(choice(bearer, session, Map.of("field", "painIndex", "value", 5))).andExpect(status().isOk());
-		mockMvc.perform(choice(bearer, session, Map.of("field", "bodyParts", "skip", true))).andExpect(status().isOk());
-		mockMvc.perform(choice(bearer, session, Map.of("field", "sleepHours", "skip", true))).andExpect(status().isOk());
 
 		for (int i = 1; i <= 3; i++) {
 			mockMvc.perform(send(bearer, session, "메시지 " + i)).andExpect(status().isOk());
 		}
 		mockMvc.perform(send(bearer, session, "하나 더")).andExpect(status().isTooManyRequests());
 
-		mockMvc.perform(choice(bearer, session, Map.of("field", "medication", "value", true)))
+		mockMvc.perform(choice(bearer, session, Map.of("field", "bodyParts", "value", List.of("FACE"))))
 			.andExpect(status().isOk());
 		mockMvc.perform(post("/api/v1/chatbot/sessions/" + session + "/finish").header(AUTH, bearer))
 			.andExpect(status().isOk())

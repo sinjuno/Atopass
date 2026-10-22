@@ -20,6 +20,7 @@ public record RecordDetailResponse(
 	List<SkinSign> skinSigns,
 	LifestyleResponse lifestyle,
 	String notes,
+	DailyCheckResponse dailyCheck,
 	List<PhotoSummary> photos,
 	LocalDateTime createdAt,
 	LocalDateTime updatedAt
@@ -40,6 +41,7 @@ public record RecordDetailResponse(
 			record.getSkinSigns().stream().sorted().toList(),
 			LifestyleResponse.from(record),
 			record.getNotes(),
+			DailyCheckResponse.from(record),
 			photos,
 			record.getCreatedAt(),
 			record.getUpdatedAt());

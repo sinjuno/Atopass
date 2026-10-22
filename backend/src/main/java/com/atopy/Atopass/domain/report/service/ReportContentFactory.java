@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.report.service;
 
+import com.atopy.Atopass.domain.record.dto.response.DailyCheckResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinCondition;
@@ -87,7 +88,8 @@ class ReportContentFactory {
 		List<ReportPhoto> photos = includePhotos ? photoSource.photosOf(record.getId()) : List.of();
 		return new DayEntry(record.getRecordDate(), conditions, record.getSleepHours(),
 			record.getAlcohol(), record.getOutdoorActivity(), record.getNotes(), photos,
-			record.getPainIndex(), record.getMedication(), record.getSkinSigns().stream().sorted().toList());
+			record.getPainIndex(), record.getMedication(), record.getSkinSigns().stream().sorted().toList(),
+			DailyCheckResponse.from(record));
 	}
 
 	private LifestyleSummary lifestyleSummary(List<SkinRecord> records) {

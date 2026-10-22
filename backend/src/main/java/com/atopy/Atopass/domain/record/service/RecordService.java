@@ -2,6 +2,7 @@ package com.atopy.Atopass.domain.record.service;
 
 import com.atopy.Atopass.domain.member.entity.Member;
 import com.atopy.Atopass.domain.member.repository.MemberRepository;
+import com.atopy.Atopass.domain.record.dto.request.DailyCheckRequest;
 import com.atopy.Atopass.domain.record.dto.request.LifestyleRequest;
 import com.atopy.Atopass.domain.record.dto.request.RecordRequest;
 import com.atopy.Atopass.domain.record.dto.request.SkinConditionRequest;
@@ -24,6 +25,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,6 +70,7 @@ public class RecordService {
 			.build();
 		record.replaceConditions(toConditions(request), toConditionSigns(request));
 		record.replaceSkinSigns(toSkinSigns(request));
+		applyDailyCheck(record, request.dailyCheck());
 		try {
 			return RecordCreatedResponse.from(recordRepository.saveAndFlush(record));
 		} catch (DataIntegrityViolationException e) {
@@ -112,6 +115,7 @@ public class RecordService {
 			blankToNull(request.notes()));
 		record.replaceConditions(toConditions(request), toConditionSigns(request));
 		record.replaceSkinSigns(toSkinSigns(request));
+		applyDailyCheck(record, request.dailyCheck());
 		try {
 			recordRepository.flush();
 		} catch (DataIntegrityViolationException e) {
@@ -167,6 +171,19 @@ public class RecordService {
 		}
 		toConditionSigns(request).values().forEach(signs::addAll);
 		return signs;
+	}
+
+	/** 하루 점검을 보냈을 때만 바꾼다. 보내지 않으면 저장된 값을 그대로 둔다. */
+	private void applyDailyCheck(SkinRecord record, DailyCheckRequest check) {
+		if (check == null) {
+			return;
+		}
+		Map<String, String> answers = new LinkedHashMap<>();
+		if (check.linkedAnswers() != null) {
+			check.linkedAnswers().forEach((id, answer) -> answers.put(id, answer.trim()));
+		}
+		record.updateDailyCheck(check.skinTrend(), check.itchScore(), check.sleepDisturbed(), check.moisturizer(),
+			check.medicationUse(), answers);
 	}
 
 	private RecordDetailResponse toDetail(SkinRecord record) {
