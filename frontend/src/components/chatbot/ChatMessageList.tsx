@@ -76,6 +76,9 @@ function ChatBubble({
   );
 }
 
+/** 증상 예시 사진의 출처. 사진 바로 아래에 작게 보여 준다 */
+const SKIN_SIGN_IMAGE_SOURCE = '출처: 대한아토피피부염학회, 아토피인사이드';
+
 /** 사용자가 보여 달라고 답한 증상 예시 사진. 인증이 필요해 blob으로 받아 보여 준다 */
 function SkinSignImage({ sign }: { sign: SkinSign }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -103,6 +106,9 @@ function SkinSignImage({ sign }: { sign: SkinSign }) {
   if (failed) return <p className="mb-2 text-sm text-gray-500">사진을 불러오지 못했어요.</p>;
   if (!url) return <div className="mb-2 aspect-[4/3] w-full animate-pulse rounded-xl bg-gray-200" aria-hidden />;
   return (
-    <img src={url} alt={`${SKIN_SIGN_LABELS[sign]} 예시 사진`} className="mb-2 w-full rounded-xl border border-gray-200 bg-white" />
+    <figure className="mb-2">
+      <img src={url} alt={`${SKIN_SIGN_LABELS[sign]} 예시 사진`} className="w-full rounded-xl border border-gray-200 bg-white" />
+      <figcaption className="mt-1 text-xs leading-snug text-gray-500">{SKIN_SIGN_IMAGE_SOURCE}</figcaption>
+    </figure>
   );
 }
