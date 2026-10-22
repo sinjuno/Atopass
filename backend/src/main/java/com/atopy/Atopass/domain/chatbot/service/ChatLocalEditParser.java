@@ -123,7 +123,7 @@ class ChatLocalEditParser {
 		if (!matchedAny) {
 			return Optional.empty();
 		}
-		return Optional.of(new ChatReplyParser.ModelOutput(true, null, updates, false, false, false));
+		return Optional.of(new ChatReplyParser.ModelOutput(true, null, updates, false, false, false, null));
 	}
 
 }
