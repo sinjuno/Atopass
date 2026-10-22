@@ -122,25 +122,4 @@ class SymptomMigrationIntegrationTest extends ApiTestSupport {
 			conditionId, symptom, score);
 	}
 
-	@Test
-	void 예전_증상_목록으로_만든_허용_값_검사는_지우고_지금_목록을_허용하는_검사는_둔다() {
-		jdbc.execute("create table old_signs (skin_sign varchar(30) not null,"
-			+ " constraint old_sign_check check (skin_sign in ('ERYTHEMA', 'EDEMA')))");
-		jdbc.execute("create table new_signs (skin_sign varchar(30) not null,"
-			+ " constraint new_sign_check check (skin_sign in (" + java.util.Arrays.stream(
-				com.atopy.Atopass.domain.record.entity.SkinSign.values()).map(s -> "'" + s.name() + "'")
-				.collect(java.util.stream.Collectors.joining(", ")) + ")))");
-		try {
-			migration.dropStaleSignChecks("old_signs");
-			migration.dropStaleSignChecks("new_signs");
-
-			jdbc.update("insert into old_signs (skin_sign) values ('FISSURE')");
-			assertThat(jdbc.queryForObject("select count(*) from information_schema.table_constraints"
-				+ " where constraint_type = 'CHECK' and lower(table_name) = 'new_signs'", Integer.class)).isEqualTo(1);
-		} finally {
-			jdbc.execute("drop table old_signs");
-			jdbc.execute("drop table new_signs");
-		}
-	}
-
 }

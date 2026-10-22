@@ -1,7 +1,5 @@
 package com.atopy.Atopass.domain.report.service;
 
-import com.atopy.Atopass.domain.chatbot.service.LinkedQuestion;
-import com.atopy.Atopass.domain.record.dto.response.DailyCheckResponse;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.report.service.ReportContent.DayEntry;
@@ -55,7 +53,15 @@ class ReportHtmlBuilder {
 		return html.toString();
 	}
 
+	/**
+	 * 제목·기간 요약. 고통 지수를 기록한 날이 있으면 오른쪽 위에 기간 고통 지수 그래프를 함께 둔다.
+	 * 표 안의 width:100% 요소가 float와 겹칠 수 있어 float 대신 두 칸짜리 표로 나눈다.
+	 */
 	private void header(StringBuilder html, ReportContent content) {
+		byte[] chart = ReportPainChart.png(content.startDate(), content.endDate(), content.days());
+		if (chart != null) {
+			html.append("<table class=\"header\"><tr><td>");
+		}
 		html.append("<h1>").append(TITLE).append("</h1>")
 			.append("<table class=\"meta\">")
 			.append(row("조회 기간", DATE.format(content.startDate()) + " ~ " + DATE.format(content.endDate())))
@@ -68,6 +74,23 @@ class ReportHtmlBuilder {
 		html.append(row("평소 생활 (기간 평균)", usualLifestyleText(content.lifestyle())))
 			.append(row("작성일", DATE.format(content.generatedDate())))
 			.append("</table>");
+		if (chart != null) {
+			html.append("</td><td class=\"header-chart\">");
+			painChart(html, chart, content);
+			html.append("</td></tr></table>");
+		}
+	}
+
+	/** 고통 지수 그래프 상자: 제목, 왼쪽 눈금(10·5·0), 그래프 이미지, 아래 시작·끝 날짜 */
+	private void painChart(StringBuilder html, byte[] png, ReportContent content) {
+		html.append("<div class=\"chart-box\"><p class=\"chart-title\">기간 고통 지수 (0~10)</p>")
+			.append("<table class=\"chart\"><tr><td class=\"chart-scale\">")
+			.append("<div class=\"scale-top\">10</div><div class=\"scale-mid\">5</div><div>0</div></td><td>")
+			.append("<img class=\"chart\" alt=\"기간 고통 지수 그래프\" src=\"data:image/png;base64,")
+			.append(Base64.getEncoder().encodeToString(png)).append("\"/></td></tr>")
+			.append("<tr><td></td><td><table class=\"chart-dates\"><tr><td>").append(SHORT_DATE.format(content.startDate()))
+			.append("</td><td class=\"end\">").append(SHORT_DATE.format(content.endDate())).append("</td></tr></table></td></tr>")
+			.append("</table><p class=\"chart-note\">점선은 5점, 큰 점은 가장 높은 날입니다. 기록이 없는 날은 선이 끊깁니다.</p></div>");
 	}
 
 	/** 고통 지수를 기록한 날의 평균과 최고. 기록한 날이 없으면 null. 0도 기록한 값이다. */
@@ -146,22 +169,9 @@ class ReportHtmlBuilder {
 		}
 	}
 
-	/**
-	 * 수면·음주·야외활동 중 기록한 것만 보여 주고, 평소와 다른 것은 굵게 표시한다 (이스케이프된 XHTML)
-	 * 하루 점검 항목은 진료 때 읽기 쉽도록 의학 용어를 함께 적는다. (예: 소양감(가려움) 7점)
-	 */
+	/** 수면·음주·야외활동 중 기록한 것만 보여 주고, 평소와 다른 것은 굵게 표시한다 (이스케이프된 XHTML) */
 	private String lifestyleText(DayEntry day, Double usualSleep) {
 		List<String> parts = new ArrayList<>();
-		DailyCheckResponse check = day.dailyCheck();
-		if (check != null && check.skinTrend() != null) {
-			parts.add("피부 상태 " + check.skinTrend().label());
-		}
-		if (check != null && check.itchScore() != null) {
-			parts.add("소양감(가려움) " + check.itchScore() + "점");
-		}
-		if (check != null && check.sleepDisturbed() != null) {
-			parts.add(check.sleepDisturbed() ? "<b>수면 장애(가려워서 잠 설침)</b>" : "수면 장애 없음");
-		}
 		if (day.sleepHours() != null) {
 			String sleep = "수면 " + day.sleepHours().stripTrailingZeros().toPlainString() + "시간";
 			parts.add(isShortSleep(day, usualSleep)
@@ -174,21 +184,12 @@ class ReportHtmlBuilder {
 			String outdoor = "야외활동 " + outdoorText(day.outdoorActivity());
 			parts.add(day.outdoorActivity() == OutdoorActivity.HIGH ? "<b>" + outdoor + "</b>" : outdoor);
 		}
-		if (check != null && check.moisturizer() != null) {
-			parts.add("보습 관리 " + (check.moisturizer() ? "함" : "안 함"));
-		}
-		if (check != null && check.medicationUse() != null) {
-			parts.add("처방 약 사용 " + check.medicationUse().label());
-		} else if (day.medication() != null) {
+		if (day.medication() != null) {
 			parts.add(day.medication() ? "약 복용" : "약 미복용");
 		}
 		if (day.skinSigns() != null && !day.skinSigns().isEmpty()) {
 			parts.add("나타난 증상 " + escape(day.skinSigns().stream().map(SkinSign::label)
 				.collect(java.util.stream.Collectors.joining(", "))));
-		}
-		if (check != null && check.linkedAnswers() != null) {
-			check.linkedAnswers().forEach((id, answer) -> parts.add(escape(
-				LinkedQuestion.find(id).map(LinkedQuestion::label).orElse(id) + " " + answer)));
 		}
 		return parts.isEmpty() ? "생활 기록 없음" : String.join(" · ", parts);
 	}
@@ -312,6 +313,21 @@ class ReportHtmlBuilder {
 			@page { size: A4; margin: 18mm 15mm 20mm 15mm; @bottom-center { content: counter(page) " / " counter(pages); font-size: 9pt; color: #666666; } }
 			body { font-family: 'NanumGothic', sans-serif; font-size: 10pt; color: #222222; }
 			h1 { font-size: 20pt; margin: 0 0 8pt 0; color: #1f3a5f; }
+			table.header { margin-top: 0; }
+			table.header td { vertical-align: top; padding: 0; }
+			td.header-chart { width: 214pt; padding-left: 10pt; }
+			table.header table.meta th { width: 40%; }
+			.chart-box { border: 1px solid #c8d0dc; padding: 5pt 6pt 4pt 6pt; }
+			.chart-title { font-size: 8.5pt; color: #1f3a5f; margin: 0 0 3pt 0; }
+			table.chart { margin-top: 0; }
+			table.chart td { padding: 0; vertical-align: top; }
+			td.chart-scale { width: 12pt; padding-right: 3pt; font-size: 7pt; line-height: 8pt; color: #888888; text-align: right; }
+			.scale-top, .scale-mid { height: 25pt; }
+			img.chart { width: 174pt; height: 58pt; }
+			table.chart-dates { margin-top: 1pt; }
+			table.chart-dates td { font-size: 7pt; color: #888888; }
+			table.chart-dates td.end { text-align: right; }
+			.chart-note { font-size: 7pt; color: #888888; margin: 2pt 0 0 0; }
 			h2 { font-size: 13pt; margin: 18pt 0 6pt 0; color: #1f3a5f; border-bottom: 1px solid #1f3a5f; padding-bottom: 3pt; }
 			p { margin: 4pt 0; }
 			.hint { font-size: 8.5pt; color: #666666; }

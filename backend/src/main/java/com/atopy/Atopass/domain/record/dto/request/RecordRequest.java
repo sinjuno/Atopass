@@ -22,7 +22,6 @@ import java.util.Set;
 /**
  * 피부 기록 생성·수정 요청. PUT은 전체 내용을 보낸다.
  * 부위별 증상(skinConditions)과 고통 지수(painIndex) 중 하나 이상은 있어야 한다.
- * 하루 점검(dailyCheck)은 챗봇이 모은 항목이라, 다른 화면이 보내지 않아도 지워지지 않게 null이면 그대로 둔다.
  */
 public record RecordRequest(
 	@NotNull(message = "기록 날짜를 입력해 주세요.")
@@ -50,11 +49,7 @@ public record RecordRequest(
 	LifestyleRequest lifestyle,
 
 	@Size(max = 2000, message = "특이사항은 2000자 이하여야 합니다.")
-	String notes,
-
-	/** 하루 점검 항목. 보내지 않으면(null) 수정할 때 저장된 값을 그대로 둔다. */
-	@Valid
-	DailyCheckRequest dailyCheck
+	String notes
 ) {
 
 	@JsonIgnore

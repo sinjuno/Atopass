@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.chatbot.entity;
 
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +47,11 @@ public class ChatMessage extends BaseTimeEntity {
 	@Column(name = "via_choice", nullable = false)
 	private boolean viaChoice;
 
+	/** 챗봇이 이 말과 함께 보여 준 증상 예시 사진. 사용자가 보여 달라고 했을 때만 있다. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "image_sign", length = 30)
+	private SkinSign imageSign;
+
 	public static ChatMessage of(ChatSession session, ChatRole role, String content) {
 		return of(session, role, content, false);
 	}
@@ -56,6 +62,13 @@ public class ChatMessage extends BaseTimeEntity {
 		message.role = role;
 		message.content = content;
 		message.viaChoice = viaChoice;
+		return message;
+	}
+
+	/** 증상 예시 사진을 함께 보여 주는 챗봇의 말 */
+	public static ChatMessage withImage(ChatSession session, String content, SkinSign imageSign) {
+		ChatMessage message = of(session, ChatRole.ASSISTANT, content);
+		message.imageSign = imageSign;
 		return message;
 	}
 

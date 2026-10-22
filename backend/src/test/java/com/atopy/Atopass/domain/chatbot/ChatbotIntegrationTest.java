@@ -93,20 +93,17 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "어제 몇 시간 주무셨나요?",
-			 "updates": {"skinTrend": "BETTER", "itchScore": 4, "painIndex": 6,
-			 "conditions": [{"bodyPart": "LEFT_THIGH", "symptoms": {"pain": 4}}]}, "finished": false}""");
+			 "updates": {"painIndex": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 4}}]}, "finished": false}""");
 
-		mockMvc.perform(sendMessage(bearer, session, "나아졌어요. 가려움 4점, 고통은 6점이고 왼쪽 허벅지가 4점이에요"))
+		mockMvc.perform(sendMessage(bearer, session, "고통은 6점이고 팔 가려움이 4점이에요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.reply").value("그 부분을 보면 지금 어떤 상태예요? 해당하는 것을 모두 골라 주세요."))
-			.andExpect(jsonPath("$.data.askingField").value("skinShape"))
-			.andExpect(jsonPath("$.data.choice.multiple").value(true))
+			.andExpect(jsonPath("$.data.reply").value("오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요."))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"))
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinShape"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
-			.andExpect(jsonPath("$.data.draft.dailyCheck.itchScore").value(4))
-			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("LEFT_THIGH"))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("ARM"))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4));
 	}
 
@@ -117,8 +114,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"updates\": {}}");
 
 		mockMvc.perform(sendMessage(bearer, session, "안녕하세요"))
-			.andExpect(jsonPath("$.data.reply").value("오늘 피부 상태는 어땠나요?"))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinTrend"));
+			.andExpect(jsonPath("$.data.reply").value("오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"));
 	}
 
 	@Test
@@ -130,18 +127,16 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			 "updates": {"painIndex": 4}}""");
 		llm.enqueue("""
 			{"understood": true, "reply": "다른 건요?",
-			 "updates": {"skinTrend": "BETTER", "itchScore": 0, "swelling": false, "scratch": false,
-			 "sleepDisturbed": false, "sleepHours": 6, "moisturizer": false, "medication": false, "skinSigns": [],
-			 "skipped": ["bodyParts", "notes"]}}""");
+			 "updates": {"sleepHours": 6, "medication": false, "skinSigns": [], "skipped": ["bodyParts", "notes"]}}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 4점"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
-		mockMvc.perform(sendMessage(bearer, session, "나아졌고 안 가렵고 상처도 없어요. 6시간 푹 잤고 보습제도 약도 안 썼어요"))
+		mockMvc.perform(sendMessage(bearer, session, "6시간 잤고 약은 안 먹었고 증상도 특이사항도 없어요"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
 			.andExpect(jsonPath("$.data.reply").value(org.hamcrest.Matchers.allOf(
-				org.hamcrest.Matchers.startsWith("오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 피부 상태: 좋아짐\n- 가려움: 0점\n- 고통 지수: 4점"),
+				org.hamcrest.Matchers.startsWith("오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 고통 지수: 4점"),
 				org.hamcrest.Matchers.endsWith("오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요."))))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0));
 	}
@@ -168,7 +163,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "그만할래요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
-			.andExpect(jsonPath("$.data.reply").value("오늘 피부 상태는 어땠나요?"));
+			.andExpect(jsonPath("$.data.reply").value("오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)"));
 	}
 
 	@Test
@@ -257,7 +252,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.understood").value(false))
 			.andExpect(jsonPath("$.data.reply").value("점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)"))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinTrend"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").doesNotExist());
 	}
 
@@ -274,51 +269,30 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 질문은_피부_상태부터_특이사항까지_정해진_순서로_이어진다() throws Exception {
+	void 질문은_고통_지수_증상_부위_수면_약_복용_특이사항_순서로_이어진다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
-		llm.enqueue("{\"understood\": true, \"updates\": {\"skinTrend\": \"BETTER\"}}");
-		mockMvc.perform(sendMessage(bearer, session, "좀 나아졌어요"))
-			.andExpect(jsonPath("$.data.reply").value("가려움은 어느 정도였나요? (0은 없음, 10은 매우 심함)"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"itchScore\": 3}}");
-		mockMvc.perform(sendMessage(bearer, session, "3점"))
-			.andExpect(jsonPath("$.data.reply").value("오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
 		mockMvc.perform(sendMessage(bearer, session, "5점"))
-			.andExpect(jsonPath("$.data.reply").value("어디가 가장 불편했나요? 해당하는 부위를 모두 골라 주세요."));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"conditions\": [{\"bodyPart\": \"LEFT_THIGH\", \"pain\": 5}]}}");
-		mockMvc.perform(sendMessage(bearer, session, "왼쪽 허벅지요"))
-			.andExpect(jsonPath("$.data.reply").value("그 부분을 보면 지금 어떤 상태예요? 해당하는 것을 모두 골라 주세요."));
+			.andExpect(jsonPath("$.data.reply").value("오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"EDEMA\"]}}");
-		// 붉어졌다고 하면 붓기·열감을 묻는 연결 질문을 버튼으로 묻는다.
-		mockMvc.perform(sendMessage(bearer, session, "빨갛고 오돌토돌해요"))
-			.andExpect(jsonPath("$.data.askingField").value("C07"))
-			.andExpect(jsonPath("$.data.reply").value("만지면 뜨겁거나 부은 느낌도 있어요?"));
-		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/choices").header(AUTH, bearer),
-				Map.of("field", "C07", "value", "예")))
-			.andExpect(jsonPath("$.data.reply").value("긁어서 생긴 상처가 있나요?"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"scratch\": false}}");
-		mockMvc.perform(sendMessage(bearer, session, "없어요"))
-			.andExpect(jsonPath("$.data.reply").value("가려워서 잠을 설쳤나요?"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"sleepDisturbed\": false}}");
-		mockMvc.perform(sendMessage(bearer, session, "잘 잤어요"))
+		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
+			.andExpect(jsonPath("$.data.reply").value("그 증상이 어느 부위에 나타났나요? 해당하는 부위를 모두 골라 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"conditions\": [{\"bodyPart\": \"FACE\", \"pain\": 5}]}}");
+		mockMvc.perform(sendMessage(bearer, session, "얼굴이요"))
 			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"sleepHours\": 8}}");
 		mockMvc.perform(sendMessage(bearer, session, "8시간"))
 			.andExpect(jsonPath("$.data.draft.sleepScore").value(5))
-			.andExpect(jsonPath("$.data.reply").value("보습제는 발랐나요?"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"moisturizer\": true}}");
-		mockMvc.perform(sendMessage(bearer, session, "발랐어요"))
-			.andExpect(jsonPath("$.data.reply").value("처방받은 연고나 약을 사용했나요?"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"medicationUse\": \"NOT_USED\"}}");
-		mockMvc.perform(sendMessage(bearer, session, "안 썼어요"))
+			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요?"));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
+		mockMvc.perform(sendMessage(bearer, session, "예"))
 			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(3))
-			.andExpect(jsonPath("$.data.draft.dailyCheck.linkedAnswers.C07").value("예"))
+			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(2))
 			.andExpect(jsonPath("$.data.draft.notes").value("새 보습제를 썼어요"));
 	}
 
@@ -380,8 +354,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"reply\": \"몇 점인가요?\", \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\"}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "팔이 가려워요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.pendingFields[2]").value("painIndex"))
-			.andExpect(jsonPath("$.data.pendingFields[3]").value("symptoms"));
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"))
+			.andExpect(jsonPath("$.data.pendingFields[1]").value("symptoms"));
 	}
 
 	@Test
@@ -413,7 +387,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].role").value("USER"))
 			.andExpect(jsonPath("$.data.messages[0].content").value("기록할게요"))
 			.andExpect(jsonPath("$.data.messages[1].role").value("ASSISTANT"))
-			.andExpect(jsonPath("$.data.messages[1].content").value("오늘 피부 상태는 어땠나요?"))
+			.andExpect(jsonPath("$.data.messages[1].content").value("오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)"))
 			.andExpect(jsonPath("$.data.messages[3].content").value("몇 점인가요?"))
 			.andExpect(jsonPath("$.data.messages[0].createdAt").isNotEmpty());
 	}
@@ -508,7 +482,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].role").value("ASSISTANT"))
 			.andExpect(jsonPath("$.data.messages[0].content").value(org.hamcrest.Matchers.allOf(
 				org.hamcrest.Matchers.containsString("오늘 기록이 이미 저장되어 있어요."),
-				org.hamcrest.Matchers.containsString("- 팔: 고통 4점"),
+				org.hamcrest.Matchers.containsString("- 팔: 증상 없음"),
 				org.hamcrest.Matchers.containsString("- 수면 시간: 6시간"),
 				org.hamcrest.Matchers.containsString("수정할 내용이 있나요?"))));
 		// 저장된 값이 초안으로 들어오고, 빈 항목을 다시 묻지 않는다.
@@ -544,7 +518,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.recordId").value(recordId))
 			.andExpect(jsonPath("$.data.reply").value(
-				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 고통 4점\n- 나타난 증상: 없음\n- 수면 시간: 8시간"));
+				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
 		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
 		// 글로 고치면 저장 버튼 없이 바로 기존 기록이 수정된다.
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))

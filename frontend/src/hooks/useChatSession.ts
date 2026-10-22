@@ -2,15 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
-import type {
-  AskingField,
-  ChatChoiceRequest,
-  ChatChoiceSpec,
-  ChatMessage,
-  PendingField,
-  SendMessageResponse,
-} from '@/types/chatbot';
-import { BODY_MAP_PARTS, BODY_PART_LABELS } from '@/utils/constants';
+import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
+import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
 /**
@@ -28,22 +21,35 @@ interface SendResult {
 
 const isApiError = (e: unknown, code: string) => e instanceof ApiError && e.code === code;
 
-/**
- * 선택지 답을 대화에 남길 문장 — 서버가 대화 내역에 저장하는 문장과 같다.
- * 서버가 준 선택지는 고른 글자 그대로이고, 여러 개 고르기에서 하나도 안 고르면 "하나도 없음" 버튼 글자(예: 괜찮음)다
- */
-export function choiceText(choice: ChatChoiceRequest, spec: ChatChoiceSpec | null): string {
-  if ('skip' in choice) return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
-  const { field, value } = choice;
-  if (field === 'bodyParts' && Array.isArray(value)) {
-    return BODY_MAP_PARTS.filter((part) => (value as string[]).includes(part))
-      .map((part) => BODY_PART_LABELS[part])
-      .join(', ');
+const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
+
+/** 선택지 답을 대화에 남길 문장 — 서버가 대화 내역에 저장하는 문장과 같다 */
+export function choiceText(choice: ChatChoiceRequest): string {
+  if ('skip' in choice) {
+    if (choice.field === 'signImage') return '괜찮아요';
+    return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
   }
-  if (Array.isArray(value)) return value.length === 0 ? (spec?.noneLabel ?? '없어요') : value.join(', ');
-  if (field === 'painIndex' || field === 'itchScore') return `${value}점`;
-  if (field === 'sleepHours') return `${value}시간`;
-  return String(value).trim();
+  switch (choice.field) {
+    case 'signImage':
+      return choice.value ? '보여 주세요' : '괜찮아요';
+    case 'painIndex':
+      return `${choice.value}점`;
+    case 'bodyParts':
+      return BODY_MAP_PARTS.filter((part) => choice.value.includes(part))
+        .map((part) => BODY_PART_LABELS[part])
+        .join(', ');
+    case 'sleepHours':
+      return `${choice.value}시간`;
+    case 'medication':
+      return choice.value ? '예' : '아니오';
+    case 'skinSigns':
+      return choice.value.length === 0
+        ? '없어요'
+        : [...choice.value]
+            .sort((a, b) => SKIN_SIGN_ORDER.indexOf(a) - SKIN_SIGN_ORDER.indexOf(b))
+            .map((sign) => SKIN_SIGN_LABELS[sign])
+            .join(', ');
+  }
 }
 
 
@@ -61,13 +67,12 @@ export function useChatSession(recordDate: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pendingFields, setPendingFields] = useState<PendingField[]>([]);
-  const [askingField, setAskingField] = useState<AskingField | null>(null);
-  const [choiceSpec, setChoiceSpec] = useState<ChatChoiceSpec | null>(null);
+  const [askingField, setAskingField] = useState<PendingField | null>(null);
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   // 그날 기록이 저장되었으면 그 ID. 사진을 바로 올릴 때 쓴다
   const [recordId, setRecordId] = useState<number | null>(null);
-  // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
-  const [painIndex, setPainIndex] = useState<number | null>(null);
+  // 지금까지 모은 초안 — 고통 지수(캐릭터 표정), 방금 고른 증상(부위 선택지), 부위별 증상(총정리 마네킹)에 쓴다
+  const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null);
   // 가장 최근 응답에서 말을 알아들었는지. 알아듣지 못했을 때만 아토미가 고민하는 표정을 짓는다
   const [understood, setUnderstood] = useState(true);
   const [status, setStatus] = useState<ChatStatus>('loading');
@@ -95,11 +100,10 @@ export function useChatSession(recordDate: string) {
       setMessages(messages);
       setPendingFields(state.pendingFields);
       setAskingField(state.askingField);
-      setChoiceSpec(state.choice);
       setRequiresConfirmation(state.requiresConfirmation);
       setRecordId(state.recordId);
       recordIdRef.current = state.recordId;
-      setPainIndex(state.draft.painIndex ?? null);
+      setChatDraft(state.draft);
       setStatus('ready');
     },
     [recordDate],
@@ -158,16 +162,15 @@ export function useChatSession(recordDate: string) {
         // understood: false여도 reply에 같은 질문(필요하면 입력 예시 포함)이 오므로 그대로 표시한다
         setMessages((prev) => [
           ...prev,
-          { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString() },
+          { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString(), imageSign: res.imageSign },
         ]);
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
-        setChoiceSpec(res.choice);
         setRequiresConfirmation(res.requiresConfirmation);
         if (recordIdRef.current === null && res.recordId !== null) setJustCompleted(true);
         recordIdRef.current = res.recordId;
         setRecordId(res.recordId);
-        setPainIndex(res.draft?.painIndex ?? null);
+        setChatDraft(res.draft);
         setUnderstood(res.understood);
         setStatus('ready');
         setLimitReached(false);
@@ -209,24 +212,23 @@ export function useChatSession(recordDate: string) {
   /** 선택지 답 — LLM을 거치지 않으므로 이용 한도와 상관없이 보낼 수 있다 */
   const choose = useCallback(
     async (choice: ChatChoiceRequest) => {
-      const result = await runTurn(choiceText(choice, choiceSpec), (id) => chatbotApi.sendChoice(id, choice));
+      const result = await runTurn(choiceText(choice), (id) => chatbotApi.sendChoice(id, choice));
       // 다른 탭에서 답했거나 해서 지금 묻는 항목이 바뀌었을 수 있다 — 서버 상태로 다시 맞춘다
       if (!result.ok && !result.closed && sessionId) {
         try {
           const state = await chatbotApi.getDraft(sessionId);
           setPendingFields(state.pendingFields);
           setAskingField(state.askingField);
-          setChoiceSpec(state.choice);
           setRequiresConfirmation(state.requiresConfirmation);
           setRecordId(state.recordId);
-          setPainIndex(state.draft.painIndex ?? null);
+          setChatDraft(state.draft);
         } catch {
           // 다시 맞추지 못해도 오류 문구는 이미 보여 주고 있다
         }
       }
       return result;
     },
-    [runTurn, sessionId, choiceSpec],
+    [runTurn, sessionId],
   );
 
   /**
@@ -261,9 +263,10 @@ export function useChatSession(recordDate: string) {
     messages,
     pendingFields,
     askingField,
-    choiceSpec,
     requiresConfirmation,
-    painIndex,
+    chatDraft,
+    // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
+    painIndex: chatDraft?.painIndex ?? null,
     understood,
     status,
     error,
