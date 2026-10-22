@@ -1,5 +1,5 @@
-import type { CustomChoiceField, PendingField } from '@/types/chatbot';
-import type { BodyPart, MedicationUse, OutdoorActivity, SkinSign, SkinTrend, SymptomKey } from '@/types/record';
+import type { PendingField } from '@/types/chatbot';
+import type { BodyPart, OutdoorActivity, SkinSign, SymptomKey } from '@/types/record';
 
 // Swagger BodyPart enum 순서
 export const BODY_PART_LABELS: Record<BodyPart, string> = {
@@ -89,8 +89,6 @@ export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   LICHENIFICATION: '태선화',
   XEROSIS: '건조증',
   ITCHING: '가려움',
-  FISSURE: '균열',
-  BLEEDING: '출혈',
 };
 
 /** 증상을 쉬운 말로 풀어 쓴 설명. 증상을 고르는 버튼 아래에 작게 보여 준다 (서버 SkinSign의 설명과 같다) */
@@ -102,8 +100,6 @@ export const SKIN_SIGN_DESCRIPTIONS: Record<SkinSign, string> = {
   LICHENIFICATION: '오래 긁어서 피부가 두꺼워지고 거칠어짐, 주름이 깊어짐',
   XEROSIS: '피부가 건조하고 당기거나 하얗게 일어남',
   ITCHING: '피부가 가려움',
-  FISSURE: '피부가 갈라지거나 틈이 생김',
-  BLEEDING: '긁거나 갈라진 곳에서 피가 남',
 };
 
 /** 수면 점수: 7~8시간이 5점, 2시간 벗어날 때마다 1점 감점 (최저 1점) */
@@ -126,55 +122,13 @@ export const CHAT_SLEEP_HOURS_DEFAULT = 7;
 
 /** 챗봇이 묻는 항목 이름 (예: 내려 둔 선택지 탭의 "수면 시간 고르기") */
 export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
-  skinTrend: '피부 상태',
-  itchScore: '가려움 정도',
   painIndex: '고통 지수',
-  bodyParts: '불편한 부위',
+  bodyParts: '고통 부위',
   symptoms: '부위별 점수',
-  skinShape: '피부 모양',
-  swelling: '붓기',
-  scratch: '긁은 자국',
-  oozing: '진물·피',
-  sleepDisturbed: '수면 방해',
   sleepHours: '수면 시간',
-  moisturizer: '보습제',
-  medicationUse: '연고·약',
+  medication: '약 복용',
+  skinSigns: '나타난 증상',
   notes: '특이사항',
-};
-
-/** 챗봇 선택지 중 화면이 따로 그리는 것(막대·마네킹). 그 밖의 항목은 서버가 준 선택지(choice)로 그린다 */
-export const CUSTOM_CHOICE_FIELDS: readonly CustomChoiceField[] = ['painIndex', 'itchScore', 'bodyParts', 'sleepHours', 'notes'];
-
-export const SKIN_TREND_LABELS: Record<SkinTrend, string> = {
-  BETTER: '좋아짐',
-  SAME: '평소와 비슷',
-  WORSE: '평소보다 나빠짐',
-};
-
-export const MEDICATION_USE_LABELS: Record<MedicationUse, string> = {
-  USED: '사용함',
-  NOT_USED: '안 함',
-  NO_PRESCRIPTION: '처방 없음',
-};
-
-/** 연결 질문 답을 기록에 보여 줄 이름 (질문 ID → 이름) */
-export const LINKED_ANSWER_LABELS: Record<string, string> = {
-  C01: '불편 시간대',
-  C02: '악화 순간',
-  C03: '접촉 요인',
-  C04: '새 제품',
-  C05: '손 씻기 빈도',
-  C06: '보습 시점',
-  C07: '붓기·열감',
-  C08: '긁는 상황',
-  C09: '발견 시점',
-  C10: '취침 시간 변화',
-  C11: '땀 관리',
-  C12: '음식 메모',
-  C13: '마스크 착용',
-  C14: '실내 난방',
-  C15: '옷 소재',
-  C16: '에어컨 사용',
 };
 
 /** 챗봇 이용 동의 팝업 문구 */

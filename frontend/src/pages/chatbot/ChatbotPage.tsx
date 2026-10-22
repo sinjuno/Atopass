@@ -8,10 +8,9 @@ import RecordCompleteOverlay from '@/components/chatbot/RecordCompleteOverlay';
 import PageHeader from '@/components/common/PageHeader';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
-import type { AskingField, ChatChoiceRequest, CustomChoiceField } from '@/types/chatbot';
+import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
 import { useRecordDraft } from '@/hooks/useRecordDraft';
 import { atomiMood } from '@/utils/atomiMood';
-import { CUSTOM_CHOICE_FIELDS } from '@/utils/constants';
 import { formatKoreanDate, today } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 import { recordPath } from '@/utils/routes';
@@ -23,7 +22,6 @@ export default function ChatbotPage() {
   const {
     messages,
     askingField,
-    choiceSpec,
     requiresConfirmation,
     painIndex,
     status,
@@ -54,17 +52,12 @@ export default function ChatbotPage() {
   };
 
   // 서버가 정한 항목(askingField)을 선택지로 묻는다. 부위·증상 점수(symptoms)는 글로 답한다.
-  // 막대·마네킹은 화면이 그리고, 그 밖의 항목(연결 질문 포함)은 서버가 준 선택지(choiceSpec)로 그린다.
-  // 첫 화면에서는 첫 질문의 선택지와 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
+  // 첫 화면에서는 고통 지수 막대와 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
   // (LLM이 응답하지 못해도 버튼만으로 끝까지 기록할 수 있다)
   const started = messages.length > 0;
- const hasChoices =
-    !!askingField && (CUSTOM_CHOICE_FIELDS.includes(askingField as CustomChoiceField) || choiceSpec !== null);
-  const choiceField: AskingField | null =
-    !requiresConfirmation && askingField && askingField !== 'symptoms' && hasChoices ? askingField : null;
-  // 특이사항과 연결 질문을 직접 적는 단계는 글로 답하므로 입력창을 막지 않는다
-  const answersByText = choiceField === 'notes' || choiceSpec?.text === true;
-  const textLocked = started && choiceField !== null && !answersByText && !choicesMinimized;
+  const choiceField: ChoiceField | null =
+    !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
+  const textLocked = started && choiceField !== null && choiceField !== 'notes' && !choicesMinimized;
   // 고통 지수·수면 시간 막대를 쓰는 동안은 막대에 화면을 다 내주도록 대화 목록을 숨긴다.
   // 선택지를 내려 두면(choicesMinimized) 다시 보인다. 특이사항은 대화를 보며 적어야 하므로 숨기지 않는다.
   const hideChatForSlider =
@@ -134,7 +127,6 @@ export default function ChatbotPage() {
         <ChatChoices
           key={`${choiceField}:${choiceRound}`}
           field={choiceField}
-          spec={choiceSpec}
           onChoose={(c) => void handleChoose(c)}
           onMinimizedChange={setChoicesMinimized}
         />
