@@ -6,18 +6,10 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import ComparisonView from '@/components/record/ComparisonView';
 import { useAsync } from '@/hooks/useAsync';
-import { monthCells, monthRange, WEEKDAYS } from '@/utils/calendar';
+import { monthCells, monthRange, SCORE_LEVELS, scoreColor, WEEKDAYS } from '@/utils/calendar';
 import { today } from '@/utils/date';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { recordPath } from '@/utils/routes';
-
-/** 고통 지수 구간별 표시 색 */
-const SCORE_LEVELS = [
-  { max: 3, label: '0~3점', className: 'bg-emerald-500' },
-  { max: 6, label: '4~6점', className: 'bg-amber-400' },
-  { max: 10, label: '7~10점', className: 'bg-red-500' },
-];
-const scoreColor = (score: number) => SCORE_LEVELS.find((level) => score <= level.max)!.className;
 
 /**
  * 캘린더 — /calendar. 월별 기록 여부와 대표 점수를 보여 주고, 날짜를 누르면 그날 기록으로 이동한다.
@@ -154,7 +146,7 @@ export default function CalendarPage() {
                       {day}
                       <span
                         className={`size-2 rounded-full ${
-                          record ? (score === null ? 'bg-gray-400' : scoreColor(score)) : 'bg-transparent'
+                          record ? scoreColor(score) : 'bg-transparent'
                         }`}
                       />
                     </button>

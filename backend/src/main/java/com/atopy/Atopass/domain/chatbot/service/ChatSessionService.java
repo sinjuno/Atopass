@@ -14,6 +14,7 @@ import com.atopy.Atopass.domain.record.dto.request.RecordRequest;
 import com.atopy.Atopass.domain.record.dto.response.RecordCreatedResponse;
 import com.atopy.Atopass.domain.record.dto.response.RecordDetailResponse;
 import com.atopy.Atopass.domain.record.entity.SkinRecord;
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.repository.RecordRepository;
 import com.atopy.Atopass.domain.record.service.RecordService;
 import com.atopy.Atopass.global.exception.BusinessException;
@@ -161,10 +162,17 @@ public class ChatSessionService {
 	@Transactional
 	public Long saveTurn(String sessionId, String userText, String assistantText, String draftJson,
 		int failCount, boolean confirmationReady, boolean viaChoice, RecordRequest record) {
+		return saveTurn(sessionId, userText, assistantText, draftJson, failCount, confirmationReady, viaChoice, record, null);
+	}
+
+	/** imageSign이 있으면 챗봇의 말과 함께 그 증상의 예시 사진을 보여 준 것으로 남긴다. */
+	@Transactional
+	public Long saveTurn(String sessionId, String userText, String assistantText, String draftJson,
+		int failCount, boolean confirmationReady, boolean viaChoice, RecordRequest record, SkinSign imageSign) {
 		ChatSession session = sessionRepository.findById(sessionId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 		messageRepository.save(ChatMessage.of(session, ChatRole.USER, userText, viaChoice));
-		messageRepository.save(ChatMessage.of(session, ChatRole.ASSISTANT, assistantText));
+		messageRepository.save(ChatMessage.withImage(session, assistantText, imageSign));
 		session.updateTurn(draftJson, failCount, confirmationReady);
 		if (record == null) {
 			return session.getEditingRecordId();

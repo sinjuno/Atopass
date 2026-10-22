@@ -25,7 +25,7 @@ class ChatDraftTest {
 		ChatDraft draft = ChatDraft.empty();
 
 		assertThat(draft.pendingFields())
-			.containsExactly("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes");
+			.containsExactly("painIndex", "skinSigns", "bodyParts", "sleepHours", "medication", "notes");
 		assertThat(draft.requiredSatisfied()).isFalse();
 		assertThat(draft.readyForConfirmation(true)).isFalse();
 	}
@@ -38,7 +38,7 @@ class ChatDraftTest {
 
 		assertThat(draft.toResponse().painIndex()).isEqualTo(6);
 		assertThat(draft.requiredSatisfied()).isTrue();
-		assertThat(draft.pendingFields()).containsExactly("bodyParts", "sleepHours", "medication", "skinSigns", "notes");
+		assertThat(draft.pendingFields()).containsExactly("skinSigns", "bodyParts", "sleepHours", "medication", "notes");
 	}
 
 	@Test
@@ -187,7 +187,7 @@ class ChatDraftTest {
 		assertThat(draft.toResponse().lifestyle().alcohol()).isTrue();
 		assertThat(draft.toResponse().lifestyle().outdoorActivity()).isEqualTo(OutdoorActivity.MEDIUM);
 		assertThat(draft.toResponse().notes()).isEqualTo("평소보다 오래 걸었음");
-		assertThat(draft.pendingFields()).containsExactly("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns");
+		assertThat(draft.pendingFields()).containsExactly("painIndex", "skinSigns", "bodyParts", "sleepHours", "medication");
 	}
 
 	@Test
@@ -266,22 +266,27 @@ class ChatDraftTest {
 		assertThat(draft.askingField()).isEqualTo("painIndex");
 
 		draft.apply(json("{\"painIndex\": 6, \"medication\": true}"));
+		assertThat(draft.askingField()).isEqualTo("skinSigns");
+
+		draft.apply(json("{\"skinSigns\": []}"));
 		assertThat(draft.askingField()).isEqualTo("bodyParts");
 
 		draft.apply(json("{\"skipped\": [\"bodyParts\"]}"));
 		assertThat(draft.askingField()).isEqualTo("sleepHours");
 
-		draft.apply(json("{\"skipped\": [\"sleepHours\", \"notes\"], \"skinSigns\": []}"));
+		draft.apply(json("{\"skipped\": [\"sleepHours\", \"notes\"]}"));
 		assertThat(draft.askingField()).isNull();
 	}
 
 	@Test
-	void 고통_지수_다음에는_부위를_묻고_고른_부위에는_고통_지수가_점수로_들어간다() {
+	void 고통_지수_증상_다음에_부위를_묻고_고른_부위에는_고통_지수와_증상이_들어간다() {
 		ChatDraft draft = ChatDraft.empty();
 		// 고통 지수가 없으면 부위를 반영하지 않는다.
 		assertThat(draft.applyBodyParts(json("[\"FACE\"]"))).isEqualTo(ApplyResult.INVALID_VALUE);
 
 		draft.apply(json("{\"painIndex\": 7}"));
+		assertThat(draft.askingField()).isEqualTo("skinSigns");
+		draft.apply(json("{\"skinSigns\": [\"ITCHING\", \"ERYTHEMA\"]}"));
 		assertThat(draft.askingField()).isEqualTo("bodyParts");
 
 		assertThat(draft.applyBodyParts(json("[\"FACE\", \"NOSE\"]"))).isEqualTo(ApplyResult.INVALID_VALUE);
@@ -291,13 +296,37 @@ class ChatDraftTest {
 		assertThat(draft.applyBodyParts(json("[\"FACE\", \"left_hand\"]"))).isEqualTo(ApplyResult.OK);
 		assertThat(draft.conditions()).containsOnlyKeys(BodyPart.FACE, BodyPart.LEFT_HAND);
 		assertThat(draft.conditions().get(BodyPart.FACE)).containsEntry(Symptom.PAIN, 7);
+		// 방금 고른 증상이 고른 부위마다 그 부위의 증상으로 들어간다.
+		assertThat(draft.toResponse().skinConditions())
+			.allSatisfy(c -> assertThat(c.skinSigns()).containsExactly(SkinSign.ERYTHEMA, SkinSign.ITCHING));
 		assertThat(draft.askingField()).isEqualTo("sleepHours");
 	}
 
 	@Test
-	void 고통_지수가_0점이면_부위를_묻지_않는다() {
+	void 증상이_없다고_해도_고통이_있으면_부위를_묻고_부위에는_증상이_없다() {
 		ChatDraft draft = ChatDraft.empty();
-		draft.apply(json("{\"painIndex\": 0}"));
+		draft.apply(json("{\"painIndex\": 4, \"skinSigns\": []}"));
+		assertThat(draft.askingField()).isEqualTo("bodyParts");
+
+		draft.applyBodyParts(json("[\"NECK\"]"));
+		assertThat(draft.toResponse().skinConditions().get(0).skinSigns()).isEmpty();
+	}
+
+	@Test
+	void 고통이_0점이어도_증상이_있으면_부위를_묻는다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 0, \"skinSigns\": [\"XEROSIS\"]}"));
+		assertThat(draft.askingField()).isEqualTo("bodyParts");
+
+		draft.applyBodyParts(json("[\"FACE\"]"));
+		assertThat(draft.conditions().get(BodyPart.FACE)).containsEntry(Symptom.PAIN, 0);
+		assertThat(draft.toResponse().skinConditions().get(0).skinSigns()).containsExactly(SkinSign.XEROSIS);
+	}
+
+	@Test
+	void 고통_지수가_0점이고_증상도_없으면_부위를_묻지_않는다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 0, \"skinSigns\": []}"));
 
 		assertThat(draft.pendingFields()).doesNotContain("bodyParts");
 		assertThat(draft.askingField()).isEqualTo("sleepHours");

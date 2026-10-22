@@ -62,9 +62,9 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.lifestyle.alcohol").value(false))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
 			.andExpect(jsonPath("$.data.pendingFields.length()").value(4))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
-			.andExpect(jsonPath("$.data.pendingFields[1]").value("medication"))
-			.andExpect(jsonPath("$.data.pendingFields[2]").value("skinSigns"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"))
+			.andExpect(jsonPath("$.data.pendingFields[1]").value("sleepHours"))
+			.andExpect(jsonPath("$.data.pendingFields[2]").value("medication"))
 			.andExpect(jsonPath("$.data.pendingFields[3]").value("notes"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
 	}

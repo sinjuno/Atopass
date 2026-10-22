@@ -97,11 +97,11 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 6점이고 팔 가려움이 4점이에요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"))
-			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
+			.andExpect(jsonPath("$.data.reply").value("오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요."))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"))
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("ARM"))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4));
@@ -269,13 +269,16 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 질문은_고통_지수_부위_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
+	void 질문은_고통_지수_증상_부위_수면_약_복용_특이사항_순서로_이어진다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
 		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
 		mockMvc.perform(sendMessage(bearer, session, "5점"))
-			.andExpect(jsonPath("$.data.reply").value("어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요."));
+			.andExpect(jsonPath("$.data.reply").value("오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"EDEMA\"]}}");
+		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
+			.andExpect(jsonPath("$.data.reply").value("그 증상이 어느 부위에 나타났나요? 해당하는 부위를 모두 골라 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"conditions\": [{\"bodyPart\": \"FACE\", \"pain\": 5}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "얼굴이요"))
 			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"));
@@ -285,9 +288,6 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
 		mockMvc.perform(sendMessage(bearer, session, "예"))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"EDEMA\"]}}");
-		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
 			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
@@ -482,7 +482,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].role").value("ASSISTANT"))
 			.andExpect(jsonPath("$.data.messages[0].content").value(org.hamcrest.Matchers.allOf(
 				org.hamcrest.Matchers.containsString("오늘 기록이 이미 저장되어 있어요."),
-				org.hamcrest.Matchers.containsString("- 팔: 고통 4점"),
+				org.hamcrest.Matchers.containsString("- 팔: 증상 없음"),
 				org.hamcrest.Matchers.containsString("- 수면 시간: 6시간"),
 				org.hamcrest.Matchers.containsString("수정할 내용이 있나요?"))));
 		// 저장된 값이 초안으로 들어오고, 빈 항목을 다시 묻지 않는다.
@@ -511,14 +511,15 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
 		llm.enqueue("{\"understood\": true, \"reply\": \"수면 시간을 8시간으로 바꿨어요.\", "
 			+ "\"updates\": {\"sleepHours\": 8}, \"finished\": false, \"followUp\": false}");
-		mockMvc.perform(sendMessage(bearer, session, "잠은 8시간 잤어요"))
+		// 규칙만으로는 못 알아듣는 말투라 LLM으로 넘어간다 (규칙으로 바로 알아듣는 말투는 아래 별도 테스트에서 확인한다).
+		mockMvc.perform(sendMessage(bearer, session, "요즘 잠자는 패턴이 좀 바뀐 것 같아요"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.recordId").value(recordId))
 			.andExpect(jsonPath("$.data.reply").value(
-				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 고통 4점\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
 		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
 		// 글로 고치면 저장 버튼 없이 바로 기존 기록이 수정된다.
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
@@ -534,6 +535,31 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		assertThat(createSession(bearer, "RECORD")).isEqualTo(session);
 		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.messages.length()").value(5));
+	}
+
+	@Test
+	void 수정_세션에서_자주_쓰는_수정_말투는_LLM_없이_바로_반영한다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		((Map<String, Object>) body.get("record")).put("painIndex", 5);
+		String created = saveRecord(bearer, createSession(bearer, "RECORD"), body)
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+
+		String session = createSession(bearer, "RECORD");
+		int callsBefore = llm.callCount();
+		mockMvc.perform(sendMessage(bearer, session, "수면 시간을 8시간으로 고쳐줘"))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.editing").value(true))
+			.andExpect(jsonPath("$.data.recordId").value(recordId))
+			.andExpect(jsonPath("$.data.reply").value(
+				"바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+		assertThat(llm.callCount()).isEqualTo(callsBefore);
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.sleepHours").value(8.0));
 	}
 
 	@Test

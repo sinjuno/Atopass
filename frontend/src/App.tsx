@@ -7,6 +7,7 @@ import ChatbotPage from '@/pages/chatbot/ChatbotPage';
 import HomePage from '@/pages/home/HomePage';
 import LoginPage from '@/pages/login/LoginPage';
 import MyPage from '@/pages/mypage/MyPage';
+import OnboardingPage from '@/pages/onboarding/OnboardingPage';
 import CalendarPage from '@/pages/record/CalendarPage';
 import RecordSummaryPage from '@/pages/record/RecordSummaryPage';
 import ReportPage from '@/pages/report/ReportPage';
@@ -17,6 +18,8 @@ const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     children: [
+      // 첫 로그인 뒤 한 번 보는 소개 화면 (하단 메뉴 없이 전체 화면)
+      { path: '/onboarding', element: <OnboardingPage /> },
       {
         element: <AppLayout />,
         children: [

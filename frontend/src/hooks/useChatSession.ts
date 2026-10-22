@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
-import type { ChatChoiceRequest, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
+import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
 import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
@@ -25,8 +25,13 @@ const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
 
 /** 선택지 답을 대화에 남길 문장 — 서버가 대화 내역에 저장하는 문장과 같다 */
 export function choiceText(choice: ChatChoiceRequest): string {
-  if ('skip' in choice) return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
+  if ('skip' in choice) {
+    if (choice.field === 'signImage') return '괜찮아요';
+    return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
+  }
   switch (choice.field) {
+    case 'signImage':
+      return choice.value ? '보여 주세요' : '괜찮아요';
     case 'painIndex':
       return `${choice.value}점`;
     case 'bodyParts':
@@ -66,13 +71,18 @@ export function useChatSession(recordDate: string) {
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   // 그날 기록이 저장되었으면 그 ID. 사진을 바로 올릴 때 쓴다
   const [recordId, setRecordId] = useState<number | null>(null);
-  // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
-  const [painIndex, setPainIndex] = useState<number | null>(null);
+  // 지금까지 모은 초안 — 고통 지수(캐릭터 표정), 방금 고른 증상(부위 선택지), 부위별 증상(총정리 마네킹)에 쓴다
+  const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null);
+  // 가장 최근 응답에서 말을 알아들었는지. 알아듣지 못했을 때만 아토미가 고민하는 표정을 짓는다
+  const [understood, setUnderstood] = useState(true);
   const [status, setStatus] = useState<ChatStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   // 한도에 도달해도 대화 내역·초안 조회는 되므로 status는 그대로 두고 안내만 띄운다
   const [limitReached, setLimitReached] = useState(false);
   const startedRef = useRef(false);
+  // 저장 전(null)에서 저장됨으로 막 바뀐 순간만 완료 축하 화면을 띄운다. 이미 저장된 대화를 불러온 것은 포함하지 않는다.
+  const recordIdRef = useRef<number | null>(null);
+  const [justCompleted, setJustCompleted] = useState(false);
 
   /**
    * 서버가 이 날짜에 이어 쓸 세션을 정한다 — 열려 있던 대화는 그대로, 저장된 기록이 있으면 그 기록을 고치는 세션.
@@ -92,7 +102,8 @@ export function useChatSession(recordDate: string) {
       setAskingField(state.askingField);
       setRequiresConfirmation(state.requiresConfirmation);
       setRecordId(state.recordId);
-      setPainIndex(state.draft.painIndex ?? null);
+      recordIdRef.current = state.recordId;
+      setChatDraft(state.draft);
       setStatus('ready');
     },
     [recordDate],
@@ -144,19 +155,23 @@ export function useChatSession(recordDate: string) {
       const userMessage: ChatMessage = { role: 'USER', content: text, createdAt: new Date().toISOString() };
       setMessages((prev) => [...prev, userMessage]);
       setStatus('sending');
+      setUnderstood(true);
       setError(null);
       try {
         const res = await request(sessionId);
         // understood: false여도 reply에 같은 질문(필요하면 입력 예시 포함)이 오므로 그대로 표시한다
         setMessages((prev) => [
           ...prev,
-          { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString() },
+          { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString(), imageSign: res.imageSign },
         ]);
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
         setRequiresConfirmation(res.requiresConfirmation);
+        if (recordIdRef.current === null && res.recordId !== null) setJustCompleted(true);
+        recordIdRef.current = res.recordId;
         setRecordId(res.recordId);
-        setPainIndex(res.draft?.painIndex ?? null);
+        setChatDraft(res.draft);
+        setUnderstood(res.understood);
         setStatus('ready');
         setLimitReached(false);
         return { ok: true };
@@ -206,7 +221,7 @@ export function useChatSession(recordDate: string) {
           setAskingField(state.askingField);
           setRequiresConfirmation(state.requiresConfirmation);
           setRecordId(state.recordId);
-          setPainIndex(state.draft.painIndex ?? null);
+          setChatDraft(state.draft);
         } catch {
           // 다시 맞추지 못해도 오류 문구는 이미 보여 주고 있다
         }
@@ -249,7 +264,10 @@ export function useChatSession(recordDate: string) {
     pendingFields,
     askingField,
     requiresConfirmation,
-    painIndex,
+    chatDraft,
+    // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
+    painIndex: chatDraft?.painIndex ?? null,
+    understood,
     status,
     error,
     limitReached,
@@ -259,5 +277,7 @@ export function useChatSession(recordDate: string) {
     uploadPhotos,
     agree,
     retry: start,
+    justCompleted,
+    dismissCompletion: useCallback(() => setJustCompleted(false), []),
   };
 }

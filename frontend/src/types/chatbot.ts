@@ -7,8 +7,19 @@ export interface ChatSession {
   mode: ChatMode;
 }
 
-/** 아직 입력되지 않은 항목 */
-export type PendingField = 'painIndex' | 'bodyParts' | 'symptoms' | 'sleepHours' | 'medication' | 'skinSigns' | 'notes';
+/**
+ * 아직 입력되지 않은 항목. signImage는 기록 항목이 아니라, 사용자가 증상을 물었을 때
+ * 예시 사진을 보여 줘도 되는지 묻는 중이라는 뜻이다 (askingField로만 온다)
+ */
+export type PendingField =
+  | 'painIndex'
+  | 'bodyParts'
+  | 'symptoms'
+  | 'sleepHours'
+  | 'medication'
+  | 'skinSigns'
+  | 'notes'
+  | 'signImage';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -32,6 +43,8 @@ export interface SendMessageResponse {
   editing: boolean;
   /** 이 대화로 저장한(또는 고치는) 기록. 아직 저장 전이면 null */
   recordId: number | null;
+  /** 이 답과 함께 보여 줄 증상 예시 사진. 사용자가 보여 달라고 답했을 때만 온다 */
+  imageSign: SkinSign | null;
 }
 
 /** GET /chatbot/sessions/{sessionId}/draft — 저장된(닫힌) 세션이면 409 SESSION_CLOSED */
@@ -50,12 +63,14 @@ export interface ChatDraftState {
  */
 export type ChatChoiceRequest =
   | { field: 'painIndex'; value: number }
-  /** 고통이 있는 부위. 고른 부위마다 방금 받은 고통 지수가 그 부위의 점수가 된다 */
+  /** 증상이 나타난(고통이 있는) 부위. 고른 부위마다 고통 지수가 그 부위의 점수가, 방금 고른 증상이 그 부위의 증상이 된다 */
   | { field: 'bodyParts'; value: BodyPart[] }
   | { field: 'sleepHours'; value: number }
   | { field: 'medication'; value: boolean }
   /** 빈 배열이면 "증상 없음" */
   | { field: 'skinSigns'; value: SkinSign[] }
+  /** 증상 예시 사진을 보여 줄지 */
+  | { field: 'signImage'; value: boolean }
   /** 넘어가기. 부위·특이사항은 "없어요" */
   | { field: Exclude<ChoiceField, 'painIndex'>; skip: true };
 
@@ -71,6 +86,8 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   createdAt: string;
+  /** 챗봇이 이 말과 함께 보여 준 증상 예시 사진 */
+  imageSign?: SkinSign | null;
 }
 
 export interface ChatMessagesResponse {

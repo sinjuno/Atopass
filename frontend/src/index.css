@@ -1,56 +1,118 @@
 @import 'tailwindcss';
 
-/* 디자인 시스템 — 차분한 파스텔 블루 톤. 버튼/활성 탭/포인트는 전부 brand-*를 쓴다. */
+/* Atopass — calm, editorial health journal design system */
 @theme {
-  --color-brand-50: #f2f6ff;
-  --color-brand-100: #e4ecfe;
-  --color-brand-200: #c9d9fd;
-  --color-brand-300: #a3bdfb;
-  --color-brand-400: #7a9cf6;
-  --color-brand-500: #5b84f0;
-  --color-brand-600: #4c74e0;
-  --color-brand-700: #3d5ec2;
-  --color-brand-800: #2f499a;
-
-  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+  --color-brand-50: #f3f6f1;
+  --color-brand-100: #e5ece1;
+  --color-brand-200: #cbd9c4;
+  --color-brand-300: #a7bea0;
+  --color-brand-400: #7e9e76;
+  --color-brand-500: #5f8058;
+  --color-brand-600: #496944;
+  --color-brand-700: #395338;
+  --color-brand-800: #2b402c;
+  --shadow-card: 0 2px 10px rgba(31, 42, 32, 0.055);
 }
 
-/* 어두운 화면은 html에 dark 클래스를 붙였을 때만 쓴다 (OS 설정을 따르면 아직 밝은 색뿐인 화면과 섞인다) */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 고령 사용자도 읽기 쉽도록 기본 글자 크기를 키운다 (프론트/백 정리: 큰 버튼, 쉬운 문구) */
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --atopass-bg: #f7f7f3;
+  --atopass-surface: #fff;
+  --atopass-text: #252b25;
+  --atopass-muted: #727970;
+  --atopass-border: #e7e9e2;
+  --atopass-accent: #496944;
+}
+
 html {
-  font-size: 17px;
+  font-size: 16px;
+  background: var(--atopass-bg);
+  scroll-behavior: smooth;
 }
 
 body {
-  font-family: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
-  color: #111827;
-  background: #f5f5f5;
+  margin: 0;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Malgun Gothic', system-ui, sans-serif;
+  color: var(--atopass-text);
+  background: var(--atopass-bg);
   word-break: keep-all;
+  line-height: 1.55;
 }
 
-/* 챗봇 선택지: 질문이 오면 아래에서 올라오고, 답하면 아래로 내려간다 */
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
+button, input, select, textarea { font: inherit; }
+input, select, textarea { accent-color: var(--atopass-accent); }
+:focus-visible { outline: 3px solid rgba(95, 128, 88, .38); outline-offset: 3px; }
+::selection { color: #243522; background: #dce8d6; }
+
+button {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+    box-shadow 150ms ease, transform 150ms ease;
+}
+button:active { transform: translateY(1px); }
+
+/* Consistent card language without changing component structure or behavior. */
+[class*='shadow-card'] { box-shadow: var(--shadow-card); }
+[class*='rounded-3xl'][class*='bg-white'],
+[class*='rounded-2xl'][class*='bg-white'] {
+  border: 1px solid var(--atopass-border);
+}
+[class*='divide-gray-100'] > :not([hidden]) ~ :not([hidden]) { border-color: #edf0e9; }
+
+/* Softer neutral surfaces for pages that previously hard-coded the old gray. */
+.bg-\[\#f5f5f5\] { background-color: var(--atopass-bg); }
+
+/* Inputs: polished but restrained. */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  border-color: #dfe4db;
+}
+input:not([type='checkbox']):not([type='radio']):focus,
+select:focus,
+textarea:focus {
+  border-color: #7e9e76;
+  box-shadow: 0 0 0 3px rgba(126, 158, 118, .14);
 }
 
-@keyframes sheet-down {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(100%);
-  }
-}
+/* Chatbot choice-sheet motion is retained. */
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheet-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
 
 @media (prefers-reduced-motion: reduce) {
-  [class*='animate-[sheet-'] {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
     animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }
+
+/* 기록 완료 화면: 화면이 부드럽게 나타나고, 원 게이지가 한 바퀴 차오르고, 버튼을 누르면 부드럽게 사라진다 */
+@keyframes record-complete-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes record-complete-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.98); }
+}
+@keyframes ring-fill {
+  from { stroke-dashoffset: var(--ring-length); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

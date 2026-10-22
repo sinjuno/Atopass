@@ -37,9 +37,8 @@ interface Props {
   /** 날짜별 고통 지수. 기록 없는 날은 null. 이 날짜들이 그래프의 가로축이 된다 */
   pain: DailyValue[];
   aux: Record<AuxKey, DailyValue[]>;
-  /** 고통 지수 위에 겹친 보조 지표. 한 번에 하나만, 없으면 null */
-  active: AuxKey | null;
-  onToggle: (key: AuxKey) => void;
+  /** 그래프에서 날짜를 눌렀을 때 */
+  onDateClick?: (date: string) => void;
 }
 
 const round = (v: number, digits: number) => Number(v.toFixed(digits));
@@ -62,10 +61,10 @@ function normalizer(data: DailyValue[], swing: number) {
 
 /**
  * '전체' 탭 그래프. 고통 지수(0~10)를 굵은 빨간 선으로 크게 그리고,
- * 고른 보조 지표(수면 시간·기온·습도 중 하나)는 기간 평균을 가운데에 두고 보이지 않는 보조 축에 얇은 점선으로 겹친다.
- * 그래프를 누르거나 마우스를 올린 날의 실제 값은 그래프 아래에 보여 준다(기본 툴팁 대신).
+ * 보조 지표(수면 시간·기온·습도)는 처음부터 모두, 기간 평균을 가운데에 두고 보이지 않는 보조 축에 얇은 점선으로 겹친다.
+ * 마우스를 올린 날의 실제 값은 그래프 아래에 보여 주고(기본 툴팁 대신), 날짜를 누르면 onDateClick으로 알린다.
  */
-export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props) {
+export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
   const isDark = useIsDark();
   const theme = isDark ? CHART_DARK : CHART;
   const painColor = isDark ? PAIN_COLOR.dark : PAIN_COLOR.light;
@@ -73,19 +72,7 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
   // 범례를 누르면 그 지표만 또렷하게 보이고 나머지는 흐려진다. 다시 누르면 원래대로 돌아간다.
   const [emphasis, setEmphasis] = useState<'pain' | AuxKey | null>(null);
 
-  const togglePainEmphasis = () => setEmphasis((prev) => (prev === 'pain' ? null : 'pain'));
-  // 꺼져 있던 지표를 누르면 켜고, 켜진 지표를 누르면 강조하고, 강조된 지표를 다시 누르면 끈다.
-  const cycleAux = (key: AuxKey) => {
-    if (active !== key) {
-      onToggle(key);
-      setEmphasis(null);
-    } else if (emphasis !== key) {
-      setEmphasis(key);
-    } else {
-      onToggle(key);
-      setEmphasis(null);
-    }
-  };
+  const toggleEmphasis = (key: 'pain' | AuxKey) => setEmphasis((prev) => (prev === key ? null : key));
   const dimmed = (key: 'pain' | AuxKey) => emphasis !== null && emphasis !== key;
 
   const auxByDate = Object.fromEntries(
@@ -114,7 +101,6 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
     (best, d) => (d.value !== null && (best === null || d.value >= (best.value ?? -Infinity)) ? d : best),
     null,
   );
-  const painDays = painValues.filter((v) => v >= 1).length;
 
   const shownDate = selectedDate && pain.some((p) => p.date === selectedDate) ? selectedDate : (pain.at(-1)?.date ?? null);
   const shownPain = pain.find((p) => p.date === shownDate)?.value ?? null;
@@ -122,24 +108,27 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
   const pick = (state: { activeLabel?: unknown } | null | undefined) => {
     if (typeof state?.activeLabel === 'string') setSelectedDate(state.activeLabel);
   };
+  const click = (state: { activeLabel?: unknown } | null | undefined) => {
+    pick(state);
+    if (typeof state?.activeLabel === 'string') onDateClick?.(state.activeLabel);
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <SummaryCard label="평균 고통 지수" value={painAverage === null ? '-' : painAverage.toFixed(1)} />
         <SummaryCard
           label="최고값"
           value={peak?.value != null ? String(peak.value) : '-'}
           sub={peak ? formatMonthDay(peak.date) : undefined}
         />
-        <SummaryCard label="통증 있는 날" value={`${painDays}일`} />
       </div>
 
-      <div role="group" aria-label="그래프에 겹쳐 볼 지표" className="flex flex-wrap gap-1.5">
+      <div role="group" aria-label="강조해서 볼 지표" className="flex flex-wrap gap-1.5">
         <button
           type="button"
           aria-pressed={emphasis === 'pain'}
-          onClick={togglePainEmphasis}
+          onClick={() => toggleEmphasis('pain')}
           className={`flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:bg-gray-800 dark:text-gray-100 ${
             dimmed('pain') ? 'opacity-40' : ''
           }`}
@@ -149,19 +138,16 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
           고통 지수
         </button>
         {AUX_METRICS.map((m) => {
-          const isOn = active === m.key;
           const isEmphasized = emphasis === m.key;
           return (
             <button
               key={m.key}
               type="button"
-              aria-pressed={isOn}
-              onClick={() => cycleAux(m.key)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
-                isOn
-                  ? 'border-gray-300 text-gray-800 dark:border-gray-600 dark:text-gray-100'
-                  : 'border-gray-200 text-gray-400 opacity-50 dark:border-gray-700 dark:text-gray-500'
-              } ${dimmed(m.key) ? 'opacity-40' : ''}`}
+              aria-pressed={isEmphasized}
+              onClick={() => toggleEmphasis(m.key)}
+              className={`flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 dark:border-gray-600 dark:text-gray-100 ${
+                dimmed(m.key) ? 'opacity-40' : ''
+              }`}
               style={isEmphasized ? { boxShadow: `0 0 0 2px ${AUX_COLORS[m.key]}` } : undefined}
             >
               <LineIcon color={AUX_COLORS[m.key]} dashed />
@@ -173,16 +159,16 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
 
       <p className="text-sm text-gray-400 dark:text-gray-400">
         왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 범례를
-        누르면 그 지표만 또렷하게 보여요. 실제 값은 아래에서 볼 수 있어요.
+        누르면 그 지표만 또렷하게 보이고, 다시 누르면 모두 함께 보여요. 날짜를 누르면 그날 기록으로 넘어가요.
       </p>
 
       <div
-        className="h-64 [&_*:focus:not(:focus-visible)]:outline-none"
+        className={`h-64 [&_*:focus:not(:focus-visible)]:outline-none ${onDateClick ? 'cursor-pointer' : ''}`}
         role="img"
-        aria-label="고통 지수와 선택한 지표를 겹친 변화 그래프"
+        aria-label="고통 지수와 수면 시간·기온·습도를 겹친 변화 그래프"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: -20 }} onMouseMove={pick} onClick={pick}>
+          <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: -20 }} onMouseMove={pick} onClick={click}>
             <CartesianGrid vertical={false} stroke={theme.grid} />
             <XAxis dataKey="date" tickFormatter={formatMonthDay} tickLine={false} axisLine={false} minTickGap={24} tick={theme.tick} />
             <YAxis
@@ -196,7 +182,7 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
             />
             {/* 보조 지표(0~1)가 그래프 위아래 끝에 붙지 않게 조금 여유를 둔다 */}
             <YAxis yAxisId="aux" orientation="right" domain={[0, 1]} hide />
-            {AUX_METRICS.filter((m) => m.key === active).map((m) => (
+            {AUX_METRICS.map((m) => (
               <Line
                 key={m.key}
                 yAxisId="aux"
@@ -253,7 +239,7 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
               </>
             )}
           </p>
-          {AUX_METRICS.filter((m) => m.key === active).map((m) => {
+          {AUX_METRICS.map((m) => {
             const value = auxByDate[m.key].get(shownDate) ?? null;
             const avg = average(valuesOf(aligned[m.key]));
             const diff = value === null || avg === null ? null : value - avg;
