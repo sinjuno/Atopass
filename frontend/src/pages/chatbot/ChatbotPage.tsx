@@ -29,6 +29,7 @@ export default function ChatbotPage() {
     requiresConfirmation,
     chatDraft,
     painIndex,
+    understood,
     status,
     error,
     limitReached,
@@ -141,7 +142,7 @@ export default function ChatbotPage() {
           <ChatMessageList
             messages={messages}
             typing={status === 'sending'}
-            mood={atomiMood(painIndex, requiresConfirmation)}
+            mood={atomiMood(painIndex, requiresConfirmation, understood)}
             attachment={summaryMap}
           />
         )}
