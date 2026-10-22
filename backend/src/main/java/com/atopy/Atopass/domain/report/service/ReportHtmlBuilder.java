@@ -1,5 +1,7 @@
 package com.atopy.Atopass.domain.report.service;
 
+import com.atopy.Atopass.domain.chatbot.service.LinkedQuestion;
+import com.atopy.Atopass.domain.record.dto.response.DailyCheckResponse;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.report.service.ReportContent.DayEntry;
@@ -144,9 +146,22 @@ class ReportHtmlBuilder {
 		}
 	}
 
-	/** 수면·음주·야외활동 중 기록한 것만 보여 주고, 평소와 다른 것은 굵게 표시한다 (이스케이프된 XHTML) */
+	/**
+	 * 수면·음주·야외활동 중 기록한 것만 보여 주고, 평소와 다른 것은 굵게 표시한다 (이스케이프된 XHTML)
+	 * 하루 점검 항목은 진료 때 읽기 쉽도록 의학 용어를 함께 적는다. (예: 소양감(가려움) 7점)
+	 */
 	private String lifestyleText(DayEntry day, Double usualSleep) {
 		List<String> parts = new ArrayList<>();
+		DailyCheckResponse check = day.dailyCheck();
+		if (check != null && check.skinTrend() != null) {
+			parts.add("피부 상태 " + check.skinTrend().label());
+		}
+		if (check != null && check.itchScore() != null) {
+			parts.add("소양감(가려움) " + check.itchScore() + "점");
+		}
+		if (check != null && check.sleepDisturbed() != null) {
+			parts.add(check.sleepDisturbed() ? "<b>수면 장애(가려워서 잠 설침)</b>" : "수면 장애 없음");
+		}
 		if (day.sleepHours() != null) {
 			String sleep = "수면 " + day.sleepHours().stripTrailingZeros().toPlainString() + "시간";
 			parts.add(isShortSleep(day, usualSleep)
@@ -159,12 +174,21 @@ class ReportHtmlBuilder {
 			String outdoor = "야외활동 " + outdoorText(day.outdoorActivity());
 			parts.add(day.outdoorActivity() == OutdoorActivity.HIGH ? "<b>" + outdoor + "</b>" : outdoor);
 		}
-		if (day.medication() != null) {
+		if (check != null && check.moisturizer() != null) {
+			parts.add("보습 관리 " + (check.moisturizer() ? "함" : "안 함"));
+		}
+		if (check != null && check.medicationUse() != null) {
+			parts.add("처방 약 사용 " + check.medicationUse().label());
+		} else if (day.medication() != null) {
 			parts.add(day.medication() ? "약 복용" : "약 미복용");
 		}
 		if (day.skinSigns() != null && !day.skinSigns().isEmpty()) {
 			parts.add("나타난 증상 " + escape(day.skinSigns().stream().map(SkinSign::label)
 				.collect(java.util.stream.Collectors.joining(", "))));
+		}
+		if (check != null && check.linkedAnswers() != null) {
+			check.linkedAnswers().forEach((id, answer) -> parts.add(escape(
+				LinkedQuestion.find(id).map(LinkedQuestion::label).orElse(id) + " " + answer)));
 		}
 		return parts.isEmpty() ? "생활 기록 없음" : String.join(" · ", parts);
 	}

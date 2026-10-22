@@ -34,7 +34,7 @@ export type Symptoms = Partial<Record<SymptomKey, number>>;
 
 export type OutdoorActivity = 'LOW' | 'MEDIUM' | 'HIGH';
 
-/** 나타난 증상(있음/없음) — 홍반, 부종/구진(결절), 진물/딱지, 긁은 자국(찰상), 태선화, 건조증, 가려움 */
+/** 나타난 증상(있음/없음) — 홍반, 부종/구진(결절), 진물/딱지, 긁은 자국(찰상), 태선화, 건조증, 가려움, 균열, 출혈 */
 export type SkinSign =
   | 'ERYTHEMA'
   | 'EDEMA'
@@ -42,7 +42,28 @@ export type SkinSign =
   | 'EXCORIATION'
   | 'LICHENIFICATION'
   | 'XEROSIS'
-  | 'ITCHING';
+  | 'ITCHING'
+  | 'FISSURE'
+  | 'BLEEDING';
+
+/** 오늘 피부 상태 — 좋아짐 / 평소와 비슷 / 평소보다 나빠짐 */
+export type SkinTrend = 'BETTER' | 'SAME' | 'WORSE';
+
+/** 처방받은 연고·약 사용 — 사용함 / 안 함 / 처방 없음 */
+export type MedicationUse = 'USED' | 'NOT_USED' | 'NO_PRESCRIPTION';
+
+/** 하루 점검 — 챗봇이 묻는 항목 중 위 칸에 없는 것. 기록하지 않은 항목은 null */
+export interface DailyCheck {
+  skinTrend?: SkinTrend | null;
+  /** 가려움 정도 0~10 (0은 없음) */
+  itchScore?: number | null;
+  /** 가려워서 잠을 설쳤는지 */
+  sleepDisturbed?: boolean | null;
+  moisturizer?: boolean | null;
+  medicationUse?: MedicationUse | null;
+  /** 연결 질문 답 — 질문 ID(C01~C16) → 고른 선택지 또는 직접 쓴 글 */
+  linkedAnswers?: Record<string, string> | null;
+}
 
 export interface SkinCondition {
   bodyPart: BodyPart;
@@ -68,6 +89,8 @@ export interface RecordInput {
   skinSigns?: SkinSign[] | null;
   lifestyle?: Lifestyle | null;
   notes?: string | null;
+  /** 하루 점검. 보내지 않으면(null) 수정할 때 저장된 값을 그대로 둔다 */
+  dailyCheck?: DailyCheck | null;
 }
 
 /** PhotoRef — 기록 상세/비교 응답의 사진 목록 항목 */

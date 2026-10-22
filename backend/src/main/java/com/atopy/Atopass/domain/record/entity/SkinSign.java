@@ -11,7 +11,9 @@ public enum SkinSign {
 	EXCORIATION("긁은 자국(찰상)", "긁어서 피부가 까지거나 긁힌 자국이 남음"),
 	LICHENIFICATION("태선화", "오래 긁어서 피부가 두꺼워지고 거칠어짐, 주름이 깊어짐"),
 	XEROSIS("건조증", "피부가 건조하고 당기거나 하얗게 일어남"),
-	ITCHING("가려움", "피부가 가려움");
+	ITCHING("가려움", "피부가 가려움"),
+	FISSURE("균열", "피부가 갈라지거나 틈이 생김"),
+	BLEEDING("출혈", "긁거나 갈라진 곳에서 피가 남");
 
 	private final String label;
 	private final String plain;

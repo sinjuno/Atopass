@@ -4,9 +4,12 @@ import { allSkinSigns, bodyMapSignCounts } from '@/utils/bodyMap';
 import {
   BODY_PART_LABELS,
   EMPTY_TEXT,
+  LINKED_ANSWER_LABELS,
+  MEDICATION_USE_LABELS,
   OUTDOOR_ACTIVITY_LABELS,
   PAIN_INDEX_MAX,
   SKIN_SIGN_LABELS,
+  SKIN_TREND_LABELS,
 } from '@/utils/constants';
 import BodyMap, { BodyMapLegend } from './BodyMap';
 import SavedPhotoList from './SavedPhotoList';
@@ -37,6 +40,8 @@ export default function RecordView({ record, recordId, photos }: Props) {
   const painIndex = record.painIndex ?? null;
   const alcohol = record.lifestyle?.alcohol;
   const outdoor = record.lifestyle?.outdoorActivity;
+  const check = record.dailyCheck;
+  const linkedAnswers = Object.entries(check?.linkedAnswers ?? {}).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <>
@@ -86,6 +91,29 @@ export default function RecordView({ record, recordId, photos }: Props) {
             )}
           </p>
         </div>
+      </Section>
+
+      <Section title="오늘 점검">
+        <dl className="grid grid-cols-3 gap-2 text-center">
+          <InfoTile label="피부 상태" value={check?.skinTrend ? SKIN_TREND_LABELS[check.skinTrend] : null} />
+          <InfoTile label="가려움" value={check?.itchScore == null ? null : `${check.itchScore}점`} />
+          <InfoTile
+            label="잠 설침"
+            value={check?.sleepDisturbed == null ? null : check.sleepDisturbed ? '설쳤어요' : '괜찮았어요'}
+          />
+          <InfoTile label="보습제" value={check?.moisturizer == null ? null : check.moisturizer ? '발랐어요' : '안 발랐어요'} />
+          <InfoTile label="연고·약" value={check?.medicationUse ? MEDICATION_USE_LABELS[check.medicationUse] : null} />
+        </dl>
+        {linkedAnswers.length > 0 && (
+          <dl className="mt-3 flex flex-col gap-1.5 rounded-xl bg-gray-50 p-3 text-base">
+            {linkedAnswers.map(([id, answer]) => (
+              <div key={id} className="flex gap-2">
+                <dt className="shrink-0 text-gray-500">{LINKED_ANSWER_LABELS[id] ?? id}</dt>
+                <dd className="text-gray-800">{answer}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </Section>
 
       <Section title="수면·생활">

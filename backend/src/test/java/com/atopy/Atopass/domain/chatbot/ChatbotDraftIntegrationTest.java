@@ -33,7 +33,7 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 대화_전의_새_세션은_빈_초안과_고통_지수_대기_상태다() throws Exception {
+	void 대화_전의_새_세션은_빈_초안과_피부_상태_대기_상태다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
@@ -41,7 +41,7 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.draft.skinConditions").isEmpty())
 			.andExpect(jsonPath("$.data.draft.sleepHours").doesNotExist())
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("painIndex"))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinTrend"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
 	}
 
@@ -61,11 +61,11 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4))
 			.andExpect(jsonPath("$.data.draft.lifestyle.alcohol").value(false))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
-			.andExpect(jsonPath("$.data.pendingFields.length()").value(4))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
-			.andExpect(jsonPath("$.data.pendingFields[1]").value("medication"))
-			.andExpect(jsonPath("$.data.pendingFields[2]").value("skinSigns"))
-			.andExpect(jsonPath("$.data.pendingFields[3]").value("notes"))
+			// 부위를 말했으므로 부위는 묻지 않고, 그 부위의 피부 모양을 묻는다.
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(11))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinTrend"))
+			.andExpect(jsonPath("$.data.pendingFields[2]").value("skinShape"))
+			.andExpect(jsonPath("$.data.pendingFields[10]").value("notes"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
 	}
 
@@ -75,9 +75,9 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
-			 "updates": {"painIndex": 4, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS"],
-			 "skipped": ["bodyParts", "notes"]}}""");
-		mockMvc.perform(sendMessage(bearer, session, "고통 4점, 6시간 잤고 약 먹었어요. 건조증만 있고 나머진 없어요"))
+			 "updates": {"skinTrend": "BETTER", "itchScore": 0, "painIndex": 4, "swelling": true, "scratch": false,
+			 "sleepDisturbed": false, "sleepHours": 6, "moisturizer": true, "medication": true, "skipped": ["notes"]}}""");
+		mockMvc.perform(sendMessage(bearer, session, "나아졌고 안 가려워요. 고통 4점, 좀 부었고 6시간 잘 잤어요. 보습제 바르고 약 먹었어요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
@@ -86,7 +86,8 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0))
 			.andExpect(jsonPath("$.data.draft.sleepScore").value(4))
 			.andExpect(jsonPath("$.data.draft.medication").value(true))
-			.andExpect(jsonPath("$.data.draft.skinSigns[0]").value("XEROSIS"));
+			.andExpect(jsonPath("$.data.draft.skinSigns[0]").value("EDEMA"))
+			.andExpect(jsonPath("$.data.draft.dailyCheck.skinTrend").value("BETTER"));
 	}
 
 	@Test
