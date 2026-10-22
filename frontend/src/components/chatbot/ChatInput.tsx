@@ -7,17 +7,15 @@ interface Props {
   onSubmit: (text: string) => void;
   onAttachPhotos: (files: File[]) => void;
   disabled?: boolean;
-  /** 선택지로 답하는 질문이면 글을 쓰지 못하게 막는다 (사진은 계속 추가할 수 있다) */
-  textLocked?: boolean;
 }
 
-export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, disabled, textLocked }: Props) {
+export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, disabled }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const trimmed = value.trim();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!trimmed || disabled || textLocked) return;
+    if (!trimmed || disabled) return;
     onSubmit(trimmed);
   };
 
@@ -47,8 +45,7 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
         onChange={(e) => onChange(e.target.value)}
         maxLength={CHAT_MESSAGE_MAX_LENGTH}
         rows={1}
-        disabled={textLocked}
-        placeholder={textLocked ? '위 선택지에서 골라 주세요 (접으면 글로도 답할 수 있어요)' : '피부 상태를 말해 주세요'}
+        placeholder="피부 상태를 말해 주세요"
         className="max-h-32 min-h-11 flex-1 resize-none rounded-3xl border-0 bg-gray-100 px-4 py-2.5 text-base focus:ring-2 focus:ring-brand-300 focus:outline-none disabled:opacity-60"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) handleSubmit(e);
@@ -56,7 +53,7 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
       />
       <button
         type="submit"
-        disabled={!trimmed || disabled || textLocked}
+        disabled={!trimmed || disabled}
         className="shrink-0 rounded-full bg-brand-600 px-4 py-2 text-base font-semibold text-white disabled:bg-gray-300"
       >
         보내기

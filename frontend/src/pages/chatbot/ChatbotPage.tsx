@@ -62,8 +62,11 @@ export default function ChatbotPage() {
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
-  // 특이사항과 예시 사진 여부는 글로도 답할 수 있다 (사진을 묻는 중에 다른 말을 하면 사진은 보여 주지 않는다)
-  const textLocked =
+  // 특이사항을 직접 적는 단계는 글로 답해야 하므로 입력창을 그대로 둔다.
+  // 예시 사진을 보여 줄지 묻는 단계도 글로 다른 말을 할 수 있게 둔다 (그러면 사진은 보여 주지 않는다).
+  // 그 밖의 선택지 단계는 어차피 글로 답하지 않으므로 아래 입력창 자체를 숨긴다.
+  // 선택지를 내려 두면(choicesMinimized) 다시 보인다.
+  const hideInput =
     started && choiceField !== null && choiceField !== 'notes' && choiceField !== 'signImage' && !choicesMinimized;
 
   // 가장 최근의 일일 총정리(저장·수정 안내) 말풍선 아래에, 부위마다 나타난 증상 개수만큼 칠한 마네킹을 붙인다.
@@ -84,10 +87,6 @@ export default function ChatbotPage() {
           ),
         }
       : undefined;
-  // 고통 지수·수면 시간 막대를 쓰는 동안은 막대에 화면을 다 내주도록 대화 목록을 숨긴다.
-  // 선택지를 내려 두면(choicesMinimized) 다시 보인다. 특이사항은 대화를 보며 적어야 하므로 숨기지 않는다.
-  const hideChatForSlider =
-    (choiceField === 'painIndex' || choiceField === 'sleepHours') && !choicesMinimized;
 
   // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
   const pendingPhotos = draft.photos;
@@ -129,7 +128,7 @@ export default function ChatbotPage() {
       />
 
       {/* 아래 선택지 칸이 길어도 대화가 가려지지 않도록 최소 높이를 둔다 */}
-      <div className={hideChatForSlider ? 'hidden' : 'min-h-32 flex-1 overflow-y-auto'}>
+      <div className="min-h-32 flex-1 overflow-y-auto">
         {status === 'loading' && <p className="p-6 text-center text-gray-500">대화를 준비하고 있어요…</p>}
         {status === 'error' ? (
           <div className="p-6 text-center">
@@ -181,14 +180,15 @@ export default function ChatbotPage() {
         </p>
       )}
 
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSubmit={handleSubmit}
-        onAttachPhotos={handleAttach}
-        disabled={status !== 'ready'}
-        textLocked={textLocked}
-      />
+      {!hideInput && (
+        <ChatInput
+          value={input}
+          onChange={setInput}
+          onSubmit={handleSubmit}
+          onAttachPhotos={handleAttach}
+          disabled={status !== 'ready'}
+        />
+      )}
 
       {status === 'consent' && <ConsentDialog onAgree={agree} onDecline={goToSummary} error={error} />}
       {justCompleted && <RecordCompleteOverlay onConfirm={handleConfirmComplete} onContinue={dismissCompletion} />}
