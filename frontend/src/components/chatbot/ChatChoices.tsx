@@ -168,7 +168,7 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [] }: Props) {
   const [sleepHours, setSleepHours] = useState(CHAT_SLEEP_HOURS_DEFAULT);
   const [signs, setSigns] = useState<SkinSign[]>([]);
 
-  const skip = field !== 'painIndex' && field !== 'bodyParts' && field !== 'notes' && (
+  const skip = field !== 'painIndex' && field !== 'bodyParts' && field !== 'notes' && field !== 'signImage' && (
     <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled} subtle>
       넘어가기
     </ChoiceButton>
@@ -291,6 +291,18 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [] }: Props) {
           <span className="text-sm text-gray-500">특이사항은 아래에 적어 주세요</span>
           <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled}>
             없어요
+          </ChoiceButton>
+        </div>
+      );
+    case 'signImage':
+      // 증상을 물었을 때, 예시 사진(실제 피부 사진)을 보여 줘도 되는지에 대한 답. 보여 달라고 할 때만 사진을 불러온다
+      return (
+        <div className="flex gap-2" role="group" aria-label="증상 예시 사진">
+          <ChoiceButton onClick={() => onChoose({ field, value: true })} disabled={disabled} primary wide>
+            보여 주세요
+          </ChoiceButton>
+          <ChoiceButton onClick={() => onChoose({ field, value: false })} disabled={disabled} wide>
+            괜찮아요
           </ChoiceButton>
         </div>
       );

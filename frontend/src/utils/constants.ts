@@ -129,6 +129,7 @@ export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   medication: '약 복용',
   skinSigns: '나타난 증상',
   notes: '특이사항',
+  signImage: '예시 사진',
 };
 
 /** 챗봇 이용 동의 팝업 문구 */

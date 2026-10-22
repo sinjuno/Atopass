@@ -44,6 +44,7 @@ import tools.jackson.databind.node.ObjectNode;
  * 고른 부위에는 고통 지수가 점수로, 방금 고른 증상이 그 부위의 증상으로 들어간다. (고통이 0점이고 증상도 없으면 부위는 묻지 않는다)
  * 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
+ * 사용자가 증상을 물어 예시 사진을 보여 줄지 묻는 중이면({@link #offeredSign}) 그 답(signImage)을 먼저 받는다.
  */
 public final class ChatDraft {
 
@@ -86,6 +87,8 @@ public final class ChatDraft {
 	private boolean followUp;
 	/** 이미 저장된 기록을 불러와 고치는 중. 빈 항목을 차례로 묻지 않고, 사용자가 바꿀 내용을 말하길 기다린다. */
 	private boolean editing;
+	/** 예시 사진을 보여 줘도 되는지 물어본 증상. 사용자가 답하거나 다른 말을 하면 지운다. 기록 값은 아니다. */
+	private SkinSign offeredSign;
 
 	public static ChatDraft empty() {
 		return new ChatDraft();
@@ -167,6 +170,9 @@ public final class ChatDraft {
 		if (editing) {
 			root.put("editing", true);
 		}
+		if (offeredSign != null) {
+			root.put("offeredSign", offeredSign.name());
+		}
 		return mapper.writeValueAsString(root);
 	}
 
@@ -224,6 +230,8 @@ public final class ChatDraft {
 			}
 			draft.followUp = root.path("followUp").asBoolean(false);
 			draft.editing = root.path("editing").asBoolean(false);
+			Set<SkinSign> offered = readSigns(mapper.createArrayNode().add(root.path("offeredSign").asString("")));
+			draft.offeredSign = offered.isEmpty() ? null : offered.iterator().next();
 		} catch (RuntimeException e) {
 			return new ChatDraft();
 		}
@@ -449,6 +457,21 @@ public final class ChatDraft {
 			skinSigns == null ? List.of() : List.copyOf(skinSigns), lifestyle, notes);
 	}
 
+	/** 이 증상의 예시 사진을 보여 줘도 되는지 묻는다. 다음 답은 signImage 선택지로 받는다. */
+	void offerImage(SkinSign sign) {
+		this.offeredSign = sign;
+	}
+
+	/** 예시 사진을 보여 줄지 묻고 있는 증상. 묻고 있지 않으면 null */
+	SkinSign offeredSign() {
+		return offeredSign;
+	}
+
+	/** 사진을 보여 줄지 묻던 것을 끝낸다. (답했거나, 답 대신 다른 말을 했을 때) */
+	void clearOffer() {
+		this.offeredSign = null;
+	}
+
 	/** 이번 응답이 부위나 증상 점수를 되묻는 질문인지 기록한다. 다음 턴이 성공하면 다시 정해진다. */
 	void markFollowUp(boolean followUp) {
 		this.followUp = followUp;
@@ -602,8 +625,12 @@ public final class ChatDraft {
 	/**
 	 * 지금 물어볼 항목. 아직 입력되지 않은 항목 중 가장 먼저 필요한 것이고, 모두 채워졌으면 null이다.
 	 * 챗봇이 부위나 부위 고통 점수를 되묻는 중이거나 점수가 빠진 부위가 있으면, 이어서 묻도록 고통 지수보다 먼저 symptoms다.
+	 * 증상의 예시 사진을 보여 줄지 묻는 중이면 그 답(signImage)이 가장 먼저다.
 	 */
 	public String askingField() {
+		if (offeredSign != null) {
+			return "signImage";
+		}
 		if (followUp || conditions.values().stream().anyMatch(Map::isEmpty)) {
 			return "symptoms";
 		}
@@ -611,9 +638,12 @@ public final class ChatDraft {
 		return pending.isEmpty() ? null : pending.get(0);
 	}
 
-	/** 확인 단계로 넘어갈 수 있는지. 필수 항목이 채워졌고, 선택 항목도 끝났거나 사용자가 마치겠다고 한 경우 */
+	/**
+	 * 확인 단계로 넘어갈 수 있는지. 필수 항목이 채워졌고, 선택 항목도 끝났거나 사용자가 마치겠다고 한 경우.
+	 * 예시 사진을 보여 줄지 묻는 중이면 그 답을 먼저 받는다.
+	 */
 	public boolean readyForConfirmation(boolean userFinished) {
-		return requiredSatisfied() && (userFinished || pendingOptionalFields().isEmpty());
+		return offeredSign == null && requiredSatisfied() && (userFinished || pendingOptionalFields().isEmpty());
 	}
 
 	// ── 화면·프롬프트용 변환 ──
@@ -697,6 +727,7 @@ public final class ChatDraft {
 		copy.skipped.addAll(skipped);
 		copy.followUp = followUp;
 		copy.editing = editing;
+		copy.offeredSign = offeredSign;
 		return copy;
 	}
 
@@ -716,6 +747,7 @@ public final class ChatDraft {
 		skipped.addAll(next.skipped);
 		followUp = next.followUp;
 		editing = next.editing;
+		offeredSign = next.offeredSign;
 	}
 
 }

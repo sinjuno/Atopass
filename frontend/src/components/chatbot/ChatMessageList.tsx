@@ -1,6 +1,9 @@
-import { Fragment, useEffect, useRef, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { chatbotApi } from '@/apis/chatbot';
 import AtomiAvatar from '@/components/chatbot/AtomiAvatar';
 import type { ChatMessage } from '@/types/chatbot';
+import type { SkinSign } from '@/types/record';
+import { SKIN_SIGN_LABELS } from '@/utils/constants';
 import type { AtomiMood } from '@/utils/atomiMood';
 
 interface Props {
@@ -33,6 +36,7 @@ export default function ChatMessageList({ messages, typing, mood = 'default', at
       {messages.map((m, i) => (
         <Fragment key={`${m.createdAt}-${i}`}>
           <ChatBubble role={m.role} mood={i === latestAssistant ? mood : 'default'}>
+            {m.imageSign && <SkinSignImage sign={m.imageSign} />}
             {m.content}
           </ChatBubble>
           {attachment?.index === i && <div className="ml-12 max-w-[75%]">{attachment.content}</div>}
@@ -61,13 +65,44 @@ function ChatBubble({
   return (
     <div className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && <AtomiAvatar mood={mood} />}
-      <p
+      <div
         className={`max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-base leading-relaxed ${
           isUser ? 'rounded-br-sm bg-brand-100 text-gray-900' : 'rounded-bl-sm bg-brand-50 text-gray-900'
         }`}
       >
         {children}
-      </p>
+      </div>
     </div>
+  );
+}
+
+/** 사용자가 보여 달라고 답한 증상 예시 사진. 인증이 필요해 blob으로 받아 보여 준다 */
+function SkinSignImage({ sign }: { sign: SkinSign }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    chatbotApi
+      .getSkinSignImageUrl(sign)
+      .then((u) => {
+        objectUrl = u;
+        if (cancelled) URL.revokeObjectURL(u);
+        else setUrl(u);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [sign]);
+
+  if (failed) return <p className="mb-2 text-sm text-gray-500">사진을 불러오지 못했어요.</p>;
+  if (!url) return <div className="mb-2 aspect-[4/3] w-full animate-pulse rounded-xl bg-gray-200" aria-hidden />;
+  return (
+    <img src={url} alt={`${SKIN_SIGN_LABELS[sign]} 예시 사진`} className="mb-2 w-full rounded-xl border border-gray-200 bg-white" />
   );
 }

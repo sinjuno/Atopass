@@ -40,6 +40,9 @@ import tools.jackson.databind.node.ObjectNode;
  * 화면은 선택지로 답을 받는다({@link #answerChoice}). 선택지 답은 LLM을 거치지 않고 초안에 바로 반영한다.
  * LLM의 질문 문장은 부위나 증상 점수를 되물을 때만 쓴다.
  *
+ * <p>사용자가 증상의 뜻이나 모양을 물으면 쉬운 말로 설명하고, 예시 사진을 보여 줘도 되는지 먼저 묻는다.
+ * 사용자가 보여 달라고 답했을 때만 그 답에 사진(imageSign)을 붙인다. 그 뒤에는 원래 묻던 질문을 이어서 한다.
+ *
  * <p>물어볼 항목이 끝나면 그날 기록을 바로 저장하고, 일일 총정리와 수고했다는 인사를 보여 준다.
  * 그 뒤로는 같은 대화에서 글로 고치는 대로 바로 다시 저장한다. (총정리 화면으로 보내지 않는다)
  */
@@ -61,9 +64,17 @@ public class ChatbotService {
 	static final String EDIT_SAVED = "바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.";
 	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
 	static final String FINISH_TEXT = "기록을 마칠게요";
+	static final String SHOW_IMAGE_TEXT = "보여 주세요";
+	static final String NO_IMAGE_TEXT = "괜찮아요";
+	static final String NO_IMAGE = "알겠어요. 사진은 보여 드리지 않을게요.";
+	static final String IMAGE_NOTE = "사람마다 모양과 정도가 다를 수 있어요.";
+	static final String EDIT_RESUME = "바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요.";
+	/** 증상 예시 사진을 보여 줄지 묻는 항목. 기록 값이 아니라 사진을 보여 줄지에 대한 답이다. */
+	static final String SIGN_IMAGE = "signImage";
 
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
-	private static final Set<String> CHOICE_FIELDS = Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes");
+	private static final Set<String> CHOICE_FIELDS =
+		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE);
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -72,6 +83,7 @@ public class ChatbotService {
 	private final ChatReplyParser replyParser;
 	private final JsonMapper jsonMapper;
 	private final LlmProperties llmProperties;
+	private final SkinSignImages skinSignImages;
 
 	public ChatSessionResponse createSession(Long memberId, ChatMode mode) {
 		consentService.requireConsent(memberId);
@@ -89,10 +101,18 @@ public class ChatbotService {
 	public ChatReplyResponse sendMessage(Long memberId, String sessionId, String userText) {
 		// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
 		consentService.requireConsent(memberId);
-		requireWithinDailyLimit(memberId);
 		TurnContext context = sessionService.loadForTurn(memberId, sessionId);
 
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
+		if (context.mode() == ChatMode.RECORD) {
+			// 사진을 보여 줄지 묻던 중에 글로 다른 말을 하면, 보여 주지 않는 것으로 보고 그 말을 받는다.
+			draft.clearOffer();
+			Optional<SkinSign> asked = SkinSignQuestion.detect(userText);
+			if (asked.isPresent()) {
+				return signQuestionTurn(context, draft, userText, asked.get());
+			}
+		}
+		requireWithinDailyLimit(memberId);
 		String systemPrompt = context.mode() == ChatMode.RECORD
 			? promptFactory.recordPrompt(draft, context.today())
 			: promptFactory.queryPrompt(context.queryContext(), context.today());
@@ -119,6 +139,9 @@ public class ChatbotService {
 		String field = request.field();
 		if (!CHOICE_FIELDS.contains(field) || !field.equals(draft.askingField())) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "지금 고를 수 있는 항목이 아닙니다.");
+		}
+		if (SIGN_IMAGE.equals(field)) {
+			return imageTurn(context, draft, request);
 		}
 		ObjectNode updates = jsonMapper.createObjectNode();
 		if (request.skipped()) {
@@ -149,6 +172,7 @@ public class ChatbotService {
 		TurnContext context = loadRecordTurn(memberId, sessionId);
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
 		draft.markFollowUp(false);
+		draft.clearOffer();
 		return choiceTurn(context, draft, FINISH_TEXT, true);
 	}
 
@@ -164,10 +188,57 @@ public class ChatbotService {
 		boolean ready = draft.readyForConfirmation(finished);
 		String reply = ready ? completion(draft, null) : question(draft);
 		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(),
-			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing(), context.recordId());
+			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing(), context.recordId(), null);
 		Long recordId = sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, ready,
 			true, ready ? draft.toRecordRequest(context.recordDate()) : null);
 		return response.withRecordId(recordId);
+	}
+
+	/**
+	 * 증상 이름으로 뜻이나 모양을 물은 말. LLM을 부르지 않고 쉬운 말로 설명한 뒤, 예시 사진이 있으면 보여 줘도 되는지 묻는다.
+	 * 사진이 없으면 설명 뒤에 원래 묻던 질문을 이어서 한다. LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 */
+	private ChatReplyResponse signQuestionTurn(TurnContext context, ChatDraft draft, String userText, SkinSign sign) {
+		if (skinSignImages.has(sign)) {
+			draft.offerImage(sign);
+		}
+		String reply = SkinSignQuestion.explanation(sign) + "\n\n" + nextQuestion(draft);
+		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(), draft.askingField(),
+			false, draft.toResponse(), draft.editing(), context.recordId(), null);
+		sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, false, true);
+		return response;
+	}
+
+	/**
+	 * 증상 예시 사진을 보여 줄지에 대한 답. 보여 달라고 했을 때만 답에 사진을 붙이고, 이어서 원래 묻던 질문을 한다.
+	 * 사진을 묻느라 저장을 미뤄 둔 기록이면(마지막 답과 함께 증상을 물은 경우) 이때 저장한다.
+	 */
+	private ChatReplyResponse imageTurn(TurnContext context, ChatDraft draft, ChatChoiceRequest request) {
+		if (!request.skipped() && !(request.value() instanceof Boolean)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		boolean show = !request.skipped() && Boolean.TRUE.equals(request.value());
+		SkinSign sign = draft.offeredSign();
+		draft.clearOffer();
+
+		String answer = show ? sign.label() + " 예시 사진이에요. " + IMAGE_NOTE : NO_IMAGE;
+		boolean ready = !draft.editing() && draft.readyForConfirmation(false);
+		String reply = answer + "\n\n" + (ready ? completion(draft, null) : nextQuestion(draft));
+		SkinSign imageSign = show ? sign : null;
+		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(),
+			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing(), context.recordId(), imageSign);
+		Long recordId = sessionService.saveTurn(context.sessionId(), show ? SHOW_IMAGE_TEXT : NO_IMAGE_TEXT, reply,
+			draft.toJson(jsonMapper), 0, ready, true, ready ? draft.toRecordRequest(context.recordDate()) : null, imageSign);
+		return response.withRecordId(recordId);
+	}
+
+	/** 사진을 보여 줄지 묻는 중이면 그 질문을, 아니면 원래 묻던 질문을. 저장된 기록을 고치는 중이면 고칠 내용을 기다린다. */
+	private String nextQuestion(ChatDraft draft) {
+		SkinSign offered = draft.offeredSign();
+		if (offered != null) {
+			return offered.label() + " 예시 사진을 보여 드려도 될까요? 실제 피부 사진이 나와요.";
+		}
+		return draft.editing() ? EDIT_RESUME : question(draft);
 	}
 
 	/** 대화 내역에 남길 사용자 말. 화면이 버튼을 누르자마자 보여 주는 문장과 같다. */
@@ -223,6 +294,10 @@ public class ChatbotService {
 					finished = output.finished();
 					explain = output.explain() && output.reply() != null;
 					draft.markFollowUp(output.followUp() && output.reply() != null);
+					// 증상을 설명했으면, 예시 사진을 보여 줘도 되는지 이어서 묻는다.
+					if (explain && output.sign() != null && skinSignImages.has(output.sign())) {
+						draft.offerImage(output.sign());
+					}
 				}
 				case INVALID_SCORE -> reply = SCORE_OUT_OF_RANGE;
 				case INVALID_PAIN_INDEX -> reply = PAIN_INDEX_OUT_OF_RANGE;
@@ -246,15 +321,15 @@ public class ChatbotService {
 		} else if (readyForConfirmation) {
 			reply = reply == null || reply.isBlank() ? NO_CHANGE : reply;
 		} else if (explain) {
-			// 용어 설명은 기록을 바꾸지 않으므로, 설명 뒤에 원래 묻던 질문을 이어서 한다.
-			reply = reply + "\n\n" + question(draft);
+			// 용어 설명은 기록을 바꾸지 않으므로, 설명 뒤에 사진을 보여 줄지(또는 원래 묻던 질문을) 이어서 묻는다.
+			reply = reply + "\n\n" + nextQuestion(draft);
 		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
 			reply = question(draft);
 		}
 
 		ChatReplyResponse response = new ChatReplyResponse(reply, understood, draft.pendingFields(),
 			readyForConfirmation ? null : draft.askingField(), readyForConfirmation, draft.toResponse(), draft.editing(),
-			context.recordId());
+			context.recordId(), null);
 		return new Outcome(response, draft.toJson(jsonMapper), failCount,
 			save ? draft.toRecordRequest(context.recordDate()) : null);
 	}
@@ -269,7 +344,7 @@ public class ChatbotService {
 		int failCount = understood ? 0 : context.failCount() + 1;
 		String reply = understood ? text
 			: (failCount >= EXAMPLE_AFTER_FAILURES ? NOT_UNDERSTOOD + " 예: \"이번 주 가려움은 어땠어?\"" : NOT_UNDERSTOOD);
-		ChatReplyResponse response = new ChatReplyResponse(reply, understood, List.of(), null, false, null, false, null);
+		ChatReplyResponse response = new ChatReplyResponse(reply, understood, List.of(), null, false, null, false, null, null);
 		return new Outcome(response, context.draftJson(), failCount, null);
 	}
 

@@ -25,8 +25,13 @@ const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
 
 /** 선택지 답을 대화에 남길 문장 — 서버가 대화 내역에 저장하는 문장과 같다 */
 export function choiceText(choice: ChatChoiceRequest): string {
-  if ('skip' in choice) return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
+  if ('skip' in choice) {
+    if (choice.field === 'signImage') return '괜찮아요';
+    return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
+  }
   switch (choice.field) {
+    case 'signImage':
+      return choice.value ? '보여 주세요' : '괜찮아요';
     case 'painIndex':
       return `${choice.value}점`;
     case 'bodyParts':
@@ -154,7 +159,7 @@ export function useChatSession(recordDate: string) {
         // understood: false여도 reply에 같은 질문(필요하면 입력 예시 포함)이 오므로 그대로 표시한다
         setMessages((prev) => [
           ...prev,
-          { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString() },
+          { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString(), imageSign: res.imageSign },
         ]);
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);

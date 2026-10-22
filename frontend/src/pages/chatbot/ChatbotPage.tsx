@@ -62,7 +62,9 @@ export default function ChatbotPage() {
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
-  const textLocked = started && choiceField !== null && choiceField !== 'notes' && !choicesMinimized;
+  // 특이사항과 예시 사진 여부는 글로도 답할 수 있다 (사진을 묻는 중에 다른 말을 하면 사진은 보여 주지 않는다)
+  const textLocked =
+    started && choiceField !== null && choiceField !== 'notes' && choiceField !== 'signImage' && !choicesMinimized;
 
   // 가장 최근의 일일 총정리(저장·수정 안내) 말풍선 아래에, 부위마다 나타난 증상 개수만큼 칠한 마네킹을 붙인다.
   // 저장한 뒤에는 고칠 때마다 바로 다시 저장하므로, 지금 초안이 곧 저장된 기록이다
