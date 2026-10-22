@@ -511,7 +511,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
 		llm.enqueue("{\"understood\": true, \"reply\": \"수면 시간을 8시간으로 바꿨어요.\", "
 			+ "\"updates\": {\"sleepHours\": 8}, \"finished\": false, \"followUp\": false}");
-		mockMvc.perform(sendMessage(bearer, session, "잠은 8시간 잤어요"))
+		// 규칙만으로는 못 알아듣는 말투라 LLM으로 넘어간다 (규칙으로 바로 알아듣는 말투는 아래 별도 테스트에서 확인한다).
+		mockMvc.perform(sendMessage(bearer, session, "요즘 잠자는 패턴이 좀 바뀐 것 같아요"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
@@ -534,6 +535,31 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		assertThat(createSession(bearer, "RECORD")).isEqualTo(session);
 		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.messages.length()").value(5));
+	}
+
+	@Test
+	void 수정_세션에서_자주_쓰는_수정_말투는_LLM_없이_바로_반영한다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		((Map<String, Object>) body.get("record")).put("painIndex", 5);
+		String created = saveRecord(bearer, createSession(bearer, "RECORD"), body)
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+
+		String session = createSession(bearer, "RECORD");
+		int callsBefore = llm.callCount();
+		mockMvc.perform(sendMessage(bearer, session, "수면 시간을 8시간으로 고쳐줘"))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.editing").value(true))
+			.andExpect(jsonPath("$.data.recordId").value(recordId))
+			.andExpect(jsonPath("$.data.reply").value(
+				"바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+		assertThat(llm.callCount()).isEqualTo(callsBefore);
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.sleepHours").value(8.0));
 	}
 
 	@Test

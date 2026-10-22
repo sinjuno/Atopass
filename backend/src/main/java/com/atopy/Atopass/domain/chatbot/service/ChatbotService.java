@@ -81,6 +81,7 @@ public class ChatbotService {
 	private final ChatModelClient modelClient;
 	private final ChatPromptFactory promptFactory;
 	private final ChatReplyParser replyParser;
+	private final ChatLocalEditParser localEditParser;
 	private final JsonMapper jsonMapper;
 	private final LlmProperties llmProperties;
 	private final SkinSignImages skinSignImages;
@@ -99,10 +100,8 @@ public class ChatbotService {
 	}
 
 	public ChatReplyResponse sendMessage(Long memberId, String sessionId, String userText) {
-		// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
 		consentService.requireConsent(memberId);
 		TurnContext context = sessionService.loadForTurn(memberId, sessionId);
-
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
 		if (context.mode() == ChatMode.RECORD) {
 			// 사진을 보여 줄지 묻던 중에 글로 다른 말을 하면, 보여 주지 않는 것으로 보고 그 말을 받는다.
@@ -112,15 +111,27 @@ public class ChatbotService {
 				return signQuestionTurn(context, draft, userText, asked.get());
 			}
 		}
-		requireWithinDailyLimit(memberId);
-		String systemPrompt = context.mode() == ChatMode.RECORD
-			? promptFactory.recordPrompt(draft, context.today())
-			: promptFactory.queryPrompt(context.queryContext(), context.today());
-		String raw = modelClient.complete(systemPrompt, withUserMessage(context.history(), userText));
 
-		Outcome outcome = context.mode() == ChatMode.RECORD
-			? recordOutcome(context, draft, raw)
-			: queryOutcome(context, raw);
+		Outcome outcome;
+		// "수면 시간을 6시간으로 고쳐줘"처럼 자주 쓰는 수정 말투는 LLM 없이 바로 알아듣는다.
+		// ANTHROPIC_API_KEY가 없는 환경에서도 이런 수정만큼은 되게 하고, 이용 한도도 쓰지 않는다.
+		// 저장되기 전(처음 입력하는 중)에는 부위·증상처럼 규칙만으로 못 알아듣는 말이 섞이기 쉬워
+		// 잘못 자르지 않도록, 이미 저장된 기록을 고치는 중(draft.editing())일 때만 쓴다.
+		Optional<ModelOutput> localMatch = context.mode() == ChatMode.RECORD && draft.editing()
+			? localEditParser.parse(userText) : Optional.empty();
+		if (localMatch.isPresent()) {
+			outcome = recordOutcome(context, draft, localMatch);
+		} else {
+			// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
+			requireWithinDailyLimit(memberId);
+			String systemPrompt = context.mode() == ChatMode.RECORD
+				? promptFactory.recordPrompt(draft, context.today())
+				: promptFactory.queryPrompt(context.queryContext(), context.today());
+			String raw = modelClient.complete(systemPrompt, withUserMessage(context.history(), userText));
+			outcome = context.mode() == ChatMode.RECORD
+				? recordOutcome(context, draft, replyParser.parse(raw))
+				: queryOutcome(context, raw);
+		}
 
 		Long recordId = sessionService.saveTurn(sessionId, userText, outcome.response().reply(),
 			outcome.draftJson(), outcome.failCount(), outcome.response().requiresConfirmation(), false, outcome.record());
@@ -278,9 +289,7 @@ public class ChatbotService {
 	 * 기록 모드: 응답을 검증한 뒤에만 초안에 반영하고, 반영 결과에 따라 다음 질문을 정한다.
 	 * 다음에 물을 항목이 선택지로 답하는 항목이면 화면의 선택지와 어긋나지 않도록 서버의 정해진 문장으로 묻는다.
 	 */
-	private Outcome recordOutcome(TurnContext context, ChatDraft draft, String raw) {
-		Optional<ModelOutput> parsed = replyParser.parse(raw);
-
+	private Outcome recordOutcome(TurnContext context, ChatDraft draft, Optional<ModelOutput> parsed) {
 		boolean understood = false;
 		boolean explain = false;
 		String reply = null;
