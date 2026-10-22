@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,8 @@ public class ChatSessionService {
 
 	/** 질의 모드에서 LLM에 근거로 보내는 기록 기간(일) */
 	private static final int QUERY_CONTEXT_DAYS = 90;
+	/** 연결 질문을 고를 때 돌아보는 최근 기록 기간(일) */
+	private static final int RECENT_LINKED_DAYS = 7;
 
 	private final ChatSessionRepository sessionRepository;
 	private final ChatMessageRepository messageRepository;
@@ -51,9 +55,13 @@ public class ChatSessionService {
 	private final Clock clock;
 	private final JsonMapper jsonMapper;
 
-	/** LLM 호출에 필요한 정보. DB 연결 없이 쓸 수 있는 값만 담는다. */
+	/**
+	 * LLM 호출에 필요한 정보. DB 연결 없이 쓸 수 있는 값만 담는다.
+	 * recentLinked는 기록 날짜 전 7일 동안의 기록에서 답한 연결 질문 ID다.
+	 */
 	record TurnContext(String sessionId, ChatMode mode, String draftJson, int failCount,
-		List<ChatTurn> history, LocalDate today, String queryContext, LocalDate recordDate, Long recordId) {
+		List<ChatTurn> history, LocalDate today, String queryContext, LocalDate recordDate, Long recordId,
+		Set<String> recentLinked) {
 	}
 
 	/**
@@ -140,8 +148,15 @@ public class ChatSessionService {
 					memberId, today.minusDays(QUERY_CONTEXT_DAYS), today);
 			queryContext = promptFactory.recordsContext(records);
 		}
+		Set<String> recentLinked = new TreeSet<>();
+		if (session.getMode() == ChatMode.RECORD) {
+			LocalDate recordDate = session.getRecordDate();
+			recordRepository.findByMemberIdAndRecordDateBetweenOrderByRecordDateAsc(
+					memberId, recordDate.minusDays(RECENT_LINKED_DAYS), recordDate.minusDays(1))
+				.forEach(record -> recentLinked.addAll(record.getLinkedAnswers().keySet()));
+		}
 		return new TurnContext(sessionId, session.getMode(), session.getDraft(), session.getFailCount(),
-			history, today, queryContext, session.getRecordDate(), session.getEditingRecordId());
+			history, today, queryContext, session.getRecordDate(), session.getEditingRecordId(), recentLinked);
 	}
 
 	/**

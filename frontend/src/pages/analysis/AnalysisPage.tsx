@@ -128,7 +128,7 @@ export default function AnalysisPage() {
           <div
             role="tablist"
             aria-label="그래프 종류"
-            className="mb-4 flex gap-1 overflow-x-auto border-b border-gray-100"
+            className="mb-4 flex gap-1 border-b border-gray-100"
           >
             {TABS.map((t) => (
               <button

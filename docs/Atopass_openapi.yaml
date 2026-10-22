@@ -706,10 +706,14 @@ paths:
       description: |
         선택지 버튼으로 고른 답을 보낸다. LLM을 부르지 않고 초안에 바로 반영하며, 다음 질문은 서버의 정해진 문장이다.
         이용 한도(`CHAT_LIMIT_EXCEEDED`)에 세지 않으므로 한도에 도달해도 보낼 수 있다.
-        대화 내역에는 고른 값이 "6점", "7.5시간", "예", "홍반, 건조증", "넘어갈게요" 같은 문장으로 남는다.
+        대화 내역에는 고른 값이 "6점", "7.5시간", "평소보다 나빠짐", "붉어짐, 갈라짐", "넘어갈게요" 같은 문장으로 남는다.
 
         - 지금 묻는 항목(`askingField`)에만 답할 수 있다. 다른 항목이면 `400 INVALID_INPUT`.
-        - `skip: true`는 "넘어갈게요"(특이사항은 "없어요")다. 고통 지수는 건너뛸 수 없다.
+        - 응답의 `choice`가 있는 항목(피부 상태, 피부 모양, 붓기, 긁은 자국, 진물·피, 수면 방해, 보습제, 연고·약, 연결 질문 C01~C16)은
+          `choice.options` 중 고른 글자를 그대로 보낸다. 여러 개 고르기(`choice.multiple`)는 글자 배열이고, 하나도 없으면 빈 배열이다.
+        - 연결 질문에서 "직접 입력"을 고르면 `askingField`가 `C12_TEXT`처럼 바뀐다. 이때 입력창에 적은 글(`/messages`)은 LLM을 거치지 않고
+          그대로 답이 되며, 이어서 `C12_CONFIRM`("맞아요/다시 적을게요")으로 맞는지 확인한다.
+        - `skip: true`는 "넘어갈게요"(부위·특이사항은 "없어요")다. 고통 지수는 건너뛸 수 없다.
         - 특이사항은 글(`/messages`)로 받으므로 선택지로는 `skip`만 보낼 수 있다.
         - 값이 범위나 형식에 어긋나면 `400 INVALID_INPUT`이고 초안은 바뀌지 않는다.
         - 질의 모드 세션이면 `400 INVALID_INPUT`, 닫힌 세션이면 `409 SESSION_CLOSED`.
@@ -723,27 +727,31 @@ paths:
               properties:
                 field:
                   type: string
-                  enum: [painIndex, sleepHours, medication, skinSigns, notes]
+                  description: 지금 묻는 항목(askingField). 항목 이름, 연결 질문 ID(C01~C16), C12_TEXT·C12_CONFIRM 같은 단계
+                  example: skinTrend
                 value:
                   description: |
-                    painIndex는 0~10 정수, sleepHours는 0~24 숫자(소수점 한 자리), medication은 boolean,
-                    skinSigns는 SkinSign 배열(빈 배열이면 "증상 없음"). skip이 true이면 보내지 않는다.
+                    painIndex·itchScore는 0~10 정수, sleepHours는 0~24 숫자(소수점 한 자리), bodyParts는 BodyPart 배열.
+                    선택지(choice)가 있는 항목은 고른 선택지 글자, 여러 개 고르기는 글자 배열. skip이 true이면 보내지 않는다.
                   oneOf:
                     - type: integer
                     - type: number
-                    - type: boolean
+                    - type: string
                     - type: array
                       items:
                         type: string
-                        enum: [ERYTHEMA, EDEMA, OOZING, EXCORIATION, LICHENIFICATION, XEROSIS, ITCHING]
                 skip:
                   type: boolean
                   default: false
             examples:
               painIndex:
                 value: { field: painIndex, value: 6 }
-              skinSigns:
-                value: { field: skinSigns, value: [ERYTHEMA, XEROSIS] }
+              skinTrend:
+                value: { field: skinTrend, value: 평소보다 나빠짐 }
+              skinShape:
+                value: { field: skinShape, value: [붉어짐, 갈라짐] }
+              linked:
+                value: { field: C08, value: 자다가 긁음 }
               skip:
                 value: { field: sleepHours, skip: true }
       responses:
@@ -1340,10 +1348,55 @@ components:
       type: string
       description: |
         피부에 나타난 증상(있음/없음). 부위마다, 그리고 하루 단위로 기록한다. 응답은 아래 순서로 정렬된다.
-        ERYTHEMA 홍반, EDEMA 부종/구진(결절), OOZING 진물/딱지, EXCORIATION 긁은 자국(찰상), LICHENIFICATION 태선화, XEROSIS 건조증, ITCHING 가려움.
+        ERYTHEMA 홍반, EDEMA 부종/구진(결절), OOZING 진물/딱지, EXCORIATION 긁은 자국(찰상), LICHENIFICATION 태선화, XEROSIS 건조증, ITCHING 가려움,
+        FISSURE 균열, BLEEDING 출혈.
         예전 값은 서버가 뜰 때 옮긴다: PAPULE·NODULE → EDEMA, SCALING은 지움.
-      enum: [ERYTHEMA, EDEMA, OOZING, EXCORIATION, LICHENIFICATION, XEROSIS, ITCHING]
+      enum: [ERYTHEMA, EDEMA, OOZING, EXCORIATION, LICHENIFICATION, XEROSIS, ITCHING, FISSURE, BLEEDING]
       example: ERYTHEMA
+    SkinTrend:
+      type: string
+      description: 오늘 피부 상태를 평소와 비교한 느낌. BETTER 좋아짐, SAME 평소와 비슷, WORSE 평소보다 나빠짐
+      enum: [BETTER, SAME, WORSE]
+    MedicationUse:
+      type: string
+      description: 처방받은 연고·약 사용 여부(사실만 기록). USED 사용함, NOT_USED 안 함, NO_PRESCRIPTION 처방 없음
+      enum: [USED, NOT_USED, NO_PRESCRIPTION]
+    DailyCheck:
+      type: object
+      description: |
+        하루 점검. 챗봇이 묻는 항목 중 다른 칸에 없는 것이다. 기록하지 않은 항목은 null.
+        연고·약 사용 여부는 약 복용 여부(medication)와 맞을 때만 남는다(사용함이면 복용 true). 다른 화면에서 약 복용만 바꿔
+        서로 맞지 않으면 연고·약 사용 여부를 지운다.
+      properties:
+        skinTrend:
+          allOf:
+            - $ref: '#/components/schemas/SkinTrend'
+          nullable: true
+        itchScore:
+          type: integer
+          minimum: 0
+          maximum: 10
+          nullable: true
+          description: 가려움 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도
+        sleepDisturbed:
+          type: boolean
+          nullable: true
+          description: 가려워서 잠을 설쳤는지
+        moisturizer:
+          type: boolean
+          nullable: true
+          description: 보습제를 발랐는지
+        medicationUse:
+          allOf:
+            - $ref: '#/components/schemas/MedicationUse'
+          nullable: true
+        linkedAnswers:
+          type: object
+          description: 연결 질문 답. 질문 ID(C01~C16) → 고른 선택지 또는 직접 쓴 글(200자 이하). 최대 20개
+          additionalProperties:
+            type: string
+            maxLength: 200
+          example: { C01: 자려고 누웠을 때, C12: 매운 떡볶이 }
     RecordRequest:
       type: object
       description: 부위별 증상(skinConditions)과 고통 지수(painIndex) 중 하나 이상은 있어야 한다.
@@ -1384,6 +1437,11 @@ components:
           type: string
           nullable: true
           example: 저녁에 팔 부위가 가려웠음
+        dailyCheck:
+          allOf:
+            - $ref: '#/components/schemas/DailyCheck'
+          nullable: true
+          description: 하루 점검. 보내지 않으면(null) 수정할 때 저장된 값을 그대로 둔다.
     RecordCreated:
       type: object
       properties:
@@ -1648,23 +1706,31 @@ components:
         pendingFields:
           type: array
           description: |
-            아직 입력되지 않은 항목. 필수 항목이 먼저 온다. 증상 이름이 아니라 다음 값 중 일부다.
-            painIndex(고통 지수, 필수), symptoms(증상 점수. 부위를 말했지만 점수가 아직 없을 때),
-            sleepHours(수면), medication(약 복용), skinSigns(나타난 증상), notes(특이사항)
+            아직 입력되지 않은 항목을 묻는 순서대로 준다. 증상 이름이 아니라 다음 값 중 일부다.
+            skinTrend(피부 상태), itchScore(가려움 정도), painIndex(고통 지수, 필수), bodyParts(불편한 부위),
+            symptoms(부위를 말했지만 점수가 아직 없을 때), skinShape(피부 모양), swelling(붓기), scratch(긁은 자국), oozing(진물·피),
+            sleepDisturbed(수면 방해), sleepHours(수면 시간), moisturizer(보습제), medicationUse(연고·약), notes(특이사항)
           items:
             type: string
-            enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
-          example: [sleepHours, medication, skinSigns, notes]
+            enum: [skinTrend, itchScore, painIndex, bodyParts, symptoms, skinShape, swelling, scratch, oozing, sleepDisturbed, sleepHours, moisturizer, medicationUse, notes]
+          example: [sleepHours, moisturizer, medicationUse, notes]
         askingField:
           type: string
           nullable: true
           description: |
-            지금 묻는 항목. 서버가 정하며, 화면은 이 값에 맞춰 선택지를 보여 준다.
-            painIndex(0~10 버튼), sleepHours(시간 선택), medication(예/아니오), skinSigns(여러 개 선택)는
-            `POST /chatbot/sessions/{sessionId}/choices`로 답하고, symptoms(부위·증상 점수)와 notes(특이사항)는 글로 답한다.
+            지금 묻는 항목. 서버가 정하며, 화면은 이 값에 맞춰 선택지를 보여 준다. pendingFields의 값 말고도 다음이 올 수 있다.
+            - 연결 질문 ID(C01~C16): 앞 답에 맞춰 항목 사이에 끼워 묻는 부가 질문. 나빠진 날은 최대 3개, 그 밖의 날은 1개
+            - C12_TEXT처럼 _TEXT로 끝나는 값: 연결 질문 답을 글로 적는 단계. 입력창의 글이 LLM을 거치지 않고 그대로 답이 된다
+            - C12_CONFIRM처럼 _CONFIRM으로 끝나는 값: 적은 글이 맞는지 확인하는 단계
+            painIndex·itchScore(0~10 막대), bodyParts(마네킹), sleepHours(시간 막대)와 choice가 있는 항목은
+            `POST /chatbot/sessions/{sessionId}/choices`로 답하고, symptoms(부위 점수)와 notes(특이사항)는 글로 답한다.
             확인 단계이거나 질의 모드면 null.
-          enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
-          example: sleepHours
+          example: C01
+        choice:
+          allOf:
+            - $ref: '#/components/schemas/ChatChoiceSpec'
+          nullable: true
+          description: 지금 묻는 항목의 선택지. 화면이 따로 그리는 항목(고통 지수, 가려움 정도, 부위, 수면 시간, 특이사항)이면 null
         requiresConfirmation:
           type: boolean
           description: true이면 기록 초안을 확인하는 단계(총정리)로 넘어간다.
@@ -1706,6 +1772,31 @@ components:
             notes:
               type: string
               nullable: true
+            dailyCheck:
+              $ref: '#/components/schemas/DailyCheck'
+    ChatChoiceSpec:
+      type: object
+      description: 지금 묻는 항목의 선택지. 화면은 이 값대로 버튼을 그리고, 고른 선택지 글자를 그대로 답으로 보낸다.
+      properties:
+        label:
+          type: string
+          description: 항목 이름 (선택지를 내려 두었을 때 "○○ 고르기"로 보인다)
+          example: 불편 시간대
+        options:
+          type: array
+          items:
+            type: string
+          example: [씻을 때, 옷 입을 때, 일·공부할 때, 자려고 누웠을 때]
+        multiple:
+          type: boolean
+          description: 여러 개 고르기. 아무것도 고르지 않으면 빈 배열로 보낸다
+        noneLabel:
+          type: string
+          nullable: true
+          description: 여러 개 고르기에서 "하나도 없음" 버튼 글자 (예 괜찮음)
+        text:
+          type: boolean
+          description: 글로 직접 적는 단계. 선택지 없이 입력창에 적은 글이 답이 된다
     ChatConsent:
       type: object
       properties:
@@ -1755,16 +1846,22 @@ components:
             notes:
               type: string
               nullable: true
+            dailyCheck:
+              $ref: '#/components/schemas/DailyCheck'
         pendingFields:
           type: array
           items:
             type: string
-            enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
+            enum: [skinTrend, itchScore, painIndex, bodyParts, symptoms, skinShape, swelling, scratch, oozing, sleepDisturbed, sleepHours, moisturizer, medicationUse, notes]
         askingField:
           type: string
           nullable: true
           description: 마지막 메시지 응답과 같은 값. 확인 단계면 null.
-          enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
+        choice:
+          allOf:
+            - $ref: '#/components/schemas/ChatChoiceSpec'
+          nullable: true
+          description: 마지막 메시지 응답과 같은 값
         requiresConfirmation:
           type: boolean
           description: 마지막 메시지 응답과 같은 값. 새로고침 뒤에도 유지된다.
@@ -1823,6 +1920,8 @@ components:
             notes:
               type: string
               nullable: true
+            dailyCheck:
+              $ref: '#/components/schemas/DailyCheck'
           example:
             painIndex: 6
             sleepHours: 6

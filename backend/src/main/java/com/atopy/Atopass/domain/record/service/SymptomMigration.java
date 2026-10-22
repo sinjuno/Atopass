@@ -1,9 +1,12 @@
 package com.atopy.Atopass.domain.record.service;
 
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +15,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -29,6 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>예전에는 이 칸들이 MySQL ENUM 타입이었다. ENUM에 예전 값이 남아 있으면 JPA(ddl-auto: update)가 새 값 목록으로
  * 바꾸지 못하고, 새 증상도 넣을 수 없다. 그래서 먼저 문자열(VARCHAR) 칸으로 바꾼 뒤 값을 옮긴다.
  * 지금은 엔티티가 이 칸들을 VARCHAR로 매핑하므로, 한 번 바꾸고 나면 다시 ENUM으로 돌아가지 않는다.
+ * 증상 목록이 늘어나면 예전 목록으로 만든 허용 값 검사(CHECK)도 지운다.
  */
 @Slf4j
 @Component
@@ -52,12 +58,16 @@ public class SymptomMigration implements ApplicationRunner {
 
 	private static final String PAIN = "PAIN";
 
+	/** 나타난 증상 칸이 있는 테이블 */
+	private static final List<String> SIGN_TABLES = List.of("record_skin_signs", "skin_condition_signs");
+
 	private final JdbcTemplate jdbc;
 	private final TransactionTemplate transaction;
 
 	@Override
 	public void run(ApplicationArguments args) {
 		widenEnumColumns();
+		SIGN_TABLES.forEach(this::dropStaleSignChecks);
 		transaction.executeWithoutResult(status -> {
 			migrateSigns("record_skin_signs", "record_id");
 			migrateSigns("skin_condition_signs", "skin_condition_id");
@@ -77,6 +87,42 @@ public class SymptomMigration implements ApplicationRunner {
 				log.info("{}.{} 칸을 문자열 칸으로 바꿨습니다.", column[0], column[1]);
 			}
 		}
+	}
+
+	/**
+	 * 증상 목록이 늘었는데(균열·출혈) 예전 목록으로 만든 허용 값 검사(CHECK skin_sign in (...))가 남아 있으면 지운다.
+	 * ddl-auto: update는 이미 있는 검사를 고치지 않아, 남아 있으면 새 증상을 저장하지 못한다. 지금 증상을 모두 허용하는 검사는 둔다.
+	 */
+	public void dropStaleSignChecks(String table) {
+		try {
+			List<Map<String, Object>> checks = jdbc.queryForList(
+				"select tc.constraint_name as name, cc.check_clause as clause"
+					+ " from information_schema.table_constraints tc join information_schema.check_constraints cc"
+					+ " on cc.constraint_schema = tc.constraint_schema and cc.constraint_name = tc.constraint_name"
+					+ " where tc.table_schema = schema() and tc.constraint_type = 'CHECK' and upper(tc.table_name) = upper(?)",
+				table);
+			boolean mysql = isMysql();
+			for (Map<String, Object> check : checks) {
+				String clause = String.valueOf(check.get("clause"));
+				boolean stale = clause.toLowerCase(Locale.ROOT).contains("skin_sign")
+					&& Arrays.stream(SkinSign.values()).anyMatch(sign -> !clause.contains("'" + sign.name() + "'"));
+				if (stale) {
+					String name = String.valueOf(check.get("name"));
+					jdbc.execute(mysql
+						? "alter table " + table + " drop check `" + name + "`"
+						: "alter table " + table + " drop constraint \"" + name + "\"");
+					log.info("{}의 예전 증상 허용 값 검사({})를 지웠습니다.", table, name);
+				}
+			}
+		} catch (DataAccessException e) {
+			// 검사 정보를 읽지 못하는 DB면 건너뛴다. 저장이 막히면 위 로그 없이 오류가 난다.
+			log.warn("{}의 증상 허용 값 검사를 확인하지 못했습니다: {}", table, e.getMessage());
+		}
+	}
+
+	private boolean isMysql() {
+		String product = jdbc.execute((ConnectionCallback<String>) c -> c.getMetaData().getDatabaseProductName());
+		return product != null && product.toLowerCase(Locale.ROOT).contains("mysql");
 	}
 
 	/** 나타난 증상: 구진·결절 → 부종/구진, 각질은 지운다. */

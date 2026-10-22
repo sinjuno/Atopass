@@ -8,6 +8,8 @@ import java.util.List;
  * @param understood           입력을 해석했는지. false이면 같은 내용을 다시 묻는 응답이다.
  * @param pendingFields        아직 입력되지 않은 항목 (painIndex, symptoms, sleepHours, medication, skinSigns, notes)
  * @param askingField          지금 묻는 항목. 화면은 이 값에 맞춰 선택지를 보여 준다. 묻는 것이 없거나 질의 모드면 null
+ *                             연결 질문은 질문 ID(C01~C16), 그 답을 글로 적는 단계는 C12_TEXT, 적은 글을 확인하는 단계는 C12_CONFIRM이다.
+ * @param choice               지금 묻는 항목의 선택지. 화면이 따로 그리는 항목(고통 지수, 가려움 정도, 부위, 수면 시간, 특이사항)이면 null
  * @param requiresConfirmation true이면 기록 초안을 확인(일일 총정리)하는 단계로 넘어간다.
  * @param draft                지금까지 모은 기록 초안. 질의 모드에서는 null
  * @param editing              그날 기록이 이미 저장되어, 이제 글로 고치면 바로 저장되는 대화인지
@@ -18,6 +20,7 @@ public record ChatReplyResponse(
 	boolean understood,
 	List<String> pendingFields,
 	String askingField,
+	ChatChoiceSpec choice,
 	boolean requiresConfirmation,
 	ChatDraftResponse draft,
 	boolean editing,
@@ -26,7 +29,7 @@ public record ChatReplyResponse(
 
 	/** 기록을 저장한 뒤 그 ID를 붙인다. */
 	public ChatReplyResponse withRecordId(Long id) {
-		return new ChatReplyResponse(reply, understood, pendingFields, askingField, requiresConfirmation, draft,
+		return new ChatReplyResponse(reply, understood, pendingFields, askingField, choice, requiresConfirmation, draft,
 			id != null || editing, id);
 	}
 }

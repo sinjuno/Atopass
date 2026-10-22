@@ -15,6 +15,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -24,8 +25,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.AccessLevel;
@@ -75,6 +78,36 @@ public class SkinRecord extends BaseTimeEntity {
 	@Column(columnDefinition = "text")
 	private String notes;
 
+	// ── 하루 점검: 챗봇이 묻는 항목 중 위 칸에 없는 것. 기록하지 않았으면 null ──
+
+	/** 오늘 피부 상태 (평소와 비교) */
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(length = 10)
+	private SkinTrend skinTrend;
+
+	/** 가려움 정도 0~10 (사용자가 느끼는 주관적인 정도. 0은 없음) */
+	private Integer itchScore;
+
+	/** 가려워서 잠을 설쳤는지 */
+	private Boolean sleepDisturbed;
+
+	/** 보습제를 발랐는지 */
+	private Boolean moisturizer;
+
+	/** 처방받은 연고·약 사용 여부. 약 복용 여부(medication)와 맞을 때만 남긴다. */
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(length = 20)
+	private MedicationUse medicationUse;
+
+	/** 연결 질문(C01~C16)의 답. 질문 ID → 고른 선택지 또는 직접 쓴 글 */
+	@ElementCollection
+	@CollectionTable(name = "record_linked_answers", joinColumns = @JoinColumn(name = "record_id"))
+	@MapKeyColumn(name = "question_id", length = 3)
+	@Column(name = "answer", nullable = false, length = 200)
+	private Map<String, String> linkedAnswers = new LinkedHashMap<>();
+
 	@OneToMany(mappedBy = "record", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<SkinCondition> conditions = new ArrayList<>();
 
@@ -108,6 +141,10 @@ public class SkinRecord extends BaseTimeEntity {
 		return Collections.unmodifiableSet(skinSigns);
 	}
 
+	public Map<String, String> getLinkedAnswers() {
+		return Collections.unmodifiableMap(linkedAnswers);
+	}
+
 	/** 수면 점수(1~5). 수면 시간을 기록하지 않았으면 null */
 	public Integer getSleepScore() {
 		return SleepScore.of(sleepHours);
@@ -123,6 +160,23 @@ public class SkinRecord extends BaseTimeEntity {
 		this.alcohol = alcohol;
 		this.outdoorActivity = outdoorActivity;
 		this.notes = notes;
+	}
+
+	/**
+	 * 하루 점검 항목을 통째로 바꾼다.
+	 * 연고·약 사용 여부는 약 복용 여부와 맞아야 한다(사용함이면 복용 true, 그 밖에는 false). 다른 화면에서 약 복용 여부만
+	 * 바꿔 서로 맞지 않으면, 사용자가 마지막에 고친 약 복용 여부를 따르고 연고·약 사용 여부는 지운다.
+	 */
+	public void updateDailyCheck(SkinTrend skinTrend, Integer itchScore, Boolean sleepDisturbed, Boolean moisturizer,
+		MedicationUse medicationUse, Map<String, String> linkedAnswers) {
+		this.skinTrend = skinTrend;
+		this.itchScore = itchScore;
+		this.sleepDisturbed = sleepDisturbed;
+		this.moisturizer = moisturizer;
+		boolean matches = medicationUse == null || Objects.equals(medication, medicationUse == MedicationUse.USED);
+		this.medicationUse = matches ? medicationUse : null;
+		this.linkedAnswers.keySet().retainAll(linkedAnswers.keySet());
+		this.linkedAnswers.putAll(linkedAnswers);
 	}
 
 	/** 나타난 증상을 통째로 교체한다. */

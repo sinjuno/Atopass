@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.chatbot.dto.request;
 
+import com.atopy.Atopass.domain.record.dto.request.DailyCheckRequest;
 import com.atopy.Atopass.domain.record.dto.request.LifestyleRequest;
 import com.atopy.Atopass.domain.record.dto.request.RecordRequest;
 import com.atopy.Atopass.domain.record.dto.request.SkinConditionRequest;
@@ -46,13 +47,16 @@ public record RecordContent(
 	LifestyleRequest lifestyle,
 
 	@Size(max = 500, message = "특이사항은 500자 이하여야 합니다.")
-	String notes
+	String notes,
+
+	@Valid
+	DailyCheckRequest dailyCheck
 ) {
 
 	/** 일반 피부 기록 생성과 같은 로직을 쓰기 위해 날짜를 붙여 변환한다. */
 	public RecordRequest toRecordRequest(LocalDate recordDate) {
 		return new RecordRequest(
-			recordDate, skinConditions, painIndex, sleepHours, medication, skinSigns, lifestyle, notes);
+			recordDate, skinConditions, painIndex, sleepHours, medication, skinSigns, lifestyle, notes, dailyCheck);
 	}
 
 	@JsonIgnore

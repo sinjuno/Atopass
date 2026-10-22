@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.chatbot.dto.response;
 
+import com.atopy.Atopass.domain.record.dto.response.DailyCheckResponse;
 import com.atopy.Atopass.domain.record.dto.response.LifestyleResponse;
 import com.atopy.Atopass.domain.record.dto.response.SkinConditionResponse;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
@@ -17,6 +18,8 @@ public record ChatDraftResponse(
 	/** 나타난 증상. 아직 묻지 않았으면 null, "없음"이면 빈 배열 */
 	List<SkinSign> skinSigns,
 	LifestyleResponse lifestyle,
-	String notes
+	String notes,
+	/** 하루 점검 항목 (피부 상태, 가려움 정도, 수면 방해, 보습제, 연고·약, 연결 질문 답) */
+	DailyCheckResponse dailyCheck
 ) {
 }
