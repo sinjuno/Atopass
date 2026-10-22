@@ -15,7 +15,7 @@ export default function PainIndexSlider({ value, onChange, disabled }: Props) {
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between">
         <p className="text-sm text-gray-500">고통 지수 · 0은 없음, 10은 매우 심함</p>
-        <span className={value === null ? 'text-base text-gray-400' : 'text-lg font-bold text-emerald-700'} aria-hidden>
+        <span className={value === null ? 'text-base text-gray-400' : 'text-lg font-bold text-brand-700'} aria-hidden>
           {value === null ? '기록 없음' : `${value}점`}
         </span>
       </div>
@@ -29,7 +29,7 @@ export default function PainIndexSlider({ value, onChange, disabled }: Props) {
         disabled={disabled}
         aria-label="고통 지수"
         aria-valuetext={value === null ? '기록 없음' : `${value}점`}
-        className="h-11 w-full accent-emerald-600"
+        className="h-11 w-full accent-brand-600"
       />
       <div className="flex justify-between px-1 text-xs text-gray-400" aria-hidden>
         {PAIN_INDEXES.map((n) => (

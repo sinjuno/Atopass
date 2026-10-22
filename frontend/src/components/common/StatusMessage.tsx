@@ -2,7 +2,7 @@
 export function LoadingMessage({ message = '불러오는 중…' }: { message?: string }) {
   return (
     <div role="status" className="flex flex-col items-center gap-3 py-10 text-gray-500">
-      <span className="size-6 animate-spin rounded-full border-2 border-emerald-100 border-t-emerald-600" />
+      <span className="size-6 animate-spin rounded-full border-2 border-brand-100 border-t-brand-600" />
       {message}
     </div>
   );

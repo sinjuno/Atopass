@@ -6,6 +6,7 @@ import AnalysisPage from '@/pages/analysis/AnalysisPage';
 import ChatbotPage from '@/pages/chatbot/ChatbotPage';
 import HomePage from '@/pages/home/HomePage';
 import LoginPage from '@/pages/login/LoginPage';
+import MyPage from '@/pages/mypage/MyPage';
 import CalendarPage from '@/pages/record/CalendarPage';
 import RecordSummaryPage from '@/pages/record/RecordSummaryPage';
 import ReportPage from '@/pages/report/ReportPage';
@@ -20,6 +21,7 @@ const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: '/', element: <HomePage /> },
+          { path: '/mypage', element: <MyPage /> },
           { path: '/chatbot', element: <ChatbotPage /> },
           { path: '/record/:date', element: <RecordSummaryPage /> },
           { path: '/calendar', element: <CalendarPage /> },

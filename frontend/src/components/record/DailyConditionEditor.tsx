@@ -46,7 +46,7 @@ export default function DailyConditionEditor({ medication, skinSigns, skinCondit
                 // 선택한 버튼을 다시 누르면 선택 해제(null = 기록 없음)
                 onClick={() => onChange({ ...current, medication: selected ? null : o.value })}
                 className={`rounded-full border px-4 py-1.5 text-base ${
-                  selected ? 'border-emerald-600 bg-emerald-50 font-semibold text-emerald-700' : 'border-gray-300 text-gray-600'
+                  selected ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 text-gray-600'
                 }`}
               >
                 {o.label}
@@ -68,7 +68,7 @@ export default function DailyConditionEditor({ medication, skinSigns, skinCondit
               return (
                 <li
                   key={sign}
-                  className="flex items-center gap-1 rounded-full border border-emerald-600 bg-emerald-50 px-3 py-1 text-base text-emerald-700"
+                  className="flex items-center gap-1 rounded-full border border-brand-600 bg-brand-50 px-3 py-1 text-base text-brand-700"
                 >
                   {SKIN_SIGN_LABELS[sign]}
                   {removable && (
@@ -76,7 +76,7 @@ export default function DailyConditionEditor({ medication, skinSigns, skinCondit
                       type="button"
                       onClick={() => removeDailySign(sign)}
                       aria-label={`${SKIN_SIGN_LABELS[sign]} 지우기`}
-                      className="-mr-1 px-1 text-emerald-700"
+                      className="-mr-1 px-1 text-brand-700"
                     >
                       ×
                     </button>

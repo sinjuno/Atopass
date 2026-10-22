@@ -72,8 +72,8 @@ export default function ReportPage() {
     <>
       <PageHeader title="진료 참고용 기록" />
 
-      <div className="flex flex-col gap-4 px-4 pt-4">
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 rounded-2xl border border-gray-200 p-4">
+      <div className="flex flex-col gap-4 px-5 pt-4 pb-4">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 rounded-3xl bg-white p-5 shadow-card">
           <fieldset>
             <legend className="mb-2 font-bold text-gray-700">기간</legend>
             <div role="radiogroup" aria-label="기간 고르는 방법" className="mb-3 flex flex-wrap gap-1.5">
@@ -118,7 +118,7 @@ export default function ReportPage() {
               {FIXED_ITEMS.map((item) => (
                 <li key={item}>
                   <label className="flex items-center gap-2.5 text-gray-500">
-                    <input type="checkbox" checked disabled className="size-5 accent-emerald-600" />
+                    <input type="checkbox" checked disabled className="size-5 accent-brand-600" />
                     {item}
                   </label>
                 </li>
@@ -129,7 +129,7 @@ export default function ReportPage() {
                     type="checkbox"
                     checked={includePhotos}
                     onChange={(e) => setIncludePhotos(e.target.checked)}
-                    className="size-5 accent-emerald-600"
+                    className="size-5 accent-brand-600"
                   />
                   사진
                 </label>
@@ -149,27 +149,27 @@ export default function ReportPage() {
           <button
             type="submit"
             disabled={submitting || !!rangeError}
-            className="rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white disabled:opacity-60"
+            className="rounded-3xl bg-brand-600 py-4 text-lg font-bold text-white disabled:opacity-60"
           >
             {submitting ? 'PDF 만드는 중…' : 'PDF 만들기'}
           </button>
         </form>
 
         {selected && (
-          <section id="report-preview" className="scroll-mt-16 rounded-2xl border border-gray-200 p-4">
+          <section id="report-preview" className="scroll-mt-16 rounded-3xl bg-white p-5 shadow-card">
             <h2 className="mb-3 font-bold text-gray-700">미리보기</h2>
             <ReportPreview key={selected.reportId} report={selected} />
           </section>
         )}
 
-        <section className="rounded-2xl border border-gray-200 p-4">
+        <section className="rounded-3xl bg-white p-5 shadow-card">
           <h2 className="mb-2 font-bold text-gray-700">이전에 만든 기록</h2>
           {reports.loading ? (
             <p className="py-4 text-center text-gray-400">불러오는 중…</p>
           ) : reports.error ? (
             <p className="py-4 text-center text-gray-400">
               목록을 불러오지 못했어요.{' '}
-              <button type="button" onClick={reports.reload} className="font-medium text-emerald-600 underline">
+              <button type="button" onClick={reports.reload} className="font-medium text-brand-600 underline">
                 다시 시도
               </button>
             </p>
@@ -202,7 +202,7 @@ export default function ReportPage() {
                           {report.includePhotos ? ' · 사진 포함' : ''}
                         </span>
                       </span>
-                      <span className="shrink-0 font-bold text-emerald-600">보기</span>
+                      <span className="shrink-0 font-bold text-brand-600">보기</span>
                     </button>
                   </li>
                 ))}
@@ -223,7 +223,7 @@ function RangeChip({ checked, onClick, children }: { checked: boolean; onClick: 
       role="radio"
       aria-checked={checked}
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-sm font-medium ${checked ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+      className={`rounded-full px-3 py-1.5 text-sm font-medium ${checked ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'}`}
     >
       {children}
     </button>

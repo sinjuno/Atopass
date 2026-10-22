@@ -70,11 +70,11 @@ export default function SkinConditionEditor({ value, onChange, painIndex }: Prop
                   aria-pressed={checked}
                   onClick={() => toggleSign(selected, sign)}
                   className={`flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left ${
-                    checked ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-gray-300 bg-white text-gray-700'
+                    checked ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-gray-300 bg-white text-gray-700'
                   }`}
                 >
                   <span className={`text-base ${checked ? 'font-semibold' : ''}`}>{SKIN_SIGN_LABELS[sign]}</span>
-                  <span className={`text-sm leading-snug ${checked ? 'text-emerald-700' : 'text-gray-500'}`}>
+                  <span className={`text-sm leading-snug ${checked ? 'text-brand-700' : 'text-gray-500'}`}>
                     {SKIN_SIGN_DESCRIPTIONS[sign]}
                   </span>
                 </button>

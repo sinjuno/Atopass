@@ -211,6 +211,7 @@ public class ChatbotService {
 		Optional<ModelOutput> parsed = replyParser.parse(raw);
 
 		boolean understood = false;
+		boolean explain = false;
 		String reply = null;
 		boolean finished = false;
 		if (parsed.isPresent() && parsed.get().understood()) {
@@ -220,6 +221,7 @@ public class ChatbotService {
 					understood = true;
 					reply = output.reply();
 					finished = output.finished();
+					explain = output.explain() && output.reply() != null;
 					draft.markFollowUp(output.followUp() && output.reply() != null);
 				}
 				case INVALID_SCORE -> reply = SCORE_OUT_OF_RANGE;
@@ -243,6 +245,9 @@ public class ChatbotService {
 			reply = completion(draft, reply);
 		} else if (readyForConfirmation) {
 			reply = reply == null || reply.isBlank() ? NO_CHANGE : reply;
+		} else if (explain) {
+			// 용어 설명은 기록을 바꾸지 않으므로, 설명 뒤에 원래 묻던 질문을 이어서 한다.
+			reply = reply + "\n\n" + question(draft);
 		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
 			reply = question(draft);
 		}

@@ -73,6 +73,9 @@ export function useChatSession(recordDate: string) {
   // 한도에 도달해도 대화 내역·초안 조회는 되므로 status는 그대로 두고 안내만 띄운다
   const [limitReached, setLimitReached] = useState(false);
   const startedRef = useRef(false);
+  // 저장 전(null)에서 저장됨으로 막 바뀐 순간만 완료 축하 화면을 띄운다. 이미 저장된 대화를 불러온 것은 포함하지 않는다.
+  const recordIdRef = useRef<number | null>(null);
+  const [justCompleted, setJustCompleted] = useState(false);
 
   /**
    * 서버가 이 날짜에 이어 쓸 세션을 정한다 — 열려 있던 대화는 그대로, 저장된 기록이 있으면 그 기록을 고치는 세션.
@@ -92,6 +95,7 @@ export function useChatSession(recordDate: string) {
       setAskingField(state.askingField);
       setRequiresConfirmation(state.requiresConfirmation);
       setRecordId(state.recordId);
+      recordIdRef.current = state.recordId;
       setChatDraft(state.draft);
       setStatus('ready');
     },
@@ -155,6 +159,8 @@ export function useChatSession(recordDate: string) {
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
         setRequiresConfirmation(res.requiresConfirmation);
+        if (recordIdRef.current === null && res.recordId !== null) setJustCompleted(true);
+        recordIdRef.current = res.recordId;
         setRecordId(res.recordId);
         setChatDraft(res.draft);
         setStatus('ready');
@@ -261,5 +267,7 @@ export function useChatSession(recordDate: string) {
     uploadPhotos,
     agree,
     retry: start,
+    justCompleted,
+    dismissCompletion: useCallback(() => setJustCompleted(false), []),
   };
 }

@@ -103,28 +103,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center p-6">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center bg-[#f5f5f5] p-6">
       <div className="mb-8 text-center">
-        <p className="text-3xl font-extrabold text-emerald-600">Atopass</p>
+        <p className="text-3xl font-extrabold text-brand-600">Atopass</p>
         <p className="mt-2 text-gray-500">매일의 피부 기록을 쉽고 꾸준하게</p>
       </div>
 
-      <div role="tablist" aria-label="로그인 또는 회원가입" className="mb-6 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
-        {(['login', 'signup'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={mode === tab}
-            onClick={() => switchMode(tab)}
-            className={`rounded-lg py-2.5 font-bold ${mode === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-          >
-            {tab === 'login' ? '로그인' : '회원가입'}
-          </button>
-        ))}
-      </div>
+      <div className="rounded-3xl bg-white p-6 shadow-card">
+        <div role="tablist" aria-label="로그인 또는 회원가입" className="mb-6 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
+          {(['login', 'signup'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={mode === tab}
+              onClick={() => switchMode(tab)}
+              className={`rounded-lg py-2.5 font-bold ${mode === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+            >
+              {tab === 'login' ? '로그인' : '회원가입'}
+            </button>
+          ))}
+        </div>
 
-      <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
         {isSignup && (
           <TextField
             label="닉네임"
@@ -164,7 +165,7 @@ export default function LoginPage() {
         )}
 
         {notice && (
-          <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-emerald-700">
+          <p role="status" className="rounded-xl bg-brand-50 px-4 py-3 text-brand-700">
             {notice}
           </p>
         )}
@@ -177,11 +178,12 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-xl bg-emerald-600 py-3 text-lg font-bold text-white disabled:opacity-60"
+          className="mt-2 rounded-3xl bg-brand-600 py-3.5 text-lg font-bold text-white disabled:opacity-60"
         >
           {submitting ? '처리 중…' : isSignup ? '가입하고 시작하기' : '로그인'}
         </button>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

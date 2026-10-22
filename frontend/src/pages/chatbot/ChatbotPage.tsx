@@ -4,6 +4,7 @@ import ChatChoices from '@/components/chatbot/ChatChoices';
 import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
+import RecordCompleteOverlay from '@/components/chatbot/RecordCompleteOverlay';
 import PageHeader from '@/components/common/PageHeader';
 import BodyMapSummary from '@/components/record/BodyMapSummary';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
@@ -37,14 +38,23 @@ export default function ChatbotPage() {
     uploadPhotos,
     agree,
     retry,
+    justCompleted,
+    dismissCompletion,
   } = useChatSession(recordDate);
   const draft = useRecordDraft(recordDate);
   const [input, setInput] = useState('');
   const [photoError, setPhotoError] = useState<string | null>(null);
   // 답할 때마다 늘려서 선택지를 새로 만든다 — 다음 질문의 선택지가 다시 아래에서 올라오게
   const [choiceRound, setChoiceRound] = useState(0);
+  // 선택지를 내려 두면 글로 답할 수 있고, 펼쳐 두면 선택지로만 답한다
+  const [choicesMinimized, setChoicesMinimized] = useState(false);
 
   const goToSummary = () => navigate(recordPath(recordDate));
+
+  const handleConfirmComplete = () => {
+    dismissCompletion();
+    goToSummary();
+  };
 
   // 서버가 정한 항목(askingField)을 선택지로 묻는다. 부위·증상 점수(symptoms)는 글로 답한다.
   // 첫 화면에서는 고통 지수 막대와 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
@@ -52,7 +62,7 @@ export default function ChatbotPage() {
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
-  const textLocked = started && choiceField !== null && choiceField !== 'notes';
+  const textLocked = started && choiceField !== null && choiceField !== 'notes' && !choicesMinimized;
 
   // 가장 최근의 일일 총정리(저장·수정 안내) 말풍선 아래에, 부위마다 나타난 증상 개수만큼 칠한 마네킹을 붙인다.
   // 저장한 뒤에는 고칠 때마다 바로 다시 저장하므로, 지금 초안이 곧 저장된 기록이다
@@ -106,7 +116,7 @@ export default function ChatbotPage() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-[#f5f5f5]">
       <PageHeader
         title="오늘의 기록"
         right={<span className="text-base text-gray-500">{formatKoreanDate(recordDate)}</span>}
@@ -140,6 +150,7 @@ export default function ChatbotPage() {
           field={choiceField}
           onChoose={(c) => void handleChoose(c)}
           skinSigns={chatDraft?.skinSigns ?? []}
+          onMinimizedChange={setChoicesMinimized}
         />
       )}
 
@@ -174,6 +185,7 @@ export default function ChatbotPage() {
       />
 
       {status === 'consent' && <ConsentDialog onAgree={agree} onDecline={goToSummary} error={error} />}
+      {justCompleted && <RecordCompleteOverlay onConfirm={handleConfirmComplete} onContinue={dismissCompletion} />}
     </div>
   );
 }

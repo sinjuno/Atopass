@@ -89,7 +89,7 @@ function TriState<T extends string | boolean>({
             aria-pressed={selected}
             onClick={() => onChange(selected ? null : o.value)}
             className={`rounded-full border px-3 py-1.5 text-base ${
-              selected ? 'border-emerald-600 bg-emerald-50 font-semibold text-emerald-700' : 'border-gray-300 text-gray-600'
+              selected ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 text-gray-600'
             }`}
           >
             {o.label}

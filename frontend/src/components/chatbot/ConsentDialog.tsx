@@ -48,7 +48,7 @@ export default function ConsentDialog({ onAgree, onDecline, error }: Props) {
             type="button"
             onClick={() => void handleAgree()}
             disabled={submitting}
-            className="rounded-xl bg-emerald-600 py-3 text-lg font-bold text-white disabled:bg-gray-300"
+            className="rounded-xl bg-brand-600 py-3 text-lg font-bold text-white disabled:bg-gray-300"
           >
             {submitting ? '저장 중…' : '동의하고 시작하기'}
           </button>

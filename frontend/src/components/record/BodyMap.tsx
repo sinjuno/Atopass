@@ -10,6 +10,8 @@ interface Props {
   selected?: BodyPart | readonly BodyPart[] | null;
   /** 부위를 눌렀을 때 */
   onSelect: (part: BodyPart) => void;
+  /** 마네킹 가로 최대 크기(px). 기본 190 */
+  maxWidth?: number;
 }
 
 /**
@@ -74,7 +76,7 @@ const DECORATION = { fill: '#f3f4f6', stroke: '#d1d5db', strokeWidth: 1.5 };
  * 부위 색은 나타난 증상이 많을수록 붉다(0개는 하얀색, 7개는 새빨간색, 기록 없음은 회색).
  * 부위를 누르면 고른다. 팔·다리·손·발·목은 앞뒤 어느 쪽을 눌러도 같은 부위다.
  */
-export default function BodyMap({ counts, selected, onSelect }: Props) {
+export default function BodyMap({ counts, selected, onSelect, maxWidth = 190 }: Props) {
   const [side, setSide] = useState<Side>('front');
   const selectedParts: readonly BodyPart[] = selected == null ? [] : typeof selected === 'string' ? [selected] : selected;
   const renderPart = (part: BodyPart, side: 'front' | 'back') => {
@@ -128,7 +130,8 @@ export default function BodyMap({ counts, selected, onSelect }: Props) {
 
       <svg
         viewBox="0 0 200 400"
-        className="h-auto w-full max-w-[190px]"
+        className="h-auto w-full"
+        style={{ maxWidth }}
         role="group"
         aria-label={`부위별 증상 마네킹 ${SIDE_LABELS[side]}모습`}
       >

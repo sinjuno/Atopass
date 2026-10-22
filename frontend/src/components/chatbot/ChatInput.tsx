@@ -22,11 +22,11 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t border-gray-200 bg-white p-3">
+    <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t border-gray-200 bg-white px-3 py-2">
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="shrink-0 rounded-full border border-gray-300 px-3 py-2 text-base text-gray-600"
+        className="shrink-0 rounded-full bg-gray-100 px-3.5 py-2.5 text-base text-gray-600"
         aria-label="사진 추가"
       >
         사진
@@ -48,8 +48,8 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
         maxLength={CHAT_MESSAGE_MAX_LENGTH}
         rows={1}
         disabled={textLocked}
-        placeholder={textLocked ? '위 선택지에서 골라 주세요' : '피부 상태를 말해 주세요'}
-        className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-gray-300 px-4 py-2 text-base focus:border-emerald-500 focus:outline-none disabled:bg-gray-100"
+        placeholder={textLocked ? '위 선택지에서 골라 주세요 (접으면 글로도 답할 수 있어요)' : '피부 상태를 말해 주세요'}
+        className="max-h-32 min-h-11 flex-1 resize-none rounded-3xl border-0 bg-gray-100 px-4 py-2.5 text-base focus:ring-2 focus:ring-brand-300 focus:outline-none disabled:opacity-60"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) handleSubmit(e);
         }}
@@ -57,7 +57,7 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
       <button
         type="submit"
         disabled={!trimmed || disabled || textLocked}
-        className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-base font-semibold text-white disabled:bg-gray-300"
+        className="shrink-0 rounded-full bg-brand-600 px-4 py-2 text-base font-semibold text-white disabled:bg-gray-300"
       >
         보내기
       </button>

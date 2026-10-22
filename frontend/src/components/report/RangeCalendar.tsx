@@ -78,7 +78,7 @@ export default function RangeCalendar({ value, onChange, max }: Props) {
           const isEdge = date === start || date === end;
           const inRange = !!start && !!end && date > start && date < end;
           return (
-            <li key={date} className={inRange ? 'bg-emerald-50' : undefined}>
+            <li key={date} className={inRange ? 'bg-brand-50' : undefined}>
               <button
                 type="button"
                 disabled={date > max}
@@ -86,7 +86,7 @@ export default function RangeCalendar({ value, onChange, max }: Props) {
                 aria-pressed={isEdge || inRange}
                 aria-label={date}
                 className={`mx-auto flex size-10 items-center justify-center rounded-full disabled:text-gray-200 ${
-                  isEdge ? 'bg-emerald-600 font-bold text-white' : inRange ? 'text-emerald-800' : 'text-gray-800'
+                  isEdge ? 'bg-brand-600 font-bold text-white' : inRange ? 'text-brand-800' : 'text-gray-800'
                 }`}
               >
                 {Number(date.slice(-2))}

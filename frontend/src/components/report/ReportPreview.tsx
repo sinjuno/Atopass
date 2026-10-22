@@ -66,7 +66,7 @@ export default function ReportPreview({ report }: { report: Report }) {
             >
               새 창에서 보기
             </a>
-            <a href={objectUrl} download={fileName} className="rounded-xl bg-emerald-600 py-3 text-center font-bold text-white">
+            <a href={objectUrl} download={fileName} className="rounded-xl bg-brand-600 py-3 text-center font-bold text-white">
               PDF 다운로드
             </a>
           </div>

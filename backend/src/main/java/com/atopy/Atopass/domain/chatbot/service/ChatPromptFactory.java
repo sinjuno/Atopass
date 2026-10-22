@@ -95,6 +95,8 @@ class ChatPromptFactory {
 			   "{부위}의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?" (예: "얼굴의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
 			   부위를 여러 개 말했다면 한 번에 하나씩 차례로 묻습니다. 증상만 말하고 부위를 말하지 않았다면 증상은 skinSigns에 넣고 부위는 묻지 않습니다.
 			9. reply가 부위나 부위의 고통 점수를 되묻는 질문이면 followUp을 true로 합니다. 그 밖의 항목은 앱이 묻으므로 followUp은 false입니다.
+			10. 사용자가 증상이나 용어의 뜻을 물으면(예: "태선화가 뭐야?") [증상 목록]의 쉬운 말을 바탕으로 한두 문장으로 쉽게 설명하고,
+			    updates는 비우고 explain을 true로 합니다. 설명 뒤에 질문은 덧붙이지 않습니다(앱이 이어서 묻습니다). 진단이나 치료 조언은 하지 않습니다.
 
 			[출력 형식]
 			설명이나 코드블록 없이 아래 형태의 JSON 객체 하나만 출력합니다.
@@ -102,6 +104,8 @@ class ChatPromptFactory {
 			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false, "followUp": false}
 			부위 기록은 conditions에 부위, 고통 점수, 그 부위의 증상을 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위의 고통 점수로 넣습니다.
 			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "pain": 8, "skinSigns": ["ITCHING", "ERYTHEMA"]}]}, "finished": false, "followUp": false}
+			용어의 뜻을 물었을 때는 이렇게 답합니다.
+			{"understood": true, "reply": "태선화는 오래 긁어서 피부가 두꺼워지고 거칠어지는 것을 말해요.", "updates": {}, "finished": false, "followUp": false, "explain": true}
 			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields(),
 				draft.editing() ? EDITING_GUIDE : "");
 	}

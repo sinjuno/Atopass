@@ -21,7 +21,7 @@ export default function TextField({ label, error, hint, ...inputProps }: Props) 
         aria-invalid={!!error}
         aria-describedby={describedBy}
         className={`w-full rounded-xl border bg-white px-4 py-3 text-base outline-none focus:ring-2 ${
-          error ? 'border-red-300 focus:ring-red-100' : 'border-gray-300 focus:border-emerald-500 focus:ring-emerald-100'
+          error ? 'border-red-300 focus:ring-red-100' : 'border-gray-200 focus:border-brand-500 focus:ring-brand-100'
         }`}
         {...inputProps}
       />

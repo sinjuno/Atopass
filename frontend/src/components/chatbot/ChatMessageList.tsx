@@ -63,7 +63,7 @@ function ChatBubble({
       {!isUser && <AtomiAvatar mood={mood} />}
       <p
         className={`max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-base leading-relaxed ${
-          isUser ? 'rounded-br-sm bg-emerald-600 text-white' : 'rounded-bl-sm bg-gray-100 text-gray-900'
+          isUser ? 'rounded-br-sm bg-brand-100 text-gray-900' : 'rounded-bl-sm bg-brand-50 text-gray-900'
         }`}
       >
         {children}

@@ -16,7 +16,7 @@ export default function SleepHoursSlider({ value, onChange, disabled }: Props) {
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between">
         <p className="text-sm text-gray-500">수면 시간 · 어젯밤 잔 시간</p>
-        <span className={value === null ? 'text-base text-gray-400' : 'text-lg font-bold text-emerald-700'} aria-hidden>
+        <span className={value === null ? 'text-base text-gray-400' : 'text-lg font-bold text-brand-700'} aria-hidden>
           {value === null ? '기록 없음' : `${value}시간`}
         </span>
       </div>
@@ -30,7 +30,7 @@ export default function SleepHoursSlider({ value, onChange, disabled }: Props) {
         disabled={disabled}
         aria-label="수면 시간"
         aria-valuetext={value === null ? '기록 없음' : `${value}시간`}
-        className="h-11 w-full accent-emerald-600"
+        className="h-11 w-full accent-brand-600"
       />
       <div className="flex justify-between px-1 text-xs text-gray-400" aria-hidden>
         {CHAT_SLEEP_HOURS_OPTIONS.map((h) => (

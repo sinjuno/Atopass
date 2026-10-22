@@ -47,14 +47,14 @@ export default function VisitCard() {
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 p-4">
+    <section className="rounded-3xl bg-white p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-bold text-gray-700">피부과 재진</h2>
         <button
           type="button"
           onClick={() => setEditing((v) => !v)}
           aria-expanded={editing}
-          className="rounded-lg px-2 py-1 text-sm font-semibold text-emerald-700"
+          className="rounded-lg px-2 py-1 text-sm font-semibold text-brand-700"
         >
           {editing ? '닫기' : '날짜 기록'}
         </button>
@@ -65,7 +65,7 @@ export default function VisitCard() {
       ) : visits.error ? (
         <p className="text-gray-400">
           재진 날짜를 불러오지 못했어요.{' '}
-          <button type="button" onClick={visits.reload} className="font-medium text-emerald-600 underline">
+          <button type="button" onClick={visits.reload} className="font-medium text-brand-600 underline">
             다시 시도
           </button>
         </p>
@@ -73,7 +73,7 @@ export default function VisitCard() {
         <>
           {nextVisit && days !== null ? (
             <p className="flex items-center gap-3">
-              <span className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xl font-bold text-white">{dDayLabel(days)}</span>
+              <span className="rounded-xl bg-brand-600 px-3 py-1.5 text-xl font-bold text-white">{dDayLabel(days)}</span>
               <span>
                 <span className="block text-sm text-gray-500">{days === 0 ? '오늘 재진이에요' : '다음 재진까지'}</span>
                 <span className="block font-semibold">{formatKoreanDate(nextVisit)}</span>
@@ -94,12 +94,12 @@ export default function VisitCard() {
               aria-label="재진 날짜"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2.5"
+              className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
             />
             <button
               type="submit"
               disabled={!date || saving}
-              className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white disabled:opacity-50"
+              className="shrink-0 rounded-xl bg-brand-600 px-4 py-2.5 font-bold text-white disabled:opacity-50"
             >
               {saving ? '저장 중…' : '저장'}
             </button>

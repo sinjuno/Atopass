@@ -19,7 +19,7 @@ export default function PeriodInsights({ insights }: { insights: Insight[] }) {
   if (insights.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-gray-200">
+    <section className="rounded-3xl bg-white shadow-card">
       <button
         type="button"
         aria-expanded={open}
@@ -27,7 +27,7 @@ export default function PeriodInsights({ insights }: { insights: Insight[] }) {
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
         <span className="font-bold text-gray-700">
-          이 기간에 눈에 띈 변화 <span className="text-emerald-700">{insights.length}</span>
+          이 기간에 눈에 띈 변화 <span className="text-brand-700">{insights.length}</span>
         </span>
         <span aria-hidden className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}>
           ▾

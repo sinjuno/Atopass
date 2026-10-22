@@ -79,7 +79,7 @@ function RecordSummary({ date }: { date: string }) {
           }
         />
         {message && (
-          <p role="status" className="bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+          <p role="status" className="bg-brand-50 px-4 py-2 text-sm text-brand-700">
             {message}
           </p>
         )}
@@ -244,7 +244,7 @@ function RecordSummary({ date }: { date: string }) {
           type="button"
           onClick={() => void handleSave()}
           disabled={saving}
-          className="rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white disabled:bg-gray-300"
+          className="rounded-3xl bg-brand-600 py-4 text-lg font-bold text-white shadow-[0_8px_20px_rgba(76,116,224,0.28)] disabled:bg-gray-300 disabled:shadow-none"
         >
           {saving ? '저장 중…' : mode === 'edit' ? '수정 내용 저장' : '확인하고 저장'}
         </button>
