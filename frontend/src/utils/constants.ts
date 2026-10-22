@@ -80,6 +80,21 @@ export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
 
+/** 0~10점 막대를 누르고 있는 동안 보여 줄 점수별 단계와 예시 (인덱스 = 점수) */
+export const ITCH_SCALE: { stage: string; example: string }[] = [
+  { stage: '가려움 없음', example: '가려움이 전혀 느껴지지 않아요.' },
+  { stage: '거의 없음', example: '가끔 피부가 의식되지만 긁고 싶지는 않아요.' },
+  { stage: '매우 약함', example: '조금 가렵지만 신경 쓰이지 않고 일상생활에 지장이 없어요.' },
+  { stage: '약함', example: '가려움이 느껴지지만 다른 일에 집중하면 잊을 수 있어요.' },
+  { stage: '약간 불편함', example: '가끔 긁고 싶고, 무의식적으로 피부를 만지게 돼요.' },
+  { stage: '중간 정도', example: '가려움이 자주 신경 쓰이고, 집중할 때 방해가 돼요.' },
+  { stage: '꽤 심함', example: '가려움을 참기 어렵고, 하던 일을 잠시 멈추고 긁게 돼요.' },
+  { stage: '심함', example: '공부나 업무에 집중하기 어렵고, 가려움 때문에 자주 중단해요.' },
+  { stage: '매우 심함', example: '가려움이 계속 신경 쓰여 다른 일에 집중하기 매우 어려워요.' },
+  { stage: '극심함', example: '가려움을 견디기 매우 힘들고, 일상생활을 유지하기 어려울 정도예요.' },
+  { stage: '상상할 수 있는 최악', example: '지금까지 경험한 가려움 중 가장 심한 수준으로, 견디기 극도로 힘들어요.' },
+];
+
 /** 나타난 증상 7가지 — 이 순서로 보여 준다 (1 홍반 … 7 가려움). 서버 SkinSign 선언 순서와 같다 */
 export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   ERYTHEMA: '홍반',
