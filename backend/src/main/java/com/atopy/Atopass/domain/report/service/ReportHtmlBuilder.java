@@ -340,6 +340,7 @@ class ReportHtmlBuilder {
 			table.header { margin-top: 0; }
 			table.header td { vertical-align: top; padding: 0; }
 			td.header-chart { width: 214pt; padding-left: 10pt; }
+			table.header table.meta th { width: 40%; }
 			.chart-box { border: 1px solid #c8d0dc; padding: 5pt 6pt 4pt 6pt; }
 			.chart-title { font-size: 8.5pt; color: #1f3a5f; margin: 0 0 3pt 0; }
 			table.chart { margin-top: 0; }
