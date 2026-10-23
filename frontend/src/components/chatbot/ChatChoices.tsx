@@ -11,6 +11,7 @@ import {
   CHAT_SLEEP_HOURS_DEFAULT,
   PAIN_INDEX_MIN,
   PENDING_FIELD_LABELS,
+  PHOTO_ACCEPT,
   SKIN_SIGN_DESCRIPTIONS,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
@@ -23,6 +24,8 @@ interface Props {
   skinSigns?: SkinSign[];
   /** 선택지를 내려 두면 true. 호출부가 글 입력을 열고 닫는 데 쓴다 */
   onMinimizedChange?: (minimized: boolean) => void;
+  /** 상황 질문(P01)의 "사진도 남기기" 버튼 — ChatInput의 첨부 버튼과 같은 곳에 쌓인다 */
+  onAttachPhotos?: (files: File[]) => void;
 }
 
 const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
@@ -37,7 +40,7 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
  * 사용자도 손잡이를 아래로 끌거나 눌러 내려 둘 수 있고, 내려 둔 탭을 위로 끌거나 눌러 다시 올릴 수 있다.
  * 다음 질문의 선택지는 호출부가 key를 바꿔 다시 만들어 올라오게 한다.
  */
-export default function ChatChoices({ field, onChoose, disabled, skinSigns, onMinimizedChange }: Props) {
+export default function ChatChoices({ field, onChoose, disabled, skinSigns, onMinimizedChange, onAttachPhotos }: Props) {
   // open: 올라와 있음 · hiding: 사용자가 내리는 중 · minimized: 내려 둠 · closing: 답을 골라 내려가는 중
   const [mode, setMode] = useState<'open' | 'hiding' | 'minimized' | 'closing'>('open');
   const [closed, setClosed] = useState(false);
@@ -105,7 +108,14 @@ export default function ChatChoices({ field, onChoose, disabled, skinSigns, onMi
         </SheetHandle>
         <div className="min-h-0 overflow-y-auto px-3 pb-3">
           {/* 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다 */}
-          <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || mode !== 'open'} skinSigns={skinSigns} />
+          <ChoiceBody
+            key={field}
+            field={field}
+            onChoose={pick}
+            disabled={disabled || mode !== 'open'}
+            skinSigns={skinSigns}
+            onAttachPhotos={onAttachPhotos}
+          />
         </div>
       </div>
     </>
@@ -162,13 +172,16 @@ function SheetHandle({
   );
 }
 
-function ChoiceBody({ field, onChoose, disabled, skinSigns = [] }: Props) {
+function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos }: Props) {
   const [painIndex, setPainIndex] = useState(PAIN_INDEX_MIN);
   const [parts, setParts] = useState<BodyPart[]>([]);
   const [sleepHours, setSleepHours] = useState(CHAT_SLEEP_HOURS_DEFAULT);
   const [signs, setSigns] = useState<SkinSign[]>([]);
+  const [c02, setC02] = useState<{ productNote?: string; unusualNote?: string; clinicQuestion?: string }>({});
+  const photoRef = useRef<HTMLInputElement>(null);
 
-  const skip = field !== 'painIndex' && field !== 'bodyParts' && field !== 'notes' && field !== 'signImage' && (
+  const skip = field !== 'painIndex' && field !== 'bodyParts' && field !== 'notes' && field !== 'signImage'
+    && field !== 'C02' && (
     <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled} subtle>
       넘어가기
     </ChoiceButton>
@@ -306,6 +319,93 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [] }: Props) {
           </ChoiceButton>
         </div>
       );
+    case 'P01':
+      // 고통 지수가 어제보다 많이 오른 날만 나오는 상황 질문. 사진도 바로 붙일 수 있게 둔다.
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2" role="group" aria-label="고통 지수가 언제부터 심해졌는지">
+            <ChoiceButton onClick={() => onChoose({ field, value: 'TODAY' })} disabled={disabled} wide>
+              오늘
+            </ChoiceButton>
+            <ChoiceButton onClick={() => onChoose({ field, value: 'SINCE_YESTERDAY' })} disabled={disabled} wide>
+              어제부터
+            </ChoiceButton>
+            <ChoiceButton onClick={() => onChoose({ field, value: 'FEW_DAYS_AGO' })} disabled={disabled} wide>
+              2~3일 전
+            </ChoiceButton>
+          </div>
+          <div className="flex gap-2">
+            <ChoiceButton onClick={() => photoRef.current?.click()} disabled={disabled || !onAttachPhotos} subtle wide>
+              사진도 남기기
+            </ChoiceButton>
+            {skip}
+          </div>
+          <input
+            ref={photoRef}
+            type="file"
+            accept={PHOTO_ACCEPT.join(',')}
+            multiple
+            hidden
+            onChange={(e) => {
+              onAttachPhotos?.(Array.from(e.target.files ?? []));
+              e.target.value = '';
+            }}
+          />
+        </div>
+      );
+    case 'C02': {
+      // 매일 특이사항 다음에 묻는 마무리 질문. 고른 항목만 보내고, "없어요"는 아무것도 저장하지 않는다.
+      const items: Array<{
+        key: 'productNote' | 'unusualNote' | 'clinicQuestion';
+        label: string;
+        placeholder: string;
+      }> = [
+        { key: 'productNote', label: '새로 쓴 제품', placeholder: '예: 새 보습제' },
+        { key: 'unusualNote', label: '평소와 다른 일', placeholder: '예: 늦게 잤어요' },
+        { key: 'clinicQuestion', label: '진료 때 물어볼 것', placeholder: '예: 이 연고 계속 써도 될까요?' },
+      ];
+      const toggle = (key: 'productNote' | 'unusualNote' | 'clinicQuestion') =>
+        setC02((prev) => {
+          const next = { ...prev };
+          if (key in next) delete next[key];
+          else next[key] = '';
+          return next;
+        });
+      const hasAny = Object.keys(c02).length > 0;
+      return (
+        <div className="flex flex-col gap-2">
+          {items.map(({ key, label, placeholder }) => {
+            const checked = key in c02;
+            return (
+              <label key={key} className="flex flex-col gap-1 rounded-xl border border-gray-300 bg-white px-3 py-2">
+                <span className="flex items-center gap-2">
+                  <input type="checkbox" checked={checked} onChange={() => toggle(key)} disabled={disabled} />
+                  <span className="text-base text-gray-800">{label}</span>
+                </span>
+                {checked && (
+                  <input
+                    type="text"
+                    value={c02[key] ?? ''}
+                    onChange={(e) => setC02((prev) => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    disabled={disabled}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-base"
+                  />
+                )}
+              </label>
+            );
+          })}
+          <div className="flex gap-2">
+            <ChoiceButton onClick={() => onChoose({ field, value: c02 })} disabled={disabled || !hasAny} primary wide>
+              적어 둘게요
+            </ChoiceButton>
+            <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled}>
+              없어요
+            </ChoiceButton>
+          </div>
+        </div>
+      );
+    }
   }
 }
 

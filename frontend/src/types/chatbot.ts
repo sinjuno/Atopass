@@ -19,7 +19,11 @@ export type PendingField =
   | 'medication'
   | 'skinSigns'
   | 'notes'
-  | 'signImage';
+  | 'signImage'
+  /** 상황 질문. 조건에 맞을 때만, 수면 시간 다음~특이사항 앞에 하루 1개 나온다 */
+  | 'P01'
+  /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
+  | 'C02';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -71,6 +75,10 @@ export type ChatChoiceRequest =
   | { field: 'skinSigns'; value: SkinSign[] }
   /** 증상 예시 사진을 보여 줄지 */
   | { field: 'signImage'; value: boolean }
+  /** 상황 질문(P01) 답 — 고통 지수가 언제부터 심해졌는지 */
+  | { field: 'P01'; value: 'TODAY' | 'SINCE_YESTERDAY' | 'FEW_DAYS_AGO' }
+  /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
+  | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */
   | { field: Exclude<ChoiceField, 'painIndex'>; skip: true };
 

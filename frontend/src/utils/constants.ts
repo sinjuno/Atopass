@@ -145,6 +145,8 @@ export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   skinSigns: '나타난 증상',
   notes: '특이사항',
   signImage: '예시 사진',
+  P01: '상황 질문',
+  C02: '마무리 질문',
 };
 
 /** 챗봇 이용 동의 팝업 문구 */

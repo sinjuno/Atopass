@@ -27,7 +27,8 @@ const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
 export function choiceText(choice: ChatChoiceRequest): string {
   if ('skip' in choice) {
     if (choice.field === 'signImage') return '괜찮아요';
-    return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
+    if (choice.field === 'notes' || choice.field === 'bodyParts' || choice.field === 'C02') return '없어요';
+    return '넘어갈게요';
   }
   switch (choice.field) {
     case 'signImage':
@@ -49,6 +50,10 @@ export function choiceText(choice: ChatChoiceRequest): string {
             .sort((a, b) => SKIN_SIGN_ORDER.indexOf(a) - SKIN_SIGN_ORDER.indexOf(b))
             .map((sign) => SKIN_SIGN_LABELS[sign])
             .join(', ');
+    case 'P01':
+      return { TODAY: '오늘', SINCE_YESTERDAY: '어제부터', FEW_DAYS_AGO: '2~3일 전' }[choice.value];
+    case 'C02':
+      return '적어 둘게요';
   }
 }
 
