@@ -12,21 +12,29 @@ import com.atopy.Atopass.domain.chatbot.entity.ChatRole;
 import com.atopy.Atopass.domain.chatbot.llm.ChatModelClient;
 import com.atopy.Atopass.domain.chatbot.llm.ChatTurn;
 import com.atopy.Atopass.domain.chatbot.llm.LlmProperties;
+import com.atopy.Atopass.domain.chatbot.entity.SituationalQuestionLog;
+import com.atopy.Atopass.domain.chatbot.repository.SituationalQuestionLogRepository;
 import com.atopy.Atopass.domain.chatbot.service.ChatReplyParser.ModelOutput;
 import com.atopy.Atopass.domain.chatbot.service.ChatSessionService.TurnContext;
+import com.atopy.Atopass.domain.member.repository.MemberRepository;
 import com.atopy.Atopass.domain.record.dto.request.RecordRequest;
 import com.atopy.Atopass.domain.record.dto.response.RecordCreatedResponse;
+import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
+import com.atopy.Atopass.domain.record.repository.RecordRepository;
 import com.atopy.Atopass.global.exception.BusinessException;
 import com.atopy.Atopass.global.exception.ErrorCode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -71,10 +79,19 @@ public class ChatbotService {
 	static final String EDIT_RESUME = "바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요.";
 	/** 증상 예시 사진을 보여 줄지 묻는 항목. 기록 값이 아니라 사진을 보여 줄지에 대한 답이다. */
 	static final String SIGN_IMAGE = "signImage";
+	/** 상황 질문. 지금은 P01 하나뿐이고, PR 2·3이 P02~P07을 추가할 때 이 집합에 더한다. */
+	private static final String P01 = "P01";
+	private static final Set<String> SITUATIONAL_FIELDS = Set.of(P01);
+	private static final Set<String> P01_ANSWERS = Set.of("TODAY", "SINCE_YESTERDAY", "FEW_DAYS_AGO");
+	private static final Map<String, String> P01_ANSWER_LABELS =
+		Map.of("TODAY", "오늘", "SINCE_YESTERDAY", "어제부터", "FEW_DAYS_AGO", "2~3일 전");
+	/** 마무리 질문. 매일, 특이사항 다음에 묻는다. */
+	private static final String C02 = "C02";
+	private static final int MAX_SITUATIONAL_NOTE_LENGTH = 200;
 
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
 	private static final Set<String> CHOICE_FIELDS =
-		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE);
+		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE, P01, C02);
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -85,6 +102,11 @@ public class ChatbotService {
 	private final JsonMapper jsonMapper;
 	private final LlmProperties llmProperties;
 	private final SkinSignImages skinSignImages;
+	private final SituationalQuestionSelector situationalQuestionSelector;
+	private final SituationalAnswerService situationalAnswerService;
+	private final SituationalQuestionLogRepository situationalQuestionLogRepository;
+	private final RecordRepository recordRepository;
+	private final MemberRepository memberRepository;
 
 	public ChatSessionResponse createSession(Long memberId, ChatMode mode) {
 		consentService.requireConsent(memberId);
@@ -108,7 +130,7 @@ public class ChatbotService {
 			draft.clearOffer();
 			Optional<SkinSign> asked = SkinSignQuestion.detect(userText);
 			if (asked.isPresent()) {
-				return signQuestionTurn(context, draft, userText, asked.get());
+				return signQuestionTurn(context, draft, userText, asked.get(), memberId);
 			}
 		}
 
@@ -120,7 +142,7 @@ public class ChatbotService {
 		Optional<ModelOutput> localMatch = context.mode() == ChatMode.RECORD && draft.editing()
 			? localEditParser.parse(userText) : Optional.empty();
 		if (localMatch.isPresent()) {
-			outcome = recordOutcome(context, draft, localMatch);
+			outcome = recordOutcome(context, draft, localMatch, memberId);
 		} else {
 			// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
 			requireWithinDailyLimit(memberId);
@@ -129,7 +151,7 @@ public class ChatbotService {
 				: promptFactory.queryPrompt(context.queryContext(), context.today());
 			String raw = modelClient.complete(systemPrompt, withUserMessage(context.history(), userText));
 			outcome = context.mode() == ChatMode.RECORD
-				? recordOutcome(context, draft, replyParser.parse(raw))
+				? recordOutcome(context, draft, replyParser.parse(raw), memberId)
 				: queryOutcome(context, raw);
 		}
 
@@ -152,7 +174,13 @@ public class ChatbotService {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "지금 고를 수 있는 항목이 아닙니다.");
 		}
 		if (SIGN_IMAGE.equals(field)) {
-			return imageTurn(context, draft, request);
+			return imageTurn(context, draft, request, memberId);
+		}
+		if (SITUATIONAL_FIELDS.contains(field)) {
+			return situationalTurn(context, draft, request, memberId);
+		}
+		if (C02.equals(field)) {
+			return c02Turn(context, draft, request, memberId);
 		}
 		ObjectNode updates = jsonMapper.createObjectNode();
 		if (request.skipped()) {
@@ -174,7 +202,7 @@ public class ChatbotService {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
 		}
 		draft.markFollowUp(false);
-		return choiceTurn(context, draft, choiceText(field, request.skipped(), draft.toResponse()), false);
+		return choiceTurn(context, draft, choiceText(field, request.skipped(), draft.toResponse()), false, memberId);
 	}
 
 	/** "기록 마치기" 버튼. 필수 항목이 채워졌으면 남은 선택 항목을 묻지 않고 확인 단계로 넘어간다. */
@@ -184,7 +212,7 @@ public class ChatbotService {
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
 		draft.markFollowUp(false);
 		draft.clearOffer();
-		return choiceTurn(context, draft, FINISH_TEXT, true);
+		return choiceTurn(context, draft, FINISH_TEXT, true, memberId);
 	}
 
 	private TurnContext loadRecordTurn(Long memberId, String sessionId) {
@@ -195,9 +223,10 @@ public class ChatbotService {
 		return context;
 	}
 
-	private ChatReplyResponse choiceTurn(TurnContext context, ChatDraft draft, String userText, boolean finished) {
+	private ChatReplyResponse choiceTurn(
+		TurnContext context, ChatDraft draft, String userText, boolean finished, Long memberId) {
 		boolean ready = draft.readyForConfirmation(finished);
-		String reply = ready ? completion(draft, null) : question(draft);
+		String reply = ready ? completion(draft, null) : question(draft, memberId, context.today());
 		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(),
 			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing(), context.recordId(), null);
 		Long recordId = sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, ready,
@@ -209,11 +238,12 @@ public class ChatbotService {
 	 * 증상 이름으로 뜻이나 모양을 물은 말. LLM을 부르지 않고 쉬운 말로 설명한 뒤, 예시 사진이 있으면 보여 줘도 되는지 묻는다.
 	 * 사진이 없으면 설명 뒤에 원래 묻던 질문을 이어서 한다. LLM을 부르지 않으므로 이용 한도에 세지 않는다.
 	 */
-	private ChatReplyResponse signQuestionTurn(TurnContext context, ChatDraft draft, String userText, SkinSign sign) {
+	private ChatReplyResponse signQuestionTurn(
+		TurnContext context, ChatDraft draft, String userText, SkinSign sign, Long memberId) {
 		if (skinSignImages.has(sign)) {
 			draft.offerImage(sign);
 		}
-		String reply = SkinSignQuestion.explanation(sign) + "\n\n" + nextQuestion(draft);
+		String reply = SkinSignQuestion.explanation(sign) + "\n\n" + nextQuestion(draft, memberId, context.today());
 		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(), draft.askingField(),
 			false, draft.toResponse(), draft.editing(), context.recordId(), null);
 		sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, false, true);
@@ -224,7 +254,8 @@ public class ChatbotService {
 	 * 증상 예시 사진을 보여 줄지에 대한 답. 보여 달라고 했을 때만 답에 사진을 붙이고, 이어서 원래 묻던 질문을 한다.
 	 * 사진을 묻느라 저장을 미뤄 둔 기록이면(마지막 답과 함께 증상을 물은 경우) 이때 저장한다.
 	 */
-	private ChatReplyResponse imageTurn(TurnContext context, ChatDraft draft, ChatChoiceRequest request) {
+	private ChatReplyResponse imageTurn(
+		TurnContext context, ChatDraft draft, ChatChoiceRequest request, Long memberId) {
 		if (!request.skipped() && !(request.value() instanceof Boolean)) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
 		}
@@ -234,7 +265,7 @@ public class ChatbotService {
 
 		String answer = show ? sign.label() + " 예시 사진이에요. " + IMAGE_NOTE : NO_IMAGE;
 		boolean ready = !draft.editing() && draft.readyForConfirmation(false);
-		String reply = answer + "\n\n" + (ready ? completion(draft, null) : nextQuestion(draft));
+		String reply = answer + "\n\n" + (ready ? completion(draft, null) : nextQuestion(draft, memberId, context.today()));
 		SkinSign imageSign = show ? sign : null;
 		ChatReplyResponse response = new ChatReplyResponse(reply, true, draft.pendingFields(),
 			ready ? null : draft.askingField(), ready, draft.toResponse(), draft.editing(), context.recordId(), imageSign);
@@ -244,12 +275,88 @@ public class ChatbotService {
 	}
 
 	/** 사진을 보여 줄지 묻는 중이면 그 질문을, 아니면 원래 묻던 질문을. 저장된 기록을 고치는 중이면 고칠 내용을 기다린다. */
-	private String nextQuestion(ChatDraft draft) {
+	private String nextQuestion(ChatDraft draft, Long memberId, LocalDate today) {
 		SkinSign offered = draft.offeredSign();
 		if (offered != null) {
 			return offered.label() + " 예시 사진을 보여 드려도 될까요? 실제 피부 사진이 나와요.";
 		}
-		return draft.editing() ? EDIT_RESUME : question(draft);
+		return draft.editing() ? EDIT_RESUME : question(draft, memberId, today);
+	}
+
+	/**
+	 * 상황 질문(P01 등) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
+	 * LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 */
+	private ChatReplyResponse situationalTurn(
+		TurnContext context, ChatDraft draft, ChatChoiceRequest request, Long memberId) {
+		if (request.skipped()) {
+			draft.resolveSituationalQuestion();
+			return choiceTurn(context, draft, "넘어갈게요", false, memberId);
+		}
+		String field = request.field();
+		if (!P01.equals(field) || !(request.value() instanceof String answer) || !P01_ANSWERS.contains(answer)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		situationalAnswerService.saveP01(memberId, context.recordDate(), answer);
+		draft.resolveSituationalQuestion();
+		return choiceTurn(context, draft, P01_ANSWER_LABELS.get(answer), false, memberId);
+	}
+
+	/**
+	 * 마무리 질문(C02) 답. "없어요"면 저장 없이 끝내고, 고른 항목의 글을 메인 기록과 별도로 저장한다.
+	 * 진료 때 물어볼 것은 재진 질문 목록에도 남긴다. LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 */
+	private ChatReplyResponse c02Turn(TurnContext context, ChatDraft draft, ChatChoiceRequest request, Long memberId) {
+		if (request.skipped()) {
+			draft.resolveC02();
+			return choiceTurn(context, draft, "없어요", false, memberId);
+		}
+		JsonNode value = jsonMapper.valueToTree(request.value());
+		String productNote = c02NoteOrNull(value.path("productNote"));
+		String unusualNote = c02NoteOrNull(value.path("unusualNote"));
+		String clinicQuestion = c02NoteOrNull(value.path("clinicQuestion"));
+		if (productNote == null && unusualNote == null && clinicQuestion == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 없습니다.");
+		}
+		situationalAnswerService.saveC02(memberId, context.recordDate(), productNote, unusualNote, clinicQuestion);
+		draft.resolveC02();
+		return choiceTurn(context, draft, "적어 둘게요", false, memberId);
+	}
+
+	/** C02의 글 항목 하나. 문자열이 아니면 체크하지 않은 것으로 보고 null, 너무 길면 값 오류, 빈 글은 null. */
+	private static String c02NoteOrNull(JsonNode node) {
+		if (!node.isString()) {
+			return null;
+		}
+		String text = node.asString().trim();
+		if (text.length() > MAX_SITUATIONAL_NOTE_LENGTH) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "적은 내용이 너무 길어요.");
+		}
+		return text.isEmpty() ? null : text;
+	}
+
+	/**
+	 * 수면·약 복용까지 선택 항목이 끝나 상황 질문 칸을 결정할 때가 됐으면, 조건에 맞고 최근(3일 이내)에 나오지 않은
+	 * 상황 질문 중 순위가 가장 높은 것을 고른다. 하루에 한 번만 고르고, 고른 질문은 바로 "오늘 나온 것"으로 남긴다.
+	 */
+	private void ensureSituationalDecision(Long memberId, ChatDraft draft, LocalDate today) {
+		if (!draft.situationalSlotReady()) {
+			return;
+		}
+		Optional<SkinRecord> yesterday = recordRepository.findByMemberIdAndRecordDate(memberId, today.minusDays(1));
+		Map<String, LocalDate> lastShown = situationalQuestionLogRepository.findByMemberId(memberId).stream()
+			.collect(Collectors.toMap(SituationalQuestionLog::getQuestionId, SituationalQuestionLog::getLastShownDate));
+		Optional<String> selected = situationalQuestionSelector.select(
+			new SituationalQuestionContext(draft, yesterday), lastShown, today);
+		draft.decideSituationalQuestion(selected.orElse(null));
+		selected.ifPresent(id -> markSituationalShown(memberId, id, today));
+	}
+
+	private void markSituationalShown(Long memberId, String questionId, LocalDate today) {
+		SituationalQuestionLog log = situationalQuestionLogRepository.findByMemberIdAndQuestionId(memberId, questionId)
+			.orElseGet(() -> SituationalQuestionLog.create(memberRepository.getReferenceById(memberId), questionId, today));
+		log.markShown(today);
+		situationalQuestionLogRepository.save(log);
 	}
 
 	/** 대화 내역에 남길 사용자 말. 화면이 버튼을 누르자마자 보여 주는 문장과 같다. */
@@ -289,7 +396,7 @@ public class ChatbotService {
 	 * 기록 모드: 응답을 검증한 뒤에만 초안에 반영하고, 반영 결과에 따라 다음 질문을 정한다.
 	 * 다음에 물을 항목이 선택지로 답하는 항목이면 화면의 선택지와 어긋나지 않도록 서버의 정해진 문장으로 묻는다.
 	 */
-	private Outcome recordOutcome(TurnContext context, ChatDraft draft, Optional<ModelOutput> parsed) {
+	private Outcome recordOutcome(TurnContext context, ChatDraft draft, Optional<ModelOutput> parsed, Long memberId) {
 		boolean understood = false;
 		boolean explain = false;
 		String reply = null;
@@ -331,9 +438,9 @@ public class ChatbotService {
 			reply = reply == null || reply.isBlank() ? NO_CHANGE : reply;
 		} else if (explain) {
 			// 용어 설명은 기록을 바꾸지 않으므로, 설명 뒤에 사진을 보여 줄지(또는 원래 묻던 질문을) 이어서 묻는다.
-			reply = reply + "\n\n" + nextQuestion(draft);
+			reply = reply + "\n\n" + nextQuestion(draft, memberId, context.today());
 		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
-			reply = question(draft);
+			reply = question(draft, memberId, context.today());
 		}
 
 		ChatReplyResponse response = new ChatReplyResponse(reply, understood, draft.pendingFields(),
@@ -376,7 +483,8 @@ public class ChatbotService {
 	 * 지금 물어볼 항목의 정해진 질문. 선택지로 답하는 항목은 화면에 같은 선택지가 함께 나온다.
 	 * 부위는 방금 고른 증상이 있으면 그 증상이 나타난 곳을, 없으면 불편했던 곳을 묻는다.
 	 */
-	private String question(ChatDraft draft) {
+	private String question(ChatDraft draft, Long memberId, LocalDate today) {
+		ensureSituationalDecision(memberId, draft, today);
 		String askingField = draft.askingField();
 		if (askingField == null) {
 			return CONFIRM;
@@ -390,6 +498,8 @@ public class ChatbotService {
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
 			case "medication" -> "오늘 약을 복용하셨나요?";
 			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요.";
+			case P01 -> "고통 지수가 어제보다 많이 올랐네요. 언제부터 이랬어요?";
+			case C02 -> "오늘 같이 남겨둘 게 있어요?";
 			default -> "평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요.";
 		};
 	}
