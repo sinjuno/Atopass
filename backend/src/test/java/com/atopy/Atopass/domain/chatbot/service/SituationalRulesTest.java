@@ -71,7 +71,7 @@ class SituationalRulesTest {
 			 "conditions": {"NECK": {"pain": 4}, "FACE": {"pain": 4}}}""");
 		SituationalDay yesterday = day(1, null, Set.of(BodyPart.NECK), Set.of(SkinSign.ITCHING));
 
-		assertThat(NewSignOrPartRule.subject(draft, Optional.of(yesterday))).contains("얼굴");
+		assertThat(NewSignOrPartRule.subject(draft, Optional.of(yesterday))).contains("얼굴 증상");
 	}
 
 	@Test

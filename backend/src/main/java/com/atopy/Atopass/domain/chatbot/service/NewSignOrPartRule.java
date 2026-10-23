@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * P02: 어제 기록에 없던 증상이나 부위가 오늘 있으면 "어떻게 시작됐어요?"를 묻는다. 어제 기록이 없으면 묻지 않는다.
- * 질문에 넣는 이름은 새 증상이 있으면 그 증상, 없으면 새 부위 중 앞의 것 하나다.
+ * 질문에 넣는 이름은 새 증상이 있으면 그 증상, 없으면 새 부위 중 앞의 것 하나("목 증상")다.
  */
 @Component
 class NewSignOrPartRule implements SituationalQuestionRule {
@@ -54,7 +54,8 @@ class NewSignOrPartRule implements SituationalQuestionRule {
 		if (!signs.isEmpty()) {
 			return Optional.of(signs.iterator().next().label());
 		}
-		return parts.stream().findFirst().map(BodyPart::label);
+		// "어제 없던 목이 생겼네요"는 어색하므로 부위는 "목 증상"처럼 부른다.
+		return parts.stream().findFirst().map(part -> part.label() + " 증상");
 	}
 
 	/** 이름 뒤에 받침에 맞는 "이/가"를 붙인다. 괄호 안 글자도 소리 내어 읽으므로 마지막 한글 글자로 정한다. */
