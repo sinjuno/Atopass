@@ -131,13 +131,13 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 4점"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
+		// 특이사항 다음에는 마무리 질문(C02)이 남아, 아직 확인 단계로 넘어가지 않는다.
 		mockMvc.perform(sendMessage(bearer, session, "6시간 잤고 약은 안 먹었고 증상도 특이사항도 없어요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
-			.andExpect(jsonPath("$.data.reply").value(org.hamcrest.Matchers.allOf(
-				org.hamcrest.Matchers.startsWith("오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 고통 지수: 4점"),
-				org.hamcrest.Matchers.endsWith("오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요."))))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(1))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("C02"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0));
 	}
 
@@ -290,8 +290,10 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(sendMessage(bearer, session, "예"))
 			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
+		// 특이사항 다음에는 마무리 질문(C02)이 남아, 아직 확인 단계로 넘어가지 않는다.
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
-			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
 			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(2))
 			.andExpect(jsonPath("$.data.draft.notes").value("새 보습제를 썼어요"));
 	}
