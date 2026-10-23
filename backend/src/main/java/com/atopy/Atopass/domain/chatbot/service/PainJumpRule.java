@@ -1,6 +1,5 @@
 package com.atopy.Atopass.domain.chatbot.service;
 
-import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import org.springframework.stereotype.Component;
 
 /** P01: 오늘 고통 지수가 어제보다 많이(설정값 이상) 오르면 "언제부터 이랬어요?"를 묻는다. */
@@ -18,7 +17,7 @@ class PainJumpRule implements SituationalQuestionRule {
 	}
 
 	public int priority() {
-		return 1;
+		return properties.priority().p01();
 	}
 
 	public boolean matches(SituationalQuestionContext context) {
@@ -27,7 +26,7 @@ class PainJumpRule implements SituationalQuestionRule {
 			return false;
 		}
 		return context.yesterday()
-			.map(SkinRecord::getPainIndex)
+			.map(SituationalDay::painIndex)
 			.filter(yesterdayPain -> yesterdayPain != null)
 			.filter(yesterdayPain -> todayPain - yesterdayPain >= properties.painIndexJumpThreshold())
 			.isPresent();

@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** 상황 질문(P01 등)·마무리 질문(C02)의 답을 메인 기록과 별도로 저장한다. */
+/** 상황 질문(P01~P05)·마무리 질문(C02)의 답을 메인 기록과 별도로 저장한다. */
 @Service
 @RequiredArgsConstructor
 class SituationalAnswerService {
@@ -23,11 +23,23 @@ class SituationalAnswerService {
 	private final MemberRepository memberRepository;
 	private final JsonMapper jsonMapper;
 
+	/** 선택지로 답하는 상황 질문(P01·P04·P05)의 답. 예: {"answer":"TODAY"} */
 	@Transactional
-	void saveP01(Long memberId, LocalDate recordDate, String answerCode) {
+	void saveChoice(Long memberId, LocalDate recordDate, String questionId, String answerCode) {
 		ObjectNode json = jsonMapper.createObjectNode();
 		json.put("answer", answerCode);
-		save(memberId, recordDate, "P01", json);
+		save(memberId, recordDate, questionId, json);
+	}
+
+	/** 글로 답하는 상황 질문(P02)의 답. subject는 질문에 넣은 이름(예: 새로 생긴 증상)이다. 예: {"subject":"홍반","text":"..."} */
+	@Transactional
+	void saveText(Long memberId, LocalDate recordDate, String questionId, String subject, String text) {
+		ObjectNode json = jsonMapper.createObjectNode();
+		if (subject != null) {
+			json.put("subject", subject);
+		}
+		json.put("text", text);
+		save(memberId, recordDate, questionId, json);
 	}
 
 	/** productNote·unusualNote·clinicQuestion 중 null이 아닌 것만 저장한다. clinicQuestion은 재진 질문 목록에도 남긴다. */
