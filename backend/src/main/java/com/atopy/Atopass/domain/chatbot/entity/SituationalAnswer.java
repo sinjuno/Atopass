@@ -54,4 +54,9 @@ public class SituationalAnswer extends BaseTimeEntity {
 		return answer;
 	}
 
+	/** 같은 날 같은 질문에 다시 답하면(예: 그날 기록을 지우고 다시 기록한 경우) 새로 만들지 않고 이 답으로 바꾼다. */
+	public void replaceAnswer(String answerJson) {
+		this.answerJson = answerJson;
+	}
+
 }

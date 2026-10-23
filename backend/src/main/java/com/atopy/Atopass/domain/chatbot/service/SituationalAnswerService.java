@@ -50,9 +50,16 @@ class SituationalAnswerService {
 		}
 	}
 
+	/** 같은 (회원, 날짜, 질문) 답이 이미 있으면(예: 그날 기록을 지우고 다시 기록한 경우) 새로 만들지 않고 바꾼다. */
 	private void save(Long memberId, LocalDate recordDate, String questionId, ObjectNode json) {
-		Member member = memberRepository.getReferenceById(memberId);
-		answerRepository.save(SituationalAnswer.create(member, recordDate, questionId, jsonMapper.writeValueAsString(json)));
+		String answerJson = jsonMapper.writeValueAsString(json);
+		answerRepository.findByMemberIdAndRecordDateAndQuestionId(memberId, recordDate, questionId)
+			.ifPresentOrElse(
+				existing -> existing.replaceAnswer(answerJson),
+				() -> {
+					Member member = memberRepository.getReferenceById(memberId);
+					answerRepository.save(SituationalAnswer.create(member, recordDate, questionId, answerJson));
+				});
 	}
 
 }

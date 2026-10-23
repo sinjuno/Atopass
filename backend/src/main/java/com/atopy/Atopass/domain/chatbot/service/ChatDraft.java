@@ -253,6 +253,13 @@ public final class ChatDraft {
 			draft.situationalQuestionId = root.path("situationalQuestionId").isString()
 				? root.path("situationalQuestionId").asString() : null;
 			draft.c02Resolved = root.path("c02Resolved").asBoolean(false);
+			// 이 기능이 배포되기 전에 저장된 "수정 중" 초안에는 이 값들이 없다 — 다른 선택 항목과 똑같이,
+			// 수정 중이면 상황 질문·마무리 질문도 더 묻지 않는다 (startEditing()·fromRecord()와 같은 규칙).
+			if (draft.editing) {
+				draft.situationalDecided = true;
+				draft.situationalQuestionId = null;
+				draft.c02Resolved = true;
+			}
 		} catch (RuntimeException e) {
 			return new ChatDraft();
 		}
@@ -643,7 +650,7 @@ public final class ChatDraft {
 
 	/** 상황 질문 칸을 결정할 때가 됐는지 — 아직 결정하지 않았고, 수면·약 복용까지 선택 항목이 다 끝나 특이사항만 남았을 때. */
 	boolean situationalSlotReady() {
-		return !situationalDecided && corePendingFields().isEmpty();
+		return !situationalDecided && requiredSatisfied() && corePendingFields().isEmpty();
 	}
 
 	/** 이번에 고를 상황 질문(또는 없음)을 정한다. 오늘은 다시 고르지 않는다. */

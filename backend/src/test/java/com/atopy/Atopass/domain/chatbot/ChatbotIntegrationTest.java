@@ -1,6 +1,7 @@
 package com.atopy.Atopass.domain.chatbot;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,6 +39,10 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	com.atopy.Atopass.domain.member.repository.MemberRepository memberRepository;
 	@Autowired
 	com.atopy.Atopass.domain.chatbot.repository.SituationalQuestionLogRepository situationalQuestionLogRepository;
+	@Autowired
+	com.atopy.Atopass.domain.record.repository.ClinicQuestionNoteRepository clinicQuestionNoteRepository;
+	@Autowired
+	com.atopy.Atopass.domain.chatbot.repository.SituationalAnswerRepository situationalAnswerRepository;
 
 	@BeforeEach
 	void resetLlm() {
@@ -807,6 +812,52 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void C02에_빈_글만_보내면_400이고_재진_질문_목록에_남지_않는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+
+		mockMvc.perform(choice(bearer, session, "C02", Map.of("productNote", "   ", "clinicQuestion", "  ")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		assertThat(clinicQuestionNoteRepository.findByMemberIdOrderByCreatedAtDesc(memberId)).isEmpty();
+	}
+
+	@Test
+	void C02에_진료_때_물어볼_것을_적으면_재진_질문_목록에도_하나_남는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+		mockMvc.perform(choice(bearer, session, "C02", Map.of("clinicQuestion", "이 연고 계속 써도 될까요?")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		assertThat(clinicQuestionNoteRepository.findByMemberIdOrderByCreatedAtDesc(memberId))
+			.extracting(com.atopy.Atopass.domain.record.entity.ClinicQuestionNote::getContent)
+			.containsExactly("이 연고 계속 써도 될까요?");
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.extracting(com.atopy.Atopass.domain.chatbot.entity.SituationalAnswer::getQuestionId)
+			.containsExactly("C02");
+	}
+
+	@Test
 	void 상황_질문과_마무리_질문을_답해도_메인_기록_값은_그대로_저장된다() throws Exception {
 		String bearer = newMemberBearer();
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
@@ -836,8 +887,40 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 상황_질문이_나왔지만_답하지_않고_기록을_마쳐도_완료된다() throws Exception {
+	void 기록을_지우고_다시_C02에_답해도_오류_없이_저장된다() throws Exception {
 		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+		String saved = mockMvc.perform(choice(bearer, session, "C02", Map.of("productNote", "새 크림")))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(saved).get("data").get("recordId").asLong();
+
+		mockMvc.perform(delete("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(status().isNoContent());
+
+		String reopened = createSession(bearer, "RECORD");
+		mockMvc.perform(choice(bearer, reopened, "painIndex", 4));
+		mockMvc.perform(skipChoice(bearer, reopened, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, reopened, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, reopened, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, reopened, "medication"));
+		mockMvc.perform(skipChoice(bearer, reopened, "notes"));
+		mockMvc.perform(choice(bearer, reopened, "C02", Map.of("productNote", "다른 크림")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+	}
+
+	@Test
+	void 상황_질문이_나왔지만_답하지_않고_기록을_마쳐도_완료된다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 		createRecordWithPainIndex(bearer, today.minusDays(1), 2);
 		String session = createSession(bearer, "RECORD");
@@ -848,6 +931,12 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
 		mockMvc.perform(choice(bearer, session, "medication", false))
 			.andExpect(jsonPath("$.data.askingField").value("P01"));
+
+		// 상황 질문을 보여 준 것만으로도 "오늘 나온 것"으로 남아, 답하지 않고 끝내도 3일 제외 규칙이 적용된다.
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		assertThat(situationalQuestionLogRepository.findByMemberIdAndQuestionId(memberId, "P01"))
+			.get().extracting(com.atopy.Atopass.domain.chatbot.entity.SituationalQuestionLog::getLastShownDate)
+			.isEqualTo(today);
 
 		mockMvc.perform(post("/api/v1/chatbot/sessions/" + session + "/finish").header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))

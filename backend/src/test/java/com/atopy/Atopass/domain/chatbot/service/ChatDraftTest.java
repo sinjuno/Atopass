@@ -371,6 +371,17 @@ class ChatDraftTest {
 	}
 
 	@Test
+	void 고통_지수가_아직_없으면_다른_선택_항목이_다_끝나도_상황_질문_칸이_준비되지_않는다() {
+		// 자유 입력으로 수면·약 복용·증상만 먼저 말하고 고통 지수는 아직 말하지 않은 경우 (필수 항목이 비어 있다).
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("""
+			{"sleepHours": 7, "medication": false, "skinSigns": [], "skipped": ["bodyParts"]}"""));
+
+		assertThat(draft.requiredSatisfied()).isFalse();
+		assertThat(draft.situationalSlotReady()).isFalse();
+	}
+
+	@Test
 	void 상황_질문을_고르면_수면_다음_특이사항_앞에_끼어든다() {
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
@@ -407,6 +418,18 @@ class ChatDraftTest {
 		draft.resolveC02();
 
 		assertThat(draft.readyForConfirmation(false)).isTrue();
+	}
+
+	@Test
+	void 상황_질문_필드가_없는_예전_수정_중_초안을_복원해도_다시_묻지_않는다() {
+		// 이 기능이 배포되기 전에 저장된 "수정 중" 초안 JSON에는 situationalDecided·c02Resolved가 없다.
+		ChatDraft restored = ChatDraft.fromJson(mapper, """
+			{"painIndex": 4, "sleepHours": 6, "medication": true,
+			 "skipped": ["bodyParts", "sleepHours", "medication", "skinSigns", "notes", "lifestyle"], "editing": true}""");
+
+		assertThat(restored.situationalSlotReady()).isFalse();
+		assertThat(restored.pendingFields()).doesNotContain("C02", "P01");
+		assertThat(restored.readyForConfirmation(false)).isTrue();
 	}
 
 	@Test
