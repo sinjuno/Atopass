@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ITCH_SCALE, PAIN_INDEX_MAX, PAIN_INDEX_MIN } from '@/utils/constants';
+import { PAIN_INDEX_MAX, PAIN_INDEX_MIN, PAIN_SCALE } from '@/utils/constants';
 
 interface Props {
   /** null이면 아직 고르지 않음 — 막대는 0에 두고 "기록 없음"으로 보여 준다 */
@@ -31,7 +31,7 @@ export default function PainIndexSlider({ value, onChange, disabled }: Props) {
   }, [pressing]);
 
   const score = value ?? PAIN_INDEX_MIN;
-  const scale = ITCH_SCALE[score];
+  const scale = PAIN_SCALE[score];
 
   return (
     <div className="flex flex-col gap-1">
