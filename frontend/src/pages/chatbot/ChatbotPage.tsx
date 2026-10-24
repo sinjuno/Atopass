@@ -157,6 +157,7 @@ export default function ChatbotPage() {
           onChoose={(c) => void handleChoose(c)}
           skinSigns={chatDraft?.skinSigns ?? []}
           onMinimizedChange={setChoicesMinimized}
+          onAttachPhotos={handleAttach}
         />
       )}
 

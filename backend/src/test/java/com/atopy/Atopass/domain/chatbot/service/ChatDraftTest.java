@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.atopy.Atopass.domain.chatbot.service.ChatDraft.ApplyResult;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
+import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.entity.Symptom;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -25,7 +27,7 @@ class ChatDraftTest {
 		ChatDraft draft = ChatDraft.empty();
 
 		assertThat(draft.pendingFields())
-			.containsExactly("painIndex", "skinSigns", "bodyParts", "sleepHours", "medication", "notes");
+			.containsExactly("painIndex", "skinSigns", "bodyParts", "sleepHours", "medication", "notes", "C02");
 		assertThat(draft.requiredSatisfied()).isFalse();
 		assertThat(draft.readyForConfirmation(true)).isFalse();
 	}
@@ -38,7 +40,8 @@ class ChatDraftTest {
 
 		assertThat(draft.toResponse().painIndex()).isEqualTo(6);
 		assertThat(draft.requiredSatisfied()).isTrue();
-		assertThat(draft.pendingFields()).containsExactly("skinSigns", "bodyParts", "sleepHours", "medication", "notes");
+		assertThat(draft.pendingFields())
+			.containsExactly("skinSigns", "bodyParts", "sleepHours", "medication", "notes", "C02");
 	}
 
 	@Test
@@ -187,7 +190,8 @@ class ChatDraftTest {
 		assertThat(draft.toResponse().lifestyle().alcohol()).isTrue();
 		assertThat(draft.toResponse().lifestyle().outdoorActivity()).isEqualTo(OutdoorActivity.MEDIUM);
 		assertThat(draft.toResponse().notes()).isEqualTo("평소보다 오래 걸었음");
-		assertThat(draft.pendingFields()).containsExactly("painIndex", "skinSigns", "bodyParts", "sleepHours", "medication");
+		assertThat(draft.pendingFields())
+			.containsExactly("painIndex", "skinSigns", "bodyParts", "sleepHours", "medication", "C02");
 	}
 
 	@Test
@@ -195,6 +199,7 @@ class ChatDraftTest {
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
 			{"painIndex": 3, "skipped": ["bodyParts", "sleepHours", "medication", "skinSigns", "notes", "unknown"]}"""));
+		draft.resolveC02();
 
 		assertThat(draft.pendingFields()).isEmpty();
 		assertThat(draft.readyForConfirmation(false)).isTrue();
@@ -247,7 +252,7 @@ class ChatDraftTest {
 
 		assertThat(restored.toJson(mapper)).isEqualTo(draft.toJson(mapper));
 		assertThat(restored.toResponse().skinSigns()).containsExactly(SkinSign.ERYTHEMA, SkinSign.EDEMA);
-		assertThat(restored.pendingFields()).containsExactly("symptoms");
+		assertThat(restored.pendingFields()).containsExactly("symptoms", "C02");
 	}
 
 	@Test
@@ -275,6 +280,8 @@ class ChatDraftTest {
 		assertThat(draft.askingField()).isEqualTo("sleepHours");
 
 		draft.apply(json("{\"skipped\": [\"sleepHours\", \"notes\"]}"));
+		assertThat(draft.askingField()).isEqualTo("C02");
+		draft.resolveC02();
 		assertThat(draft.askingField()).isNull();
 	}
 
@@ -352,6 +359,87 @@ class ChatDraftTest {
 		assertThat(ChatDraft.fromJson(mapper, null).pendingFields()).contains("painIndex");
 		assertThat(ChatDraft.fromJson(mapper, "  ").pendingFields()).contains("painIndex");
 		assertThat(ChatDraft.fromJson(mapper, "{깨진 json").pendingFields()).contains("painIndex");
+	}
+
+	@Test
+	void 수면_약_복용까지_끝나면_상황_질문_칸이_준비된다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("""
+			{"painIndex": 5, "skipped": ["skinSigns", "bodyParts", "sleepHours", "medication"]}"""));
+
+		assertThat(draft.situationalSlotReady()).isTrue();
+	}
+
+	@Test
+	void 고통_지수가_아직_없으면_다른_선택_항목이_다_끝나도_상황_질문_칸이_준비되지_않는다() {
+		// 자유 입력으로 수면·약 복용·증상만 먼저 말하고 고통 지수는 아직 말하지 않은 경우 (필수 항목이 비어 있다).
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("""
+			{"sleepHours": 7, "medication": false, "skinSigns": [], "skipped": ["bodyParts"]}"""));
+
+		assertThat(draft.requiredSatisfied()).isFalse();
+		assertThat(draft.situationalSlotReady()).isFalse();
+	}
+
+	@Test
+	void 상황_질문을_고르면_수면_다음_특이사항_앞에_끼어든다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("""
+			{"painIndex": 5, "skipped": ["skinSigns", "bodyParts", "sleepHours", "medication"]}"""));
+
+		draft.decideSituationalQuestion("P01");
+
+		assertThat(draft.pendingFields()).containsExactly("P01", "notes", "C02");
+		assertThat(draft.askingField()).isEqualTo("P01");
+	}
+
+	@Test
+	void 상황_질문에_답이_없으면_바로_특이사항으로_넘어간다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("""
+			{"painIndex": 5, "skipped": ["skinSigns", "bodyParts", "sleepHours", "medication"]}"""));
+
+		draft.decideSituationalQuestion(null);
+
+		assertThat(draft.pendingFields()).containsExactly("notes", "C02");
+		assertThat(draft.askingField()).isEqualTo("notes");
+	}
+
+	@Test
+	void 상황_질문과_C02를_모두_끝내야_확인_단계로_간다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("""
+			{"painIndex": 5, "skipped": ["skinSigns", "bodyParts", "sleepHours", "medication"]}"""));
+		draft.decideSituationalQuestion(null);
+		draft.apply(json("{\"notes\": \"가려움이 심해요\"}"));
+
+		assertThat(draft.readyForConfirmation(false)).isFalse();
+
+		draft.resolveC02();
+
+		assertThat(draft.readyForConfirmation(false)).isTrue();
+	}
+
+	@Test
+	void 상황_질문_필드가_없는_예전_수정_중_초안을_복원해도_다시_묻지_않는다() {
+		// 이 기능이 배포되기 전에 저장된 "수정 중" 초안 JSON에는 situationalDecided·c02Resolved가 없다.
+		ChatDraft restored = ChatDraft.fromJson(mapper, """
+			{"painIndex": 4, "sleepHours": 6, "medication": true,
+			 "skipped": ["bodyParts", "sleepHours", "medication", "skinSigns", "notes", "lifestyle"], "editing": true}""");
+
+		assertThat(restored.situationalSlotReady()).isFalse();
+		assertThat(restored.pendingFields()).doesNotContain("C02", "P01");
+		assertThat(restored.readyForConfirmation(false)).isTrue();
+	}
+
+	@Test
+	void 저장된_기록을_고칠_때는_상황_질문과_마무리_질문을_다시_묻지_않는다() {
+		SkinRecord record = SkinRecord.builder().recordDate(LocalDate.now()).painIndex(5).build();
+
+		ChatDraft draft = ChatDraft.fromRecord(record);
+
+		assertThat(draft.situationalSlotReady()).isFalse();
+		assertThat(draft.pendingFields()).doesNotContain("C02", "P01");
 	}
 
 }

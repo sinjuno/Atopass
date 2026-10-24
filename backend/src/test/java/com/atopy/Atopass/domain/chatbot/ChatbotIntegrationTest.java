@@ -1,6 +1,7 @@
 package com.atopy.Atopass.domain.chatbot;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +35,14 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	ChatSessionService sessionService;
 	@Autowired
 	ChatMessageCleaner cleaner;
+	@Autowired
+	com.atopy.Atopass.domain.member.repository.MemberRepository memberRepository;
+	@Autowired
+	com.atopy.Atopass.domain.chatbot.repository.SituationalQuestionLogRepository situationalQuestionLogRepository;
+	@Autowired
+	com.atopy.Atopass.domain.record.repository.ClinicQuestionNoteRepository clinicQuestionNoteRepository;
+	@Autowired
+	com.atopy.Atopass.domain.chatbot.repository.SituationalAnswerRepository situationalAnswerRepository;
 
 	@BeforeEach
 	void resetLlm() {
@@ -131,13 +140,13 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 4점"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
+		// 특이사항 다음에는 마무리 질문(C02)이 남아, 아직 확인 단계로 넘어가지 않는다.
 		mockMvc.perform(sendMessage(bearer, session, "6시간 잤고 약은 안 먹었고 증상도 특이사항도 없어요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
-			.andExpect(jsonPath("$.data.reply").value(org.hamcrest.Matchers.allOf(
-				org.hamcrest.Matchers.startsWith("오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 고통 지수: 4점"),
-				org.hamcrest.Matchers.endsWith("오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요."))))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(1))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("C02"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0));
 	}
 
@@ -290,8 +299,10 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(sendMessage(bearer, session, "예"))
 			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
+		// 특이사항 다음에는 마무리 질문(C02)이 남아, 아직 확인 단계로 넘어가지 않는다.
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
-			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
 			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(2))
 			.andExpect(jsonPath("$.data.draft.notes").value("새 보습제를 썼어요"));
 	}
@@ -734,6 +745,204 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages").isEmpty());
 	}
 
+	@Test
+	void 고통_지수가_어제보다_2_이상_오른_날만_P01이_수면_시간_다음에_나온다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createRecordWithPainIndex(bearer, today.minusDays(1), 3);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.askingField").value("P01"));
+	}
+
+	@Test
+	void 어제_기록이_없으면_P01이_나오지_않고_바로_특이사항으로_간다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+	}
+
+	@Test
+	void P01이_나온_지_3일_이내면_다시_나오지_않는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createRecordWithPainIndex(bearer, today.minusDays(1), 3);
+		com.atopy.Atopass.domain.member.entity.Member member = memberRepository.findByEmail(email).orElseThrow();
+		situationalQuestionLogRepository.save(
+			com.atopy.Atopass.domain.chatbot.entity.SituationalQuestionLog.create(member, "P01", today.minusDays(2)));
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+	}
+
+	@Test
+	void C02는_매일_특이사항_다음에_나오고_없어요_한_번으로_끝난다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
+
+		mockMvc.perform(skipChoice(bearer, session, "C02"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.recordId").isNumber());
+	}
+
+	@Test
+	void C02에_빈_글만_보내면_400이고_재진_질문_목록에_남지_않는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+
+		mockMvc.perform(choice(bearer, session, "C02", Map.of("productNote", "   ", "clinicQuestion", "  ")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		assertThat(clinicQuestionNoteRepository.findByMemberIdOrderByCreatedAtDesc(memberId)).isEmpty();
+	}
+
+	@Test
+	void C02에_진료_때_물어볼_것을_적으면_재진_질문_목록에도_하나_남는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+		mockMvc.perform(choice(bearer, session, "C02", Map.of("clinicQuestion", "이 연고 계속 써도 될까요?")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		assertThat(clinicQuestionNoteRepository.findByMemberIdOrderByCreatedAtDesc(memberId))
+			.extracting(com.atopy.Atopass.domain.record.entity.ClinicQuestionNote::getContent)
+			.containsExactly("이 연고 계속 써도 될까요?");
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.extracting(com.atopy.Atopass.domain.chatbot.entity.SituationalAnswer::getQuestionId)
+			.containsExactly("C02");
+	}
+
+	@Test
+	void 상황_질문과_마무리_질문을_답해도_메인_기록_값은_그대로_저장된다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createRecordWithPainIndex(bearer, today.minusDays(1), 2);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.askingField").value("P01"));
+		mockMvc.perform(choice(bearer, session, "P01", "SINCE_YESTERDAY"))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"))
+			.andExpect(jsonPath("$.data.askingField").value("C02"));
+		String saved = mockMvc.perform(choice(bearer, session, "C02", Map.of("productNote", "새 크림")))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(saved).get("data").get("recordId").asLong();
+
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.painIndex").value(6))
+			.andExpect(jsonPath("$.data.sleepHours").value(7.0))
+			.andExpect(jsonPath("$.data.medication").value(false))
+			.andExpect(jsonPath("$.data.notes").doesNotExist());
+	}
+
+	@Test
+	void 기록을_지우고_다시_C02에_답해도_오류_없이_저장된다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, session, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, session, "medication"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+		String saved = mockMvc.perform(choice(bearer, session, "C02", Map.of("productNote", "새 크림")))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(saved).get("data").get("recordId").asLong();
+
+		mockMvc.perform(delete("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(status().isNoContent());
+
+		String reopened = createSession(bearer, "RECORD");
+		mockMvc.perform(choice(bearer, reopened, "painIndex", 4));
+		mockMvc.perform(skipChoice(bearer, reopened, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, reopened, "bodyParts"));
+		mockMvc.perform(skipChoice(bearer, reopened, "sleepHours"));
+		mockMvc.perform(skipChoice(bearer, reopened, "medication"));
+		mockMvc.perform(skipChoice(bearer, reopened, "notes"));
+		mockMvc.perform(choice(bearer, reopened, "C02", Map.of("productNote", "다른 크림")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+	}
+
+	@Test
+	void 상황_질문이_나왔지만_답하지_않고_기록을_마쳐도_완료된다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createRecordWithPainIndex(bearer, today.minusDays(1), 2);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.askingField").value("P01"));
+
+		// 상황 질문을 보여 준 것만으로도 "오늘 나온 것"으로 남아, 답하지 않고 끝내도 3일 제외 규칙이 적용된다.
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		assertThat(situationalQuestionLogRepository.findByMemberIdAndQuestionId(memberId, "P01"))
+			.get().extracting(com.atopy.Atopass.domain.chatbot.entity.SituationalQuestionLog::getLastShownDate)
+			.isEqualTo(today);
+
+		mockMvc.perform(post("/api/v1/chatbot/sessions/" + session + "/finish").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.recordId").isNumber());
+	}
+
 	// ── 헬퍼 ──
 
 	/** 챗봇은 이용 동의가 있어야 쓸 수 있으므로, 테스트에서는 먼저 동의(멱등)하고 세션을 만든다. */
@@ -785,6 +994,27 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		body.put("notes", notes);
 		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isCreated());
+	}
+
+	/** 상황 질문(P01) 조건 판정에 쓰는 "어제 고통 지수"만 가진 기록을 직접 만든다. */
+	private void createRecordWithPainIndex(String bearer, LocalDate date, int painIndex) throws Exception {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("recordDate", date.toString());
+		body.put("painIndex", painIndex);
+		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated());
+	}
+
+	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder choice(
+		String bearer, String session, String field, Object value) {
+		return withJson(post("/api/v1/chatbot/sessions/" + session + "/choices").header(AUTH, bearer),
+			Map.of("field", field, "value", value));
+	}
+
+	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder skipChoice(
+		String bearer, String session, String field) {
+		return withJson(post("/api/v1/chatbot/sessions/" + session + "/choices").header(AUTH, bearer),
+			Map.of("field", field, "skip", true));
 	}
 
 }
