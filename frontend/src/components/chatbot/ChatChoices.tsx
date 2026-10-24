@@ -89,7 +89,7 @@ export default function ChatChoices({ field, onChoose, disabled, skinSigns, onMi
           내려 둔 동안에도 고르던 값을 잃지 않도록 숨기기만 한다 (다시 보이면 올라오는 움직임이 다시 나온다) */}
       <div
         onAnimationEnd={onAnimationEnd}
-        className={`${field === 'bodyParts' ? 'max-h-[88dvh]' : 'max-h-[50dvh]'} shrink-0 flex-col rounded-t-2xl border-t border-gray-200 bg-gray-50 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] ${
+        className={`${field === 'bodyParts' ? 'max-h-[88dvh] min-h-0' : 'max-h-[50dvh] shrink-0'} flex-col rounded-t-2xl border-t border-gray-200 bg-gray-50 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] ${
           minimized ? 'hidden' : 'flex'
         } ${
           mode === 'closing'
@@ -217,12 +217,13 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
               : '고통이 있는 부위를 모두 눌러 주세요'}
           </p>
           <div className="rounded-2xl bg-white p-4 shadow-card">
-            <BodyMap counts={counts} selected={parts} onSelect={toggle} maxWidth={170} />
+            <BodyMap counts={counts} selected={parts} onSelect={toggle} maxWidth={170} maxHeight="30dvh" />
           </div>
           <p className="min-h-6 text-center text-base text-gray-700">
             {parts.length > 0 ? parts.map((part) => BODY_PART_LABELS[part]).join(', ') : '아직 고른 부위가 없어요'}
           </p>
-          <div className="flex gap-2">
+          {/* 화면이 낮아 내용이 스크롤되어도 버튼은 항상 보이게 아래에 붙여 둔다 */}
+          <div className="sticky bottom-0 -mb-3 flex gap-2 bg-gray-50 pb-3 pt-1">
             <ChoiceButton onClick={() => onChoose({ field, skip: true })} disabled={disabled}>
               없어요
             </ChoiceButton>
