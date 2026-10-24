@@ -82,7 +82,7 @@ export const PAIN_INDEX_MAX = 10;
 
 /** 0~10점 막대를 누르고 있는 동안 보여 줄 점수별 단계와 예시 (인덱스 = 점수). 가려움뿐 아니라 통증·화끈거림 등 어떤 불편함이든 해당된다 */
 export const PAIN_SCALE: { stage: string; example: string }[] = [
-  { stage: '고통 없음', example: '통증이나 불편함이 전혀 느껴지지 않아요.' },
+  { stage: '불편함 없음', example: '통증이나 불편함이 전혀 느껴지지 않아요.' },
   { stage: '거의 없음', example: '가끔 피부가 의식되지만 불편하지는 않아요.' },
   { stage: '매우 약함', example: '조금 불편하지만 신경 쓰이지 않고 일상생활에 지장이 없어요.' },
   { stage: '약함', example: '불편함이 느껴지지만 다른 일에 집중하면 잊을 수 있어요.' },
