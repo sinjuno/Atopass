@@ -32,7 +32,8 @@ export default function RecordSummaryPage() {
 
 function RecordSummary({ date }: { date: string }) {
   const navigate = useNavigate();
-  const { mode, recordId, form, setForm, photos, loading, error, save, remove, removePhoto } = useDailyRecord(date);
+  const { mode, recordId, form, setForm, photos, situationalAnswers, loading, error, save, remove, removePhoto } =
+    useDailyRecord(date);
   const draft = useRecordDraft(date);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -83,7 +84,7 @@ function RecordSummary({ date }: { date: string }) {
             {message}
           </p>
         )}
-        <RecordView record={form} recordId={recordId} photos={photos} />
+        <RecordView record={form} recordId={recordId} photos={photos} situationalAnswers={situationalAnswers} />
       </div>
     );
   }

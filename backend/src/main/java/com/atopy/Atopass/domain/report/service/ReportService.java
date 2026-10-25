@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.report.service;
 
+import com.atopy.Atopass.domain.chatbot.service.SituationalAnswerReader;
 import com.atopy.Atopass.domain.member.repository.MemberRepository;
 import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.repository.RecordRepository;
@@ -40,6 +41,7 @@ public class ReportService {
 	private final MemberRepository memberRepository;
 	private final ReportFileStorage fileStorage;
 	private final ReportContentFactory contentFactory;
+	private final SituationalAnswerReader situationalAnswerReader;
 	private final ReportHtmlBuilder htmlBuilder;
 	private final ReportPdfGenerator pdfGenerator;
 	private final Clock clock;
@@ -105,8 +107,9 @@ public class ReportService {
 	}
 
 	private byte[] storePdf(Report report, List<SkinRecord> records) {
-		ReportContent content = contentFactory.create(records, report.getStartDate(), report.getEndDate(),
-			report.isIncludePhotos(), LocalDate.now(clock));
+		ReportContent content = contentFactory.create(records,
+			situationalAnswerReader.forPeriod(report.getMember().getId(), report.getStartDate(), report.getEndDate()),
+			report.getStartDate(), report.getEndDate(), report.isIncludePhotos(), LocalDate.now(clock));
 		byte[] pdf = pdfGenerator.generate(htmlBuilder.build(content));
 		report.attachFile(fileStorage.store(pdf),
 			LocalDateTime.now(clock).plusDays(FILE_RETENTION_DAYS));

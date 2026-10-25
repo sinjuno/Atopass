@@ -91,6 +91,16 @@ export interface RecordDetail extends RecordInput {
   photos: PhotoRef[];
   createdAt?: string;
   updatedAt?: string;
+  /** 그날 챗봇 상황 질문·마무리 질문 답. 메인 기록과 따로 저장되어 고칠 수 없고, 없으면 빈 배열 */
+  situationalAnswers?: SituationalAnswerItem[];
+}
+
+/** 챗봇 상황 질문(P01~P07)·마무리 질문(C02) 답 한 줄. C02는 적은 항목마다 한 줄 */
+export interface SituationalAnswerItem {
+  questionId: string;
+  /** 무엇에 대한 답인지 (예: "잠을 적게 잔 이유") */
+  title: string;
+  answer: string;
 }
 
 export interface RecordCreated {
