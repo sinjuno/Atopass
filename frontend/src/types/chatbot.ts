@@ -59,6 +59,8 @@ export interface SendMessageResponse {
   recordId: number | null;
   /** 이 답과 함께 보여 줄 증상 예시 사진. 사용자가 보여 달라고 답했을 때만 온다 */
   imageSign: SkinSign | null;
+  /** 글 입력칸 예시. 특이사항을 묻는 중일 때만 오고, 질문 문구와 같은 조건(재진일·고통 지수)으로 서버가 고른다 */
+  inputPlaceholder?: string | null;
 }
 
 /** GET /chatbot/sessions/{sessionId}/draft — 저장된(닫힌) 세션이면 409 SESSION_CLOSED */
@@ -69,6 +71,8 @@ export interface ChatDraftState {
   requiresConfirmation: boolean;
   editing: boolean;
   recordId: number | null;
+  /** 글 입력칸 예시. 특이사항을 묻는 중일 때만 온다 */
+  inputPlaceholder?: string | null;
 }
 
 /**

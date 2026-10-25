@@ -119,6 +119,7 @@ public class ChatbotService {
 	private final SituationalQuestionLogRepository situationalQuestionLogRepository;
 	private final SituationalHistoryLoader situationalHistoryLoader;
 	private final SituationalQuestionProperties situationalQuestionProperties;
+	private final NotesPromptSelector notesPromptSelector;
 	private final MemberRepository memberRepository;
 
 	public ChatSessionResponse createSession(Long memberId, ChatMode mode) {
@@ -143,7 +144,8 @@ public class ChatbotService {
 			draft.clearOffer();
 			Optional<SkinSign> asked = SkinSignQuestion.detect(userText);
 			if (asked.isPresent()) {
-				return signQuestionTurn(context, draft, userText, asked.get(), memberId);
+				return withNotesPlaceholder(
+					signQuestionTurn(context, draft, userText, asked.get(), memberId), memberId, context.today());
 			}
 		}
 
@@ -170,7 +172,9 @@ public class ChatbotService {
 
 		Long recordId = sessionService.saveTurn(sessionId, userText, outcome.response().reply(),
 			outcome.draftJson(), outcome.failCount(), outcome.response().requiresConfirmation(), false, outcome.record());
-		return context.mode() == ChatMode.RECORD ? outcome.response().withRecordId(recordId) : outcome.response();
+		return context.mode() == ChatMode.RECORD
+			? withNotesPlaceholder(outcome.response().withRecordId(recordId), memberId, context.today())
+			: outcome.response();
 	}
 
 	/**
@@ -180,8 +184,11 @@ public class ChatbotService {
 	public ChatReplyResponse answerChoice(Long memberId, String sessionId, ChatChoiceRequest request) {
 		consentService.requireConsent(memberId);
 		TurnContext context = loadRecordTurn(memberId, sessionId);
-		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
+		return withNotesPlaceholder(choiceAnswerTurn(context, request, memberId), memberId, context.today());
+	}
 
+	private ChatReplyResponse choiceAnswerTurn(TurnContext context, ChatChoiceRequest request, Long memberId) {
+		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
 		String field = request.field();
 		if (!CHOICE_FIELDS.contains(field) || !field.equals(draft.askingField())) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "지금 고를 수 있는 항목이 아닙니다.");
@@ -225,7 +232,16 @@ public class ChatbotService {
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
 		draft.markFollowUp(false);
 		draft.clearOffer();
-		return choiceTurn(context, draft, FINISH_TEXT, true, memberId);
+		return withNotesPlaceholder(choiceTurn(context, draft, FINISH_TEXT, true, memberId), memberId, context.today());
+	}
+
+	/** 특이사항(notes)을 묻는 응답이면 글 입력칸 예시를 붙인다. 질문 문구와 같은 조건으로 고른다. */
+	private ChatReplyResponse withNotesPlaceholder(ChatReplyResponse response, Long memberId, LocalDate today) {
+		if (!"notes".equals(response.askingField()) || response.draft() == null) {
+			return response;
+		}
+		return response.withInputPlaceholder(
+			notesPromptSelector.select(memberId, response.draft().painIndex(), today).placeholder());
 	}
 
 	private TurnContext loadRecordTurn(Long memberId, String sessionId) {
@@ -464,8 +480,12 @@ public class ChatbotService {
 		ChatSessionService.DraftState state = sessionService.draftState(memberId, sessionId);
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, state.draftJson());
 		boolean ready = state.confirmationReady();
+		String askingField = ready ? null : draft.askingField();
+		String placeholder = "notes".equals(askingField)
+			? notesPromptSelector.select(memberId, draft.toResponse().painIndex(), state.recordDate()).placeholder()
+			: null;
 		return new ChatDraftStateResponse(draft.toResponse(), draft.pendingFields(),
-			ready ? null : draft.askingField(), ready, draft.editing() || state.recordId() != null, state.recordId());
+			askingField, ready, draft.editing() || state.recordId() != null, state.recordId(), placeholder);
 	}
 
 	/**
@@ -582,7 +602,9 @@ public class ChatbotService {
 			case P06 -> "며칠 만이에요. 그동안 피부는 어땠어요?";
 			case P07 -> "많이 좋아졌네요! 달라진 게 있었어요?";
 			case C02 -> "오늘 같이 남겨둘 게 있어요?";
-			default -> "평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요.";
+			// 특이사항. 문구만 상황에 따라 바꾸고 저장하는 값은 같다.
+			default -> notesPromptSelector.select(memberId, draft.toResponse().painIndex(), today).question()
+				+ " 없으면 '없어요'를 눌러 주세요.";
 		};
 	}
 

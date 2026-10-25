@@ -94,6 +94,8 @@ export function useChatSession(recordDate: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pendingFields, setPendingFields] = useState<PendingField[]>([]);
   const [askingField, setAskingField] = useState<PendingField | null>(null);
+  // 서버가 정한 글 입력칸 예시. 특이사항을 묻는 중일 때만 있다
+  const [inputPlaceholder, setInputPlaceholder] = useState<string | null>(null);
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   // 그날 기록이 저장되었으면 그 ID. 사진을 바로 올릴 때 쓴다
   const [recordId, setRecordId] = useState<number | null>(null);
@@ -126,6 +128,7 @@ export function useChatSession(recordDate: string) {
       setMessages(messages);
       setPendingFields(state.pendingFields);
       setAskingField(state.askingField);
+      setInputPlaceholder(state.inputPlaceholder ?? null);
       setRequiresConfirmation(state.requiresConfirmation);
       setRecordId(state.recordId);
       recordIdRef.current = state.recordId;
@@ -192,6 +195,7 @@ export function useChatSession(recordDate: string) {
         ]);
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
+        setInputPlaceholder(res.inputPlaceholder ?? null);
         setRequiresConfirmation(res.requiresConfirmation);
         if (recordIdRef.current === null && res.recordId !== null) setJustCompleted(true);
         recordIdRef.current = res.recordId;
@@ -245,6 +249,7 @@ export function useChatSession(recordDate: string) {
           const state = await chatbotApi.getDraft(sessionId);
           setPendingFields(state.pendingFields);
           setAskingField(state.askingField);
+          setInputPlaceholder(state.inputPlaceholder ?? null);
           setRequiresConfirmation(state.requiresConfirmation);
           setRecordId(state.recordId);
           setChatDraft(state.draft);
@@ -289,6 +294,7 @@ export function useChatSession(recordDate: string) {
     messages,
     pendingFields,
     askingField,
+    inputPlaceholder,
     requiresConfirmation,
     chatDraft,
     // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null

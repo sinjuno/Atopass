@@ -7,9 +7,11 @@ interface Props {
   onSubmit: (text: string) => void;
   onAttachPhotos: (files: File[]) => void;
   disabled?: boolean;
+  /** 입력칸 예시. 없으면 기본 안내 문구 */
+  placeholder?: string;
 }
 
-export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, disabled }: Props) {
+export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, disabled, placeholder }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const trimmed = value.trim();
 
@@ -45,7 +47,7 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
         onChange={(e) => onChange(e.target.value)}
         maxLength={CHAT_MESSAGE_MAX_LENGTH}
         rows={1}
-        placeholder="피부 상태를 말해 주세요"
+        placeholder={placeholder ?? '피부 상태를 말해 주세요'}
         className="max-h-32 min-h-11 flex-1 resize-none rounded-3xl border-0 bg-gray-100 px-4 py-2.5 text-base focus:ring-2 focus:ring-brand-300 focus:outline-none disabled:opacity-60"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) handleSubmit(e);
