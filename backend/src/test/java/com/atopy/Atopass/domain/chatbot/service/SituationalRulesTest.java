@@ -14,7 +14,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 상황 질문 P02·P04·P05의 조건 판정과 순위 */
+/** 상황 질문 P02~P07의 조건 판정과 순위 */
 class SituationalRulesTest {
 
 	private final JsonMapper mapper = JsonMapper.builder().build();
@@ -22,8 +22,8 @@ class SituationalRulesTest {
 	private final LocalDate today = LocalDate.of(2026, 10, 23);
 
 	static SituationalQuestionProperties defaultProperties() {
-		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4,
-			new SituationalQuestionProperties.Priority(1, 2, 4, 5));
+		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7));
 	}
 
 	private ChatDraft draft(String json) {
@@ -32,6 +32,14 @@ class SituationalRulesTest {
 
 	private SituationalDay day(int daysAgo, Boolean medication, Set<BodyPart> parts, Set<SkinSign> signs) {
 		return new SituationalDay(today.minusDays(daysAgo), 3, BigDecimal.valueOf(7), medication, parts, signs);
+	}
+
+	private SituationalDay painDay(int daysAgo, int painIndex) {
+		return new SituationalDay(today.minusDays(daysAgo), painIndex, BigDecimal.valueOf(7), null, Set.of(), Set.of());
+	}
+
+	private ChatDraft painDraft(int painIndex) {
+		return draft("{\"painIndex\": " + painIndex + "}");
 	}
 
 	private SituationalQuestionContext context(ChatDraft draft, SituationalDay... days) {
@@ -147,7 +155,103 @@ class SituationalRulesTest {
 			.isFalse();
 	}
 
+	// ── P03 ──
+
+	@Test
+	void P03은_고통_지수_6_이상이_오늘_포함_3일_연속이면_나온다() {
+		HighPainStreakRule rule = new HighPainStreakRule(properties);
+
+		assertThat(rule.matches(context(painDraft(6), painDay(2, 7), painDay(1, 6)))).isTrue();
+		// 오늘이 5점이면 아니다.
+		assertThat(rule.matches(context(painDraft(5), painDay(2, 7), painDay(1, 6)))).isFalse();
+		// 어제가 5점이면 연속이 끊긴다.
+		assertThat(rule.matches(context(painDraft(8), painDay(2, 7), painDay(1, 5)))).isFalse();
+	}
+
+	@Test
+	void P03은_사이에_기록하지_않은_날이_있으면_연속이_아니다() {
+		HighPainStreakRule rule = new HighPainStreakRule(properties);
+
+		// 그저께 기록이 없고 사흘 전·어제만 높다.
+		assertThat(rule.matches(context(painDraft(7), painDay(3, 7), painDay(1, 7)))).isFalse();
+		assertThat(rule.matches(context(painDraft(7), painDay(1, 7)))).isFalse();
+	}
+
+	// ── P06 ──
+
+	@Test
+	void P06은_직전_기록이_3일_이상_전이면_나온다() {
+		LongGapRule rule = new LongGapRule(properties);
+
+		assertThat(rule.matches(context(painDraft(3), painDay(3, 3)))).isTrue();
+		assertThat(rule.matches(context(painDraft(3), painDay(5, 3), painDay(2, 3)))).isFalse();
+		// 최근 기록 목록 밖(예: 20일 전)이어도 직전 기록 날짜로 판정한다.
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), today.minusDays(20))))
+			.isTrue();
+	}
+
+	@Test
+	void P06은_처음_기록하는_날에는_나오지_않는다() {
+		assertThat(new LongGapRule(properties).matches(context(painDraft(3)))).isFalse();
+	}
+
+	// ── P07 ──
+
+	@Test
+	void P07은_고통_지수가_어제보다_3_이상_내리면_나온다() {
+		PainDropRule rule = new PainDropRule(properties);
+
+		assertThat(rule.matches(context(painDraft(4), painDay(1, 7)))).isTrue();
+		assertThat(rule.matches(context(painDraft(5), painDay(1, 7)))).isFalse();
+		// 올랐으면 아니다.
+		assertThat(rule.matches(context(painDraft(7), painDay(1, 4)))).isFalse();
+	}
+
+	@Test
+	void P07은_어제_기록이_없으면_나오지_않는다() {
+		PainDropRule rule = new PainDropRule(properties);
+
+		assertThat(rule.matches(context(painDraft(2)))).isFalse();
+		assertThat(rule.matches(context(painDraft(2), painDay(2, 9)))).isFalse();
+	}
+
 	// ── 순위 ──
+
+	@Test
+	void P03_P06_P07의_순위는_P03_P06_P07_순서다() {
+		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(
+			new PainDropRule(properties), new LongGapRule(properties), new HighPainStreakRule(properties)), properties);
+
+		// 3일 연속 높음 + 오래전 기록은 없음 → P03
+		assertThat(selector.select(context(painDraft(7), painDay(2, 7), painDay(1, 7)), Map.of(), today))
+			.contains("P03");
+		// 직전 기록이 4일 전 → P06 (어제 기록이 없으니 P07은 아님)
+		assertThat(selector.select(context(painDraft(2), painDay(4, 9)), Map.of(), today)).contains("P06");
+		// 어제보다 3점 내림 → P07, 최근에 나왔으면 아무것도 없음
+		assertThat(selector.select(context(painDraft(2), painDay(1, 6)), Map.of(), today)).contains("P07");
+		assertThat(selector.select(context(painDraft(2), painDay(1, 6)), Map.of("P07", today.minusDays(2)), today))
+			.isEmpty();
+	}
+
+	@Test
+	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
+		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
+			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7));
+
+		assertThat(longStreak.historyDays()).isEqualTo(9);
+		assertThat(properties.historyDays()).isEqualTo(7);
+	}
+
+	@Test
+	void 여러_조건이_맞으면_순위가_높은_P01이_P03보다_먼저다() {
+		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(
+			new HighPainStreakRule(properties), new PainJumpRule(properties)), properties);
+		SituationalQuestionContext context = context(painDraft(9), painDay(2, 6), painDay(1, 6));
+
+		assertThat(selector.select(context, Map.of(), today)).contains("P01");
+		assertThat(selector.select(context, Map.of("P01", today.minusDays(1)), today)).contains("P03");
+	}
+
 
 	@Test
 	void 여러_조건이_맞으면_P02_P04_P05_순서로_하나만_고르고_최근에_나온_것은_건너뛴다() {

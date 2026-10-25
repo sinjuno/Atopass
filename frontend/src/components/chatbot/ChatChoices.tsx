@@ -2,13 +2,20 @@ import { useEffect, useRef, useState, type AnimationEvent, type ReactNode } from
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
-import type { ChatChoiceRequest, ChoiceField, MissedMedicationReason, ShortSleepReason } from '@/types/chatbot';
+import type {
+  ChatChoiceRequest,
+  ChoiceField,
+  LongGapAnswer,
+  MissedMedicationReason,
+  ShortSleepReason,
+} from '@/types/chatbot';
 import type { BodyPart, SkinSign } from '@/types/record';
 import { sortSkinSigns, type BodyMapCounts } from '@/utils/bodyMap';
 import {
   BODY_MAP_PARTS,
   BODY_PART_LABELS,
   CHAT_SLEEP_HOURS_DEFAULT,
+  LONG_GAP_ANSWER_LABELS,
   MISSED_MEDICATION_REASON_LABELS,
   PAIN_INDEX_MIN,
   PENDING_FIELD_LABELS,
@@ -366,6 +373,39 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           template="하고 나서 생겼어요"
           templateLabel="~하고 나서 생겼어요"
           unknownLabel="잘 모르겠어요"
+          ariaLabel="어떻게 시작됐는지"
+          onSubmit={(text) => onChoose({ field, value: text })}
+          skip={skip}
+        />
+      );
+    case 'P03':
+      // 고통 지수가 높은 날이 며칠 이어질 때만 나오는 상황 질문. 칩은 "요즘 " 뒤에 커서를 둔다.
+      return (
+        <SituationalTextAnswer
+          disabled={disabled}
+          placeholder="예: 요즘 야근이 많아 늦게 자요"
+          template="요즘 해요"
+          templateLabel="요즘 ~해요"
+          templateCursor={3}
+          unknownLabel="특별히 없어요"
+          ariaLabel="요즘 생활에서 달라진 것"
+          onSubmit={(text) => onChoose({ field, value: text })}
+          skip={skip}
+        />
+      );
+    case 'P06':
+      // 직전 기록이 며칠 전일 때만 나오는 상황 질문. 하나 고르고, 덧붙일 말은 적어도 되고 안 적어도 된다.
+      return <LongGapChoices disabled={disabled} onPick={(value) => onChoose({ field, value })} skip={skip} />;
+    case 'P07':
+      // 고통 지수가 어제보다 많이 내린 날만 나오는 상황 질문
+      return (
+        <SituationalTextAnswer
+          disabled={disabled}
+          placeholder="예: 보습제를 바꿨더니 나아졌어요"
+          template="했더니 나아졌어요"
+          templateLabel="~했더니 나아졌어요"
+          unknownLabel="잘 모르겠어요"
+          ariaLabel="좋아지기 전에 달라진 것"
           onSubmit={(text) => onChoose({ field, value: text })}
           skip={skip}
         />
@@ -477,15 +517,87 @@ function ReasonChoices<T extends string>({
 }
 
 /**
- * 글로 답하는 상황 질문(P02 등). 시작 칩을 누르면 문장 끝부분이 채워지고 커서가 맨 앞에 와서 앞말만 적으면 된다.
- * "잘 모르겠어요" 칩은 그 말로 바로 저장한다.
+ * 며칠 만에 기록할 때 그동안 피부가 어땠는지 묻는 상황 질문(P06). 하나 고르면 덧붙일 말을 적는 칸이 열리고,
+ * 적지 않아도 "적어 둘게요"로 보낼 수 있다.
+ */
+function LongGapChoices({
+  disabled,
+  onPick,
+  skip,
+}: {
+  disabled?: boolean;
+  onPick: (value: { answer: LongGapAnswer; text?: string }) => void;
+  skip: ReactNode;
+}) {
+  const [answer, setAnswer] = useState<LongGapAnswer | null>(null);
+  const [text, setText] = useState('');
+  const trimmed = text.trim();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2" role="group" aria-label="그동안 피부는 어땠는지">
+        {(Object.keys(LONG_GAP_ANSWER_LABELS) as LongGapAnswer[]).map((value) => {
+          const selected = answer === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => setAnswer(value)}
+              disabled={disabled}
+              className={`min-h-11 flex-1 rounded-full border-2 px-3 text-base disabled:opacity-40 ${
+                selected ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-800'
+              }`}
+            >
+              {LONG_GAP_ANSWER_LABELS[value]}
+            </button>
+          );
+        })}
+      </div>
+      {answer && (
+        <>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={SITUATIONAL_TEXT_MAX_LENGTH}
+            rows={2}
+            placeholder="(선택) 예: 연고를 바꿨어요"
+            disabled={disabled}
+            aria-label="덧붙일 말"
+            className="resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-base"
+          />
+          <p className="text-right text-sm text-gray-500">
+            {text.length}/{SITUATIONAL_TEXT_MAX_LENGTH}
+          </p>
+        </>
+      )}
+      <div className="flex gap-2">
+        <ChoiceButton
+          onClick={() => answer && onPick(trimmed ? { answer, text: trimmed } : { answer })}
+          disabled={disabled || !answer}
+          primary
+          wide
+        >
+          적어 둘게요
+        </ChoiceButton>
+        {skip}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 글로 답하는 상황 질문(P02·P03·P07). 시작 칩을 누르면 문장 일부가 채워지고 커서가 templateCursor(기본은 맨 앞)에 와서
+ * 빈 곳만 적으면 된다. "잘 모르겠어요" 같은 칩은 그 말로 바로 저장한다.
  */
 function SituationalTextAnswer({
   disabled,
   placeholder,
   template,
   templateLabel,
+  templateCursor = 0,
   unknownLabel,
+  ariaLabel,
   onSubmit,
   skip,
 }: {
@@ -493,7 +605,9 @@ function SituationalTextAnswer({
   placeholder: string;
   template: string;
   templateLabel: string;
+  templateCursor?: number;
   unknownLabel: string;
+  ariaLabel: string;
   onSubmit: (text: string) => void;
   skip: ReactNode;
 }) {
@@ -503,10 +617,10 @@ function SituationalTextAnswer({
 
   const fillTemplate = () => {
     setText(template);
-    // 값이 그려진 뒤에 커서를 맨 앞으로 옮긴다
+    // 값이 그려진 뒤에 커서를 빈 곳으로 옮긴다
     requestAnimationFrame(() => {
       inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(0, 0);
+      inputRef.current?.setSelectionRange(templateCursor, templateCursor);
     });
   };
 
@@ -528,7 +642,7 @@ function SituationalTextAnswer({
         rows={2}
         placeholder={placeholder}
         disabled={disabled}
-        aria-label="어떻게 시작됐는지"
+        aria-label={ariaLabel}
         className="resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-base"
       />
       <p className="text-right text-sm text-gray-500">
