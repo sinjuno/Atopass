@@ -1249,6 +1249,52 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.satisfies(answer -> assertThat(answer.getAnswerJson()).isEqualTo("{\"text\":\"잘 모르겠어요\"}"));
 	}
 
+	// ── 기록 화면에 보이는 답 ──
+
+	@Test
+	void 상황_질문과_마무리_질문_답은_기록_상세에_제목과_함께_나온다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 4));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 5));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P04"));
+		mockMvc.perform(choice(bearer, session, "P04", "ITCH_WOKE"));
+		mockMvc.perform(skipChoice(bearer, session, "notes"));
+		String body = mockMvc.perform(choice(bearer, session, "C02",
+				Map.of("productNote", "새 보습제", "clinicQuestion", "연고 계속 써도 될까요?")))
+			.andExpect(jsonPath("$.data.recordId").isNumber())
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(body).path("data").path("recordId").asLong();
+
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.notes").doesNotExist())
+			.andExpect(jsonPath("$.data.situationalAnswers.length()").value(3))
+			.andExpect(jsonPath("$.data.situationalAnswers[0].questionId").value("P04"))
+			.andExpect(jsonPath("$.data.situationalAnswers[0].title").value("잠을 적게 잔 이유"))
+			.andExpect(jsonPath("$.data.situationalAnswers[0].answer").value("가려워서 깸"))
+			.andExpect(jsonPath("$.data.situationalAnswers[1].title").value("새로 쓴 제품"))
+			.andExpect(jsonPath("$.data.situationalAnswers[1].answer").value("새 보습제"))
+			.andExpect(jsonPath("$.data.situationalAnswers[2].title").value("진료 때 물어볼 것"))
+			.andExpect(jsonPath("$.data.situationalAnswers[2].answer").value("연고 계속 써도 될까요?"));
+	}
+
+	@Test
+	void 챗봇_답이_없는_기록은_빈_목록이다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(1), 3, 7, null, null, List.of());
+		String list = mockMvc.perform(get("/api/v1/records").header(AUTH, bearer))
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(list).path("data").path("content").get(0).path("recordId").asLong();
+
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.situationalAnswers.length()").value(0));
+	}
+
 	// ── 특이사항 문구(S01) ──
 
 	@Test

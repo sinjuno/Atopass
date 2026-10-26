@@ -41,7 +41,12 @@ export default function SelectedDayRecord({ date, recordId, onClose }: Props) {
           <ErrorMessage message={getErrorMessage(detail.error)} onRetry={detail.reload} />
         </div>
       ) : (
-        <RecordView record={detail.data} recordId={detail.data.recordId} photos={detail.data.photos} />
+        <RecordView
+          record={detail.data}
+          recordId={detail.data.recordId}
+          photos={detail.data.photos}
+          situationalAnswers={detail.data.situationalAnswers}
+        />
       )}
     </section>
   );

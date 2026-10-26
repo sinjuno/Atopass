@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.report.service;
 
+import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
@@ -64,13 +65,23 @@ record ReportContent(
 		/** 약 복용 여부. 기록하지 않았으면 null */
 		Boolean medication,
 		/** 나타난 증상. 없으면 빈 목록 */
-		List<SkinSign> skinSigns
+		List<SkinSign> skinSigns,
+		/** 챗봇 상황 질문·마무리 질문 답. 없으면 빈 목록 */
+		List<SituationalAnswerItem> situationalAnswers
 	) {
 
-		/** 고통 지수·약 복용·나타난 증상이 없는 하루 기록 */
+		/** 고통 지수·약 복용·나타난 증상·챗봇 답이 없는 하루 기록 */
 		DayEntry(LocalDate date, Map<BodyPart, Map<Symptom, Integer>> conditions, BigDecimal sleepHours,
 			Boolean alcohol, OutdoorActivity outdoorActivity, String notes, List<ReportPhoto> photos) {
 			this(date, conditions, sleepHours, alcohol, outdoorActivity, notes, photos, null, null, List.of());
+		}
+
+		/** 챗봇 답이 없는 하루 기록 */
+		DayEntry(LocalDate date, Map<BodyPart, Map<Symptom, Integer>> conditions, BigDecimal sleepHours,
+			Boolean alcohol, OutdoorActivity outdoorActivity, String notes, List<ReportPhoto> photos,
+			Integer painIndex, Boolean medication, List<SkinSign> skinSigns) {
+			this(date, conditions, sleepHours, alcohol, outdoorActivity, notes, photos, painIndex, medication, skinSigns,
+				List.of());
 		}
 
 	}

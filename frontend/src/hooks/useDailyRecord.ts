@@ -3,7 +3,7 @@ import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
 import { recordApi } from '@/apis/record';
-import type { PhotoRef, RecordInput } from '@/types/record';
+import type { PhotoRef, RecordInput, SituationalAnswerItem } from '@/types/record';
 import { dailyOnlySkinSigns } from '@/utils/bodyMap';
 import { chatSessionStore } from './useRecordDraft';
 
@@ -54,6 +54,7 @@ export function useDailyRecord(recordDate: string) {
   const [recordId, setRecordId] = useState<number | null>(null);
   const [form, setForm] = useState<RecordInput>(() => emptyRecord(recordDate));
   const [photos, setPhotos] = useState<PhotoRef[]>([]);
+  const [situationalAnswers, setSituationalAnswers] = useState<SituationalAnswerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,9 +65,12 @@ export function useDailyRecord(recordDate: string) {
       const summary = await recordApi.findByDate(recordDate);
       if (summary) {
         const detail = await recordApi.getDetail(summary.recordId);
-        const { recordId, photos, sleepScore: _s, createdAt: _c, updatedAt: _u, ...input } = detail;
+        // 챗봇 답은 보여 주기만 하고 기록과 함께 저장하지 않으므로 폼 값에서 뺀다
+        const { recordId, photos, sleepScore: _s, createdAt: _c, updatedAt: _u, situationalAnswers, ...input } =
+          detail;
         setMode('edit');
         setRecordId(recordId);
+        setSituationalAnswers(situationalAnswers ?? []);
         // 서버의 하루 증상에는 부위 증상이 합쳐져 있다 — 부위 증상을 빼 두어야 부위에서 지운 증상이 다시 저장되지 않는다
         setForm({ ...input, skinSigns: dailyOnlySkinSigns(input) });
         setPhotos(photos ?? []);
@@ -75,6 +79,7 @@ export function useDailyRecord(recordDate: string) {
 
       setRecordId(null);
       setPhotos([]);
+      setSituationalAnswers([]);
       const sessionId = chatSessionStore.get(recordDate);
       const draft = sessionId ? await loadChatDraft(sessionId) : null;
       if (draft === 'closed') {
@@ -152,5 +157,18 @@ export function useDailyRecord(recordDate: string) {
     [recordId],
   );
 
-  return { mode, recordId, form, setForm, photos, loading, error, save, remove, removePhoto, reload: load };
+  return {
+    mode,
+    recordId,
+    form,
+    setForm,
+    photos,
+    situationalAnswers,
+    loading,
+    error,
+    save,
+    remove,
+    removePhoto,
+    reload: load,
+  };
 }
