@@ -2,16 +2,19 @@ import { useEffect, useRef, useState, type AnimationEvent, type ReactNode } from
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
-import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
+import type { ChatChoiceRequest, ChoiceField, MissedMedicationReason, ShortSleepReason } from '@/types/chatbot';
 import type { BodyPart, SkinSign } from '@/types/record';
 import { sortSkinSigns, type BodyMapCounts } from '@/utils/bodyMap';
 import {
   BODY_MAP_PARTS,
   BODY_PART_LABELS,
   CHAT_SLEEP_HOURS_DEFAULT,
+  MISSED_MEDICATION_REASON_LABELS,
   PAIN_INDEX_MIN,
   PENDING_FIELD_LABELS,
   PHOTO_ACCEPT,
+  SHORT_SLEEP_REASON_LABELS,
+  SITUATIONAL_TEXT_MAX_LENGTH,
   SKIN_SIGN_DESCRIPTIONS,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
@@ -354,6 +357,41 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           />
         </div>
       );
+    case 'P02':
+      // 어제 없던 증상·부위가 생긴 날만 나오는 상황 질문. 질문 문구(증상 이름)는 서버가 정한다.
+      return (
+        <SituationalTextAnswer
+          disabled={disabled}
+          placeholder="예: 새 바디워시를 쓰고 나서 생겼어요"
+          template="하고 나서 생겼어요"
+          templateLabel="~하고 나서 생겼어요"
+          unknownLabel="잘 모르겠어요"
+          onSubmit={(text) => onChoose({ field, value: text })}
+          skip={skip}
+        />
+      );
+    case 'P04':
+      // 잠을 적게 자고 고통 지수도 높은 날만 나오는 상황 질문
+      return (
+        <ReasonChoices
+          labels={SHORT_SLEEP_REASON_LABELS}
+          ariaLabel="잠을 적게 잔 이유"
+          disabled={disabled}
+          onPick={(value: ShortSleepReason) => onChoose({ field, value })}
+          skip={skip}
+        />
+      );
+    case 'P05':
+      // 평소 약을 챙기다 오늘 못 챙긴 날만 나오는 상황 질문. 이유만 남기고 복용을 권하지 않는다.
+      return (
+        <ReasonChoices
+          labels={MISSED_MEDICATION_REASON_LABELS}
+          ariaLabel="약을 못 챙긴 이유"
+          disabled={disabled}
+          onPick={(value: MissedMedicationReason) => onChoose({ field, value })}
+          skip={skip}
+        />
+      );
     case 'C02': {
       // 매일 특이사항 다음에 묻는 마무리 질문. 고른 항목만 보내고, "없어요"는 아무것도 저장하지 않는다.
       const items: Array<{
@@ -408,6 +446,102 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
       );
     }
   }
+}
+
+/** 이유를 하나 고르는 상황 질문(P04·P05). 버튼 2개씩 두 줄로 두고, 맨 아래에 넘어가기 */
+function ReasonChoices<T extends string>({
+  labels,
+  ariaLabel,
+  disabled,
+  onPick,
+  skip,
+}: {
+  labels: Record<T, string>;
+  ariaLabel: string;
+  disabled?: boolean;
+  onPick: (value: T) => void;
+  skip: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label={ariaLabel}>
+        {(Object.keys(labels) as T[]).map((value) => (
+          <ChoiceButton key={value} onClick={() => onPick(value)} disabled={disabled}>
+            {labels[value]}
+          </ChoiceButton>
+        ))}
+      </div>
+      <div className="flex justify-end">{skip}</div>
+    </div>
+  );
+}
+
+/**
+ * 글로 답하는 상황 질문(P02 등). 시작 칩을 누르면 문장 끝부분이 채워지고 커서가 맨 앞에 와서 앞말만 적으면 된다.
+ * "잘 모르겠어요" 칩은 그 말로 바로 저장한다.
+ */
+function SituationalTextAnswer({
+  disabled,
+  placeholder,
+  template,
+  templateLabel,
+  unknownLabel,
+  onSubmit,
+  skip,
+}: {
+  disabled?: boolean;
+  placeholder: string;
+  template: string;
+  templateLabel: string;
+  unknownLabel: string;
+  onSubmit: (text: string) => void;
+  skip: ReactNode;
+}) {
+  const [text, setText] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const trimmed = text.trim();
+
+  const fillTemplate = () => {
+    setText(template);
+    // 값이 그려진 뒤에 커서를 맨 앞으로 옮긴다
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(0, 0);
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <ChoiceButton onClick={fillTemplate} disabled={disabled}>
+          {templateLabel}
+        </ChoiceButton>
+        <ChoiceButton onClick={() => onSubmit(unknownLabel)} disabled={disabled}>
+          {unknownLabel}
+        </ChoiceButton>
+      </div>
+      <textarea
+        ref={inputRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={SITUATIONAL_TEXT_MAX_LENGTH}
+        rows={2}
+        placeholder={placeholder}
+        disabled={disabled}
+        aria-label="어떻게 시작됐는지"
+        className="resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-base"
+      />
+      <p className="text-right text-sm text-gray-500">
+        {text.length}/{SITUATIONAL_TEXT_MAX_LENGTH}
+      </p>
+      <div className="flex gap-2">
+        <ChoiceButton onClick={() => onSubmit(trimmed)} disabled={disabled || trimmed.length === 0} primary wide>
+          적어 둘게요
+        </ChoiceButton>
+        {skip}
+      </div>
+    </div>
+  );
 }
 
 function ChoiceButton({

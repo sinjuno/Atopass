@@ -3,7 +3,13 @@ import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
 import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
-import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
+import {
+  BODY_MAP_PARTS,
+  BODY_PART_LABELS,
+  MISSED_MEDICATION_REASON_LABELS,
+  SHORT_SLEEP_REASON_LABELS,
+  SKIN_SIGN_LABELS,
+} from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
 /**
@@ -52,6 +58,12 @@ export function choiceText(choice: ChatChoiceRequest): string {
             .join(', ');
     case 'P01':
       return { TODAY: '오늘', SINCE_YESTERDAY: '어제부터', FEW_DAYS_AGO: '2~3일 전' }[choice.value];
+    case 'P02':
+      return choice.value.trim();
+    case 'P04':
+      return SHORT_SLEEP_REASON_LABELS[choice.value];
+    case 'P05':
+      return MISSED_MEDICATION_REASON_LABELS[choice.value];
     case 'C02':
       return '적어 둘게요';
   }

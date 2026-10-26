@@ -1,4 +1,4 @@
-import type { PendingField } from '@/types/chatbot';
+import type { MissedMedicationReason, PendingField, ShortSleepReason } from '@/types/chatbot';
 import type { BodyPart, OutdoorActivity, SkinSign, SymptomKey } from '@/types/record';
 
 // Swagger BodyPart enum 순서
@@ -146,8 +146,30 @@ export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   notes: '특이사항',
   signImage: '예시 사진',
   P01: '상황 질문',
+  P02: '상황 질문',
+  P04: '상황 질문',
+  P05: '상황 질문',
   C02: '마무리 질문',
 };
+
+/** 상황 질문 P04(잠을 적게 잔 이유) 선택지. 서버의 대화 내역 문구와 같다 */
+export const SHORT_SLEEP_REASON_LABELS: Record<ShortSleepReason, string> = {
+  ITCH_WOKE: '가려워서 깸',
+  LATE_SLEEP: '늦게 잠',
+  BOTH: '둘 다',
+  OTHER: '기타',
+};
+
+/** 상황 질문 P05(약을 못 챙긴 이유) 선택지. 이유만 기록하고 복용을 권하지 않는다 */
+export const MISSED_MEDICATION_REASON_LABELS: Record<MissedMedicationReason, string> = {
+  FORGOT: '깜빡함',
+  RAN_OUT: '다 떨어짐',
+  AWAY: '외출 중',
+  OTHER: '기타',
+};
+
+/** 글로 답하는 상황 질문(P02 등)의 최대 글자 수. 서버와 같다 */
+export const SITUATIONAL_TEXT_MAX_LENGTH = 200;
 
 /** 챗봇 이용 동의 팝업 문구 */
 export const CHAT_CONSENT_TEXT = [

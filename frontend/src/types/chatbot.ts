@@ -22,8 +22,14 @@ export type PendingField =
   | 'signImage'
   /** 상황 질문. 조건에 맞을 때만, 수면 시간 다음~특이사항 앞에 하루 1개 나온다 */
   | 'P01'
+  | 'P02'
+  | 'P04'
+  | 'P05'
   /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
   | 'C02';
+
+export type ShortSleepReason = 'ITCH_WOKE' | 'LATE_SLEEP' | 'BOTH' | 'OTHER';
+export type MissedMedicationReason = 'FORGOT' | 'RAN_OUT' | 'AWAY' | 'OTHER';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -77,6 +83,12 @@ export type ChatChoiceRequest =
   | { field: 'signImage'; value: boolean }
   /** 상황 질문(P01) 답 — 고통 지수가 언제부터 심해졌는지 */
   | { field: 'P01'; value: 'TODAY' | 'SINCE_YESTERDAY' | 'FEW_DAYS_AGO' }
+  /** 상황 질문(P02) 답 — 어제 없던 증상·부위가 어떻게 시작됐는지 (글, 200자 이내) */
+  | { field: 'P02'; value: string }
+  /** 상황 질문(P04) 답 — 잠을 적게 잔 이유 */
+  | { field: 'P04'; value: ShortSleepReason }
+  /** 상황 질문(P05) 답 — 약을 못 챙긴 이유 */
+  | { field: 'P05'; value: MissedMedicationReason }
   /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
   | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */

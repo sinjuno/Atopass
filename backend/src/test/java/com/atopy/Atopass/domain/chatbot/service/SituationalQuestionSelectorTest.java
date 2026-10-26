@@ -2,18 +2,18 @@ package com.atopy.Atopass.domain.chatbot.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.atopy.Atopass.domain.record.entity.SkinRecord;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 class SituationalQuestionSelectorTest {
 
 	private final JsonMapper mapper = JsonMapper.builder().build();
-	private final SituationalQuestionProperties properties = new SituationalQuestionProperties(2, 3);
+	private final SituationalQuestionProperties properties = SituationalRulesTest.defaultProperties();
 	private final LocalDate today = LocalDate.of(2026, 10, 23);
 
 	private ChatDraft draftWithPainIndex(int painIndex) {
@@ -22,14 +22,14 @@ class SituationalQuestionSelectorTest {
 		return draft;
 	}
 
-	private SkinRecord recordWithPainIndex(int painIndex) {
-		return SkinRecord.builder().recordDate(today.minusDays(1)).painIndex(painIndex).build();
+	private SituationalDay yesterdayWithPainIndex(int painIndex) {
+		return new SituationalDay(today.minusDays(1), painIndex, BigDecimal.valueOf(7), null, Set.of(), Set.of());
 	}
 
 	@Test
 	void 고통_지수가_어제보다_threshold_이상_오르면_P01이_선택된다() {
 		SituationalQuestionContext context = new SituationalQuestionContext(
-			draftWithPainIndex(6), Optional.of(recordWithPainIndex(3)));
+			draftWithPainIndex(6), today, List.of(yesterdayWithPainIndex(3)));
 		SituationalQuestionSelector selector = new SituationalQuestionSelector(
 			List.of(new PainJumpRule(properties)), properties);
 
@@ -38,7 +38,7 @@ class SituationalQuestionSelectorTest {
 
 	@Test
 	void 어제_기록이_없으면_P01이_선택되지_않는다() {
-		SituationalQuestionContext context = new SituationalQuestionContext(draftWithPainIndex(6), Optional.empty());
+		SituationalQuestionContext context = new SituationalQuestionContext(draftWithPainIndex(6), today, List.of());
 		SituationalQuestionSelector selector = new SituationalQuestionSelector(
 			List.of(new PainJumpRule(properties)), properties);
 
@@ -48,7 +48,7 @@ class SituationalQuestionSelectorTest {
 	@Test
 	void 점수_차이가_threshold_미만이면_선택되지_않는다() {
 		SituationalQuestionContext context = new SituationalQuestionContext(
-			draftWithPainIndex(4), Optional.of(recordWithPainIndex(3)));
+			draftWithPainIndex(4), today, List.of(yesterdayWithPainIndex(3)));
 		SituationalQuestionSelector selector = new SituationalQuestionSelector(
 			List.of(new PainJumpRule(properties)), properties);
 
@@ -58,7 +58,7 @@ class SituationalQuestionSelectorTest {
 	@Test
 	void 최근_3일_이내에_나온_질문은_제외된다() {
 		SituationalQuestionContext context = new SituationalQuestionContext(
-			draftWithPainIndex(6), Optional.of(recordWithPainIndex(3)));
+			draftWithPainIndex(6), today, List.of(yesterdayWithPainIndex(3)));
 		SituationalQuestionSelector selector = new SituationalQuestionSelector(
 			List.of(new PainJumpRule(properties)), properties);
 
@@ -94,7 +94,7 @@ class SituationalQuestionSelectorTest {
 				return true;
 			}
 		};
-		SituationalQuestionContext context = new SituationalQuestionContext(draftWithPainIndex(6), Optional.empty());
+		SituationalQuestionContext context = new SituationalQuestionContext(draftWithPainIndex(6), today, List.of());
 		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(low, high), properties);
 
 		assertThat(selector.select(context, Map.of(), today)).contains("HIGH");
