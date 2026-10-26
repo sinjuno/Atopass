@@ -26,6 +26,7 @@ export default function ChatbotPage() {
   const {
     messages,
     askingField,
+    inputPlaceholder,
     requiresConfirmation,
     chatDraft,
     painIndex,
@@ -189,6 +190,7 @@ export default function ChatbotPage() {
           onSubmit={handleSubmit}
           onAttachPhotos={handleAttach}
           disabled={status !== 'ready'}
+          placeholder={inputPlaceholder ? `예: ${inputPlaceholder}` : undefined}
         />
       )}
 

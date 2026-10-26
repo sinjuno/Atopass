@@ -297,7 +297,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
 		mockMvc.perform(sendMessage(bearer, session, "예"))
-			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
+			.andExpect(jsonPath("$.data.reply").value("오늘 특별히 남겨둘 일이 있으면 적어주세요. 없으면 '없어요'를 눌러 주세요."))
+			.andExpect(jsonPath("$.data.inputPlaceholder").value("바디워시를 바꿨어요"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
 		// 특이사항 다음에는 마무리 질문(C02)이 남아, 아직 확인 단계로 넘어가지 않는다.
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
@@ -1248,7 +1249,70 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.satisfies(answer -> assertThat(answer.getAnswerJson()).isEqualTo("{\"text\":\"잘 모르겠어요\"}"));
 	}
 
+	// ── 특이사항 문구(S01) ──
+
+	@Test
+	void 고통_지수가_6_이상이면_특이사항은_가장_불편했던_순간을_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("notes"))
+			.andExpect(jsonPath("$.data.reply").value("오늘 가장 불편했던 순간을 적어주세요. 없으면 '없어요'를 눌러 주세요."))
+			.andExpect(jsonPath("$.data.inputPlaceholder").value("샤워하고 나서 목이 화끈거리고 가려웠어요"));
+		// 새로고침 뒤 초안 상태에도 같은 예시가 온다.
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.inputPlaceholder").value("샤워하고 나서 목이 화끈거리고 가려웠어요"));
+	}
+
+	@Test
+	void 재진일이_7일_이내면_고통_지수가_높아도_의사_선생님께_전할_말을_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createVisit(bearer, today.plusDays(7));
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.reply").value("오늘 상태를 의사 선생님께 한 문장으로 전한다면? 없으면 '없어요'를 눌러 주세요."))
+			.andExpect(jsonPath("$.data.inputPlaceholder").value("밤에 가려워서 3일째 잠을 설치고 있어요"));
+		// 특이사항에 저장하는 값은 그대로다.
+		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"밤에 가려워서 깼어요\"}}");
+		mockMvc.perform(sendMessage(bearer, session, "밤에 가려워서 깼어요"))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
+			.andExpect(jsonPath("$.data.inputPlaceholder").doesNotExist())
+			.andExpect(jsonPath("$.data.draft.notes").value("밤에 가려워서 깼어요"));
+	}
+
+	@Test
+	void 재진일이_8일_뒤이거나_이미_지났으면_재진_문구가_나오지_않는다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createVisit(bearer, today.plusDays(8));
+		createVisit(bearer, today.minusDays(1));
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.reply").value("오늘 특별히 남겨둘 일이 있으면 적어주세요. 없으면 '없어요'를 눌러 주세요."));
+	}
+
 	// ── 헬퍼 ──
+
+	private void createVisit(String bearer, LocalDate date) throws Exception {
+		mockMvc.perform(withJson(post("/api/v1/visits").header(AUTH, bearer), Map.of("visitDate", date.toString())))
+			.andExpect(status().isCreated());
+	}
 
 	/** 챗봇은 이용 동의가 있어야 쓸 수 있으므로, 테스트에서는 먼저 동의(멱등)하고 세션을 만든다. */
 	private String createSession(String bearer, String mode) throws Exception {

@@ -15,6 +15,7 @@ import java.util.List;
  * @param editing              그날 기록이 이미 저장되어, 이제 글로 고치면 바로 저장되는 대화인지
  * @param recordId             이 대화로 저장한(또는 고치는) 기록의 ID. 아직 저장 전이면 null
  * @param imageSign            이 답과 함께 보여 줄 증상 예시 사진. 사용자가 보여 달라고 했을 때만 있고, 아니면 null
+ * @param inputPlaceholder     글 입력칸에 흐리게 보여 줄 예시. 특이사항(notes)을 묻는 중일 때만 있고, 아니면 null
  */
 public record ChatReplyResponse(
 	String reply,
@@ -25,12 +26,25 @@ public record ChatReplyResponse(
 	ChatDraftResponse draft,
 	boolean editing,
 	Long recordId,
-	SkinSign imageSign
+	SkinSign imageSign,
+	String inputPlaceholder
 ) {
+
+	public ChatReplyResponse(String reply, boolean understood, List<String> pendingFields, String askingField,
+		boolean requiresConfirmation, ChatDraftResponse draft, boolean editing, Long recordId, SkinSign imageSign) {
+		this(reply, understood, pendingFields, askingField, requiresConfirmation, draft, editing, recordId, imageSign,
+			null);
+	}
 
 	/** 기록을 저장한 뒤 그 ID를 붙인다. */
 	public ChatReplyResponse withRecordId(Long id) {
 		return new ChatReplyResponse(reply, understood, pendingFields, askingField, requiresConfirmation, draft,
-			id != null || editing, id, imageSign);
+			id != null || editing, id, imageSign, inputPlaceholder);
+	}
+
+	/** 글 입력칸 예시를 붙인다. */
+	public ChatReplyResponse withInputPlaceholder(String placeholder) {
+		return new ChatReplyResponse(reply, understood, pendingFields, askingField, requiresConfirmation, draft,
+			editing, recordId, imageSign, placeholder);
 	}
 }

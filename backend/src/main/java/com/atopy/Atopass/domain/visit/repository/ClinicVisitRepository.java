@@ -12,6 +12,9 @@ public interface ClinicVisitRepository extends JpaRepository<ClinicVisit, Long> 
 
 	boolean existsByMemberIdAndVisitDate(Long memberId, LocalDate visitDate);
 
+	/** 기간 안(양 끝 포함)에 재진 날짜가 있는지. (챗봇 특이사항 질문에서 재진일이 가까운지 볼 때 사용) */
+	boolean existsByMemberIdAndVisitDateBetween(Long memberId, LocalDate startDate, LocalDate endDate);
+
 	/** 다른 회원의 재진 날짜는 존재하지 않는 것처럼 조회되지 않는다. */
 	Optional<ClinicVisit> findByIdAndMemberId(Long id, Long memberId);
 
