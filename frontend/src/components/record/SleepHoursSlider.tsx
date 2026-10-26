@@ -10,7 +10,7 @@ interface Props {
 const SLEEP_HOURS_MIN = CHAT_SLEEP_HOURS_OPTIONS[0];
 const SLEEP_HOURS_MAX = CHAT_SLEEP_HOURS_OPTIONS[CHAT_SLEEP_HOURS_OPTIONS.length - 1];
 
-/** 수면 시간(0~12시간) 가로 막대. 고통 지수 막대처럼 왼쪽 0시간에서 오른쪽 12시간까지 좌우로 밀어 고른다 */
+/** 수면 시간(0~12시간) 가로 막대. 불편함 지수 막대처럼 왼쪽 0시간에서 오른쪽 12시간까지 좌우로 밀어 고른다 */
 export default function SleepHoursSlider({ value, onChange, disabled }: Props) {
   return (
     <div className="flex flex-col gap-1">

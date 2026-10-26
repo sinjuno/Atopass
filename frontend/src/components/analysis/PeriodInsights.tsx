@@ -2,9 +2,9 @@ import { useState } from 'react';
 import type { Insight } from '@/types/analysis';
 import { BODY_PART_LABELS, SYMPTOM_LABELS } from '@/utils/constants';
 
-/** 인사이트가 무엇에 대한 것인지. 고통 지수 변화는 bodyPart·symptom이 null이다 */
+/** 인사이트가 무엇에 대한 것인지. 불편함 지수 변화는 bodyPart·symptom이 null이다 */
 function insightSubject(insight: Insight) {
-  if (insight.type === 'PAIN_INDEX_CHANGE') return '고통 지수';
+  if (insight.type === 'PAIN_INDEX_CHANGE') return '불편함 지수';
   const part = insight.bodyPart ? BODY_PART_LABELS[insight.bodyPart] : null;
   const symptom = insight.symptom ? SYMPTOM_LABELS[insight.symptom] : null;
   return [part, symptom].filter(Boolean).join(' ') || null;

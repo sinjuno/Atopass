@@ -29,7 +29,7 @@ class ChatLocalEditParserTest {
 
 	@Test
 	void 고통_지수를_고치는_말을_알아듣는다() {
-		Optional<ChatReplyParser.ModelOutput> result = parser.parse("고통 지수는 7점이야");
+		Optional<ChatReplyParser.ModelOutput> result = parser.parse("불편함 지수는 7점이야");
 
 		assertThat(result).isPresent();
 		assertThat(result.get().updates().path("painIndex").intValue()).isEqualTo(7);

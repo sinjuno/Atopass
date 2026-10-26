@@ -99,7 +99,7 @@ export function useChatSession(recordDate: string) {
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   // 그날 기록이 저장되었으면 그 ID. 사진을 바로 올릴 때 쓴다
   const [recordId, setRecordId] = useState<number | null>(null);
-  // 지금까지 모은 초안 — 고통 지수(캐릭터 표정), 방금 고른 증상(부위 선택지), 부위별 증상(총정리 마네킹)에 쓴다
+  // 지금까지 모은 초안 — 불편함 지수(캐릭터 표정), 방금 고른 증상(부위 선택지), 부위별 증상(총정리 마네킹)에 쓴다
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null);
   // 가장 최근 응답에서 말을 알아들었는지. 알아듣지 못했을 때만 아토미가 고민하는 표정을 짓는다
   const [understood, setUnderstood] = useState(true);

@@ -59,7 +59,7 @@ export interface SendMessageResponse {
   recordId: number | null;
   /** 이 답과 함께 보여 줄 증상 예시 사진. 사용자가 보여 달라고 답했을 때만 온다 */
   imageSign: SkinSign | null;
-  /** 글 입력칸 예시. 특이사항을 묻는 중일 때만 오고, 질문 문구와 같은 조건(재진일·고통 지수)으로 서버가 고른다 */
+  /** 글 입력칸 예시. 특이사항을 묻는 중일 때만 오고, 질문 문구와 같은 조건(재진일·불편함 지수)으로 서버가 고른다 */
   inputPlaceholder?: string | null;
 }
 
@@ -81,7 +81,7 @@ export interface ChatDraftState {
  */
 export type ChatChoiceRequest =
   | { field: 'painIndex'; value: number }
-  /** 증상이 나타난(고통이 있는) 부위. 고른 부위마다 고통 지수가 그 부위의 점수가, 방금 고른 증상이 그 부위의 증상이 된다 */
+  /** 증상이 나타난(고통이 있는) 부위. 고른 부위마다 불편함 지수가 그 부위의 점수가, 방금 고른 증상이 그 부위의 증상이 된다 */
   | { field: 'bodyParts'; value: BodyPart[] }
   | { field: 'sleepHours'; value: number }
   | { field: 'medication'; value: boolean }
@@ -89,7 +89,7 @@ export type ChatChoiceRequest =
   | { field: 'skinSigns'; value: SkinSign[] }
   /** 증상 예시 사진을 보여 줄지 */
   | { field: 'signImage'; value: boolean }
-  /** 상황 질문(P01) 답 — 고통 지수가 언제부터 심해졌는지 */
+  /** 상황 질문(P01) 답 — 불편함 지수가 언제부터 심해졌는지 */
   | { field: 'P01'; value: 'TODAY' | 'SINCE_YESTERDAY' | 'FEW_DAYS_AGO' }
   /** 상황 질문(P02) 답 — 어제 없던 증상·부위가 어떻게 시작됐는지 (글, 200자 이내) */
   | { field: 'P02'; value: string }

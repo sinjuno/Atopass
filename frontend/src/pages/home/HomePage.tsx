@@ -76,7 +76,7 @@ export default function HomePage() {
                   <p className="flex items-center gap-2">
                     <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-bold text-brand-700">기록됨</span>
                     <span className="text-gray-600">
-                      {todayScore === null ? '고통 지수 기록 없음' : `고통 지수 ${todayScore}점`}
+                      {todayScore === null ? '불편함 지수 기록 없음' : `불편함 지수 ${todayScore}점`}
                     </span>
                   </p>
                   <Link
@@ -119,7 +119,7 @@ export default function HomePage() {
 
             <section className="rounded-3xl bg-white p-5 shadow-card">
               <h2 className="font-bold text-gray-700">피부 변화</h2>
-              <p className="mb-3 text-sm text-gray-400">그날 기록한 고통 지수예요</p>
+              <p className="mb-3 text-sm text-gray-400">그날 기록한 불편함 지수예요</p>
               {hasAnyScore ? (
                 <WeeklyScoreChart data={chartData} />
               ) : (
@@ -144,7 +144,7 @@ export default function HomePage() {
                         <span>
                           <span className="block font-medium">{formatKoreanDate(record.recordDate)}</span>
                           <span className="block text-sm text-gray-400">
-                            {record.painIndex === null ? '고통 지수 기록 없음' : `고통 지수 ${record.painIndex}점`}
+                            {record.painIndex === null ? '불편함 지수 기록 없음' : `불편함 지수 ${record.painIndex}점`}
                           </span>
                         </span>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="size-4 text-gray-300">

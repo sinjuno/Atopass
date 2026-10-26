@@ -20,7 +20,7 @@ public record InsightResponse(
 
 	public static final String SYMPTOM_CHANGE = "SYMPTOM_CHANGE";
 
-	/** 고통 지수(하루 대표 점수) 변화. 이때 bodyPart와 symptom은 null이다. */
+	/** 불편함 지수(하루 대표 점수) 변화. 이때 bodyPart와 symptom은 null이다. */
 	public static final String PAIN_INDEX_CHANGE = "PAIN_INDEX_CHANGE";
 
 }

@@ -60,7 +60,7 @@ export interface Lifestyle {
 export interface RecordInput {
   recordDate: string; // yyyy-MM-dd
   skinConditions: SkinCondition[];
-  /** 고통 지수 0~10 (0은 없음) */
+  /** 불편함 지수 0~10 (0은 없음) */
   painIndex?: number | null;
   sleepHours?: number | null;
   /** 약 복용 여부 */
