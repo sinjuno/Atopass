@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.chatbot.service;
 
+import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.repository.RecordRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -22,6 +23,14 @@ class SituationalHistoryLoader {
 			.stream()
 			.map(SituationalDay::from)
 			.toList();
+	}
+
+	/** today 전 가장 최근 기록의 날짜. 기간과 상관없이 찾고, 처음 기록하는 날이면 null이다. */
+	@Transactional(readOnly = true)
+	LocalDate previousRecordDate(Long memberId, LocalDate today) {
+		return recordRepository.findFirstByMemberIdAndRecordDateBeforeOrderByRecordDateDesc(memberId, today)
+			.map(SkinRecord::getRecordDate)
+			.orElse(null);
 	}
 
 }

@@ -77,17 +77,23 @@ public class ChatbotService {
 	static final String EDIT_RESUME = "바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요.";
 	/** 증상 예시 사진을 보여 줄지 묻는 항목. 기록 값이 아니라 사진을 보여 줄지에 대한 답이다. */
 	static final String SIGN_IMAGE = "signImage";
-	/** 상황 질문. PR 3이 P03·P06·P07을 추가할 때 이 집합에 더한다. */
+	/** 상황 질문 */
 	private static final String P01 = "P01";
 	private static final String P02 = "P02";
+	private static final String P03 = "P03";
 	private static final String P04 = "P04";
 	private static final String P05 = "P05";
-	private static final Set<String> SITUATIONAL_FIELDS = Set.of(P01, P02, P04, P05);
+	private static final String P06 = "P06";
+	private static final String P07 = "P07";
+	private static final Set<String> SITUATIONAL_FIELDS = Set.of(P01, P02, P03, P04, P05, P06, P07);
+	/** 글로 답하는 상황 질문 */
+	private static final Set<String> SITUATIONAL_TEXT_FIELDS = Set.of(P02, P03, P07);
 	/** 선택지로 답하는 상황 질문의 답 코드와 대화 내역에 남길 말. 화면의 버튼 글자와 같다. */
 	private static final Map<String, Map<String, String>> SITUATIONAL_CHOICE_LABELS = Map.of(
 		P01, Map.of("TODAY", "오늘", "SINCE_YESTERDAY", "어제부터", "FEW_DAYS_AGO", "2~3일 전"),
 		P04, Map.of("ITCH_WOKE", "가려워서 깸", "LATE_SLEEP", "늦게 잠", "BOTH", "둘 다", "OTHER", "기타"),
-		P05, Map.of("FORGOT", "깜빡함", "RAN_OUT", "다 떨어짐", "AWAY", "외출 중", "OTHER", "기타"));
+		P05, Map.of("FORGOT", "깜빡함", "RAN_OUT", "다 떨어짐", "AWAY", "외출 중", "OTHER", "기타"),
+		P06, Map.of("SIMILAR", "비슷했어요", "BETTER", "좋아졌어요", "WORSE", "나빠졌어요"));
 	/** P02 질문에 넣을 이름을 찾지 못했을 때(예: 묻는 사이 글로 증상을 지운 경우) 쓰는 말 */
 	private static final String P02_FALLBACK_SUBJECT = "증상";
 	/** 마무리 질문. 매일, 특이사항 다음에 묻는다. */
@@ -97,7 +103,7 @@ public class ChatbotService {
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
 	private static final Set<String> CHOICE_FIELDS =
 		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE,
-			P01, P02, P04, P05, C02);
+			P01, P02, P03, P04, P05, P06, P07, C02);
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -291,8 +297,9 @@ public class ChatbotService {
 	}
 
 	/**
-	 * 상황 질문(P01~P05) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
-	 * P02는 글로, 나머지는 선택지 코드로 답한다. LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 * 상황 질문(P01~P07) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
+	 * P02·P03·P07은 글로, P06은 선택지 코드와 덧붙인 글(선택)로, 나머지는 선택지 코드로 답한다.
+	 * LLM을 부르지 않으므로 이용 한도에 세지 않는다.
 	 */
 	private ChatReplyResponse situationalTurn(
 		TurnContext context, ChatDraft draft, ChatChoiceRequest request, Long memberId) {
@@ -301,13 +308,20 @@ public class ChatbotService {
 			return choiceTurn(context, draft, "넘어갈게요", false, memberId);
 		}
 		String field = request.field();
+		if (P06.equals(field)) {
+			String userText = longGapAnswer(context, request.value(), memberId);
+			draft.resolveSituationalQuestion();
+			return choiceTurn(context, draft, userText, false, memberId);
+		}
 		if (!(request.value() instanceof String answer)) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
 		}
 		String userText;
-		if (P02.equals(field)) {
+		if (SITUATIONAL_TEXT_FIELDS.contains(field)) {
 			userText = situationalTextOrThrow(answer);
-			String subject = NewSignOrPartRule.subject(draft, yesterday(memberId, context.today())).orElse(null);
+			String subject = P02.equals(field)
+				? NewSignOrPartRule.subject(draft, yesterday(memberId, context.today())).orElse(null)
+				: null;
 			situationalAnswerService.saveText(memberId, context.recordDate(), field, subject, userText);
 		} else {
 			userText = SITUATIONAL_CHOICE_LABELS.get(field).get(answer);
@@ -318,6 +332,22 @@ public class ChatbotService {
 		}
 		draft.resolveSituationalQuestion();
 		return choiceTurn(context, draft, userText, false, memberId);
+	}
+
+	/**
+	 * P06 답을 저장하고 대화 내역에 남길 말을 돌려준다. 값은 {"answer": 선택지 코드, "text": 덧붙인 글(선택)}이고,
+	 * 대화 내역에는 "좋아졌어요. 연고를 바꿨어요"처럼 남긴다.
+	 */
+	private String longGapAnswer(TurnContext context, Object rawValue, Long memberId) {
+		JsonNode value = jsonMapper.valueToTree(rawValue);
+		String answer = value.path("answer").isString() ? value.path("answer").asString() : null;
+		String label = answer == null ? null : SITUATIONAL_CHOICE_LABELS.get(P06).get(answer);
+		if (label == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		String text = optionalNoteOrNull(value.path("text"));
+		situationalAnswerService.saveChoiceWithText(memberId, context.recordDate(), P06, answer, text);
+		return text == null ? label : label + ". " + text;
 	}
 
 	/** 글로 답하는 상황 질문의 답. 비었거나 너무 길면 값 오류. */
@@ -342,9 +372,9 @@ public class ChatbotService {
 			return choiceTurn(context, draft, "없어요", false, memberId);
 		}
 		JsonNode value = jsonMapper.valueToTree(request.value());
-		String productNote = c02NoteOrNull(value.path("productNote"));
-		String unusualNote = c02NoteOrNull(value.path("unusualNote"));
-		String clinicQuestion = c02NoteOrNull(value.path("clinicQuestion"));
+		String productNote = optionalNoteOrNull(value.path("productNote"));
+		String unusualNote = optionalNoteOrNull(value.path("unusualNote"));
+		String clinicQuestion = optionalNoteOrNull(value.path("clinicQuestion"));
 		if (productNote == null && unusualNote == null && clinicQuestion == null) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 없습니다.");
 		}
@@ -353,8 +383,8 @@ public class ChatbotService {
 		return choiceTurn(context, draft, "적어 둘게요", false, memberId);
 	}
 
-	/** C02의 글 항목 하나. 문자열이 아니면 체크하지 않은 것으로 보고 null, 너무 길면 값 오류, 빈 글은 null. */
-	private static String c02NoteOrNull(JsonNode node) {
+	/** C02의 글 항목 하나나 P06에 덧붙인 글. 문자열이 아니면 적지 않은 것으로 보고 null, 너무 길면 값 오류, 빈 글은 null. */
+	private static String optionalNoteOrNull(JsonNode node) {
 		if (!node.isString()) {
 			return null;
 		}
@@ -377,8 +407,12 @@ public class ChatbotService {
 			situationalHistoryLoader.recentDays(memberId, today, situationalQuestionProperties.historyDays());
 		Map<String, LocalDate> lastShown = situationalQuestionLogRepository.findByMemberId(memberId).stream()
 			.collect(Collectors.toMap(SituationalQuestionLog::getQuestionId, SituationalQuestionLog::getLastShownDate));
+		// 최근 기록이 있으면 그중 마지막이 직전 기록이고, 없을 때만 더 오래된 기록을 찾는다.
+		LocalDate previousRecordDate = recentDays.isEmpty()
+			? situationalHistoryLoader.previousRecordDate(memberId, today)
+			: recentDays.get(recentDays.size() - 1).date();
 		Optional<String> selected = situationalQuestionSelector.select(
-			new SituationalQuestionContext(draft, today, recentDays), lastShown, today);
+			new SituationalQuestionContext(draft, today, recentDays, previousRecordDate), lastShown, today);
 		draft.decideSituationalQuestion(selected.orElse(null));
 		selected.ifPresent(id -> markSituationalShown(memberId, id, today));
 	}
@@ -542,8 +576,11 @@ public class ChatbotService {
 			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요.";
 			case P01 -> "고통 지수가 어제보다 많이 올랐네요. 언제부터 이랬어요?";
 			case P02 -> newSignOrPartQuestion(draft, memberId, today);
+			case P03 -> "며칠째 많이 불편하네요. 요즘 생활에서 달라진 게 있어요?";
 			case P04 -> "잠을 적게 잤네요. 가려워서 깼어요, 다른 이유가 있었어요?";
 			case P05 -> "오늘은 약을 못 챙기셨네요. 어떤 이유였어요?";
+			case P06 -> "며칠 만이에요. 그동안 피부는 어땠어요?";
+			case P07 -> "많이 좋아졌네요! 달라진 게 있었어요?";
 			case C02 -> "오늘 같이 남겨둘 게 있어요?";
 			default -> "평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요.";
 		};

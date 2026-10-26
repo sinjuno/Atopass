@@ -1,4 +1,4 @@
-import type { MissedMedicationReason, PendingField, ShortSleepReason } from '@/types/chatbot';
+import type { LongGapAnswer, MissedMedicationReason, PendingField, ShortSleepReason } from '@/types/chatbot';
 import type { BodyPart, OutdoorActivity, SkinSign, SymptomKey } from '@/types/record';
 
 // Swagger BodyPart enum 순서
@@ -147,8 +147,11 @@ export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   signImage: '예시 사진',
   P01: '상황 질문',
   P02: '상황 질문',
+  P03: '상황 질문',
   P04: '상황 질문',
   P05: '상황 질문',
+  P06: '상황 질문',
+  P07: '상황 질문',
   C02: '마무리 질문',
 };
 
@@ -166,6 +169,13 @@ export const MISSED_MEDICATION_REASON_LABELS: Record<MissedMedicationReason, str
   RAN_OUT: '다 떨어짐',
   AWAY: '외출 중',
   OTHER: '기타',
+};
+
+/** 상황 질문 P06(며칠 만에 기록할 때 그동안 피부가 어땠는지) 선택지. 서버의 대화 내역 문구와 같다 */
+export const LONG_GAP_ANSWER_LABELS: Record<LongGapAnswer, string> = {
+  SIMILAR: '비슷했어요',
+  BETTER: '좋아졌어요',
+  WORSE: '나빠졌어요',
 };
 
 /** 글로 답하는 상황 질문(P02 등)의 최대 글자 수. 서버와 같다 */

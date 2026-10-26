@@ -6,6 +6,7 @@ import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessa
 import {
   BODY_MAP_PARTS,
   BODY_PART_LABELS,
+  LONG_GAP_ANSWER_LABELS,
   MISSED_MEDICATION_REASON_LABELS,
   SHORT_SLEEP_REASON_LABELS,
   SKIN_SIGN_LABELS,
@@ -59,7 +60,15 @@ export function choiceText(choice: ChatChoiceRequest): string {
     case 'P01':
       return { TODAY: '오늘', SINCE_YESTERDAY: '어제부터', FEW_DAYS_AGO: '2~3일 전' }[choice.value];
     case 'P02':
+    case 'P03':
+    case 'P07':
       return choice.value.trim();
+    case 'P06': {
+      // 서버의 대화 내역과 같게 "좋아졌어요. 연고를 바꿨어요"처럼 붙인다
+      const text = choice.value.text?.trim();
+      const label = LONG_GAP_ANSWER_LABELS[choice.value.answer];
+      return text ? `${label}. ${text}` : label;
+    }
     case 'P04':
       return SHORT_SLEEP_REASON_LABELS[choice.value];
     case 'P05':

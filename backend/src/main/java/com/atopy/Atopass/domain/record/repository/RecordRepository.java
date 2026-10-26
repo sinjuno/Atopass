@@ -24,6 +24,9 @@ public interface RecordRepository extends JpaRepository<SkinRecord, Long> {
 	List<SkinRecord> findByMemberIdAndRecordDateBetweenOrderByRecordDateAsc(
 		Long memberId, LocalDate startDate, LocalDate endDate);
 
+	/** date 전(그날은 빼고) 가장 최근 기록. (챗봇 상황 질문에서 며칠 만에 기록하는지 볼 때 사용) */
+	Optional<SkinRecord> findFirstByMemberIdAndRecordDateBeforeOrderByRecordDateDesc(Long memberId, LocalDate date);
+
 	long countByMemberIdAndRecordDateBetween(Long memberId, LocalDate startDate, LocalDate endDate);
 
 }

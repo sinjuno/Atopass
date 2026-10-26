@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** 상황 질문(P01~P05)·마무리 질문(C02)의 답을 메인 기록과 별도로 저장한다. */
+/** 상황 질문(P01~P07)·마무리 질문(C02)의 답을 메인 기록과 별도로 저장한다. */
 @Service
 @RequiredArgsConstructor
 class SituationalAnswerService {
@@ -31,7 +31,21 @@ class SituationalAnswerService {
 		save(memberId, recordDate, questionId, json);
 	}
 
-	/** 글로 답하는 상황 질문(P02)의 답. subject는 질문에 넣은 이름(예: 새로 생긴 증상)이다. 예: {"subject":"홍반","text":"..."} */
+	/** 선택지와 덧붙인 글(선택)로 답하는 상황 질문(P06)의 답. text가 null이면 뺀다. 예: {"answer":"BETTER","text":"..."} */
+	@Transactional
+	void saveChoiceWithText(Long memberId, LocalDate recordDate, String questionId, String answerCode, String text) {
+		ObjectNode json = jsonMapper.createObjectNode();
+		json.put("answer", answerCode);
+		if (text != null) {
+			json.put("text", text);
+		}
+		save(memberId, recordDate, questionId, json);
+	}
+
+	/**
+	 * 글로 답하는 상황 질문(P02·P03·P07)의 답. subject는 질문에 넣은 이름(P02의 새로 생긴 증상)이고, 없으면 null이다.
+	 * 예: {"subject":"홍반","text":"..."}
+	 */
 	@Transactional
 	void saveText(Long memberId, LocalDate recordDate, String questionId, String subject, String text) {
 		ObjectNode json = jsonMapper.createObjectNode();

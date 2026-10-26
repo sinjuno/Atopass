@@ -1082,6 +1082,172 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.askingField").value("notes"));
 	}
 
+	@Test
+	void 고통_지수_6_이상이_3일_연속이면_P03이_나오고_적은_글을_따로_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(2), 7, 7, null, null, List.of());
+		createFullRecord(bearer, today.minusDays(1), 6, 7, null, null, List.of());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P03"))
+			.andExpect(jsonPath("$.data.reply").value("며칠째 많이 불편하네요. 요즘 생활에서 달라진 게 있어요?"));
+
+		mockMvc.perform(choice(bearer, session, "P03", "요즘 야근이 많아요"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> {
+				assertThat(answer.getQuestionId()).isEqualTo("P03");
+				assertThat(answer.getAnswerJson()).isEqualTo("{\"text\":\"요즘 야근이 많아요\"}");
+			});
+	}
+
+	@Test
+	void 고통_지수가_높은_날_사이에_기록하지_않은_날이_있으면_P03이_나오지_않는다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(3), 7, 7, null, null, List.of());
+		createFullRecord(bearer, today.minusDays(1), 7, 7, null, null, List.of());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 7));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+	}
+
+	@Test
+	void 직전_기록이_3일_이상_전이면_P06이_나오고_고른_답과_덧붙인_글을_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		// 최근 7일 밖이어도 직전 기록으로 본다.
+		createFullRecord(bearer, today.minusDays(20), 3, 7, null, null, List.of());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P06"))
+			.andExpect(jsonPath("$.data.reply").value("며칠 만이에요. 그동안 피부는 어땠어요?"));
+
+		mockMvc.perform(choice(bearer, session, "P06", "BETTER")).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P06", Map.of("answer", "FORGOT"))).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P06", Map.of("answer", "BETTER", "text", " 연고를 바꿨어요 ")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> {
+				assertThat(answer.getQuestionId()).isEqualTo("P06");
+				assertThat(answer.getAnswerJson()).isEqualTo("{\"answer\":\"BETTER\",\"text\":\"연고를 바꿨어요\"}");
+			});
+	}
+
+	@Test
+	void P06은_글_없이_답만_골라도_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(3), 3, 7, null, null, List.of());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P06"));
+		mockMvc.perform(choice(bearer, session, "P06", Map.of("answer", "SIMILAR")))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> assertThat(answer.getAnswerJson()).isEqualTo("{\"answer\":\"SIMILAR\"}"));
+	}
+
+	@Test
+	void 처음_기록하거나_직전_기록이_2일_전이면_P06이_나오지_않는다() throws Exception {
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		String first = newMemberBearer();
+		String twoDays = newMemberBearer();
+		createFullRecord(twoDays, today.minusDays(2), 3, 7, null, null, List.of());
+
+		for (String bearer : List.of(first, twoDays)) {
+			String session = createSession(bearer, "RECORD");
+			mockMvc.perform(choice(bearer, session, "painIndex", 3));
+			mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+			mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+			mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+			mockMvc.perform(choice(bearer, session, "medication", true))
+				.andExpect(jsonPath("$.data.askingField").value("notes"));
+		}
+	}
+
+	@Test
+	void 고통_지수가_어제보다_3_이상_내리면_P07이_나오고_건너뛰면_저장하지_않는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(1), 7, 7, null, null, List.of());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 4));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P07"))
+			.andExpect(jsonPath("$.data.reply").value("많이 좋아졌네요! 달라진 게 있었어요?"));
+
+		mockMvc.perform(skipChoice(bearer, session, "P07"))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today)).isEmpty();
+		assertThat(situationalQuestionLogRepository.findByMemberIdAndQuestionId(memberId, "P07")).isPresent();
+	}
+
+	@Test
+	void P07의_잘_모르겠어요는_그_말로_바로_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(1), 8, 7, null, null, List.of());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 2));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P07"));
+		mockMvc.perform(choice(bearer, session, "P07", "잘 모르겠어요"))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> assertThat(answer.getAnswerJson()).isEqualTo("{\"text\":\"잘 모르겠어요\"}"));
+	}
+
 	// ── 헬퍼 ──
 
 	/** 챗봇은 이용 동의가 있어야 쓸 수 있으므로, 테스트에서는 먼저 동의(멱등)하고 세션을 만든다. */
@@ -1144,7 +1310,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isCreated());
 	}
 
-	/** 상황 질문(P02·P05) 조건 판정에 쓰는 지난 기록. bodyPart가 있으면 그 부위에 고통 지수를 점수로 넣는다. */
+	/** 상황 질문 조건 판정에 쓰는 지난 기록. bodyPart가 있으면 그 부위에 고통 지수를 점수로 넣는다. */
 	private void createFullRecord(String bearer, LocalDate date, int painIndex, int sleepHours, Boolean medication,
 		String bodyPart, List<String> skinSigns) throws Exception {
 		Map<String, Object> body = new LinkedHashMap<>();

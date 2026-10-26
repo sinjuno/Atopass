@@ -23,13 +23,17 @@ export type PendingField =
   /** 상황 질문. 조건에 맞을 때만, 수면 시간 다음~특이사항 앞에 하루 1개 나온다 */
   | 'P01'
   | 'P02'
+  | 'P03'
   | 'P04'
   | 'P05'
+  | 'P06'
+  | 'P07'
   /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
   | 'C02';
 
 export type ShortSleepReason = 'ITCH_WOKE' | 'LATE_SLEEP' | 'BOTH' | 'OTHER';
 export type MissedMedicationReason = 'FORGOT' | 'RAN_OUT' | 'AWAY' | 'OTHER';
+export type LongGapAnswer = 'SIMILAR' | 'BETTER' | 'WORSE';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -89,6 +93,12 @@ export type ChatChoiceRequest =
   | { field: 'P04'; value: ShortSleepReason }
   /** 상황 질문(P05) 답 — 약을 못 챙긴 이유 */
   | { field: 'P05'; value: MissedMedicationReason }
+  /** 상황 질문(P03) 답 — 며칠째 많이 불편한 동안 생활에서 달라진 것 (글, 200자 이내) */
+  | { field: 'P03'; value: string }
+  /** 상황 질문(P06) 답 — 며칠 만에 기록할 때 그동안 피부가 어땠는지, 덧붙인 글은 선택 (200자 이내) */
+  | { field: 'P06'; value: { answer: LongGapAnswer; text?: string } }
+  /** 상황 질문(P07) 답 — 많이 좋아진 날 달라진 것 (글, 200자 이내) */
+  | { field: 'P07'; value: string }
   /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
   | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */
