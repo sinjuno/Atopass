@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.report.service;
 
+import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.report.service.ReportContent.DayEntry;
@@ -129,6 +130,9 @@ class ReportHtmlBuilder {
 			if (!notes.isEmpty()) {
 				html.append(rawRow("메모", notes));
 			}
+			if (!day.situationalAnswers().isEmpty()) {
+				html.append(rawRow("챗봇 답", answersText(day.situationalAnswers())));
+			}
 			html.append("</table></div>");
 		}
 	}
@@ -226,8 +230,11 @@ class ReportHtmlBuilder {
 		return parts.isEmpty() ? "기록 없음" : String.join(" · ", parts);
 	}
 
+	/** 특이사항과, 챗봇이 그날 물어 받은 답(상황 질문·마무리 질문)을 날짜별로 함께 보여 준다. */
 	private void notesSection(StringBuilder html, List<DayEntry> days) {
-		List<DayEntry> withNotes = days.stream().filter(d -> d.notes() != null).toList();
+		List<DayEntry> withNotes = days.stream()
+			.filter(d -> d.notes() != null || !d.situationalAnswers().isEmpty())
+			.toList();
 		html.append("<h2>특이사항 및 메모</h2>");
 		if (withNotes.isEmpty()) {
 			html.append("<p>기록된 특이사항이 없습니다.</p>");
@@ -235,10 +242,25 @@ class ReportHtmlBuilder {
 		}
 		html.append("<table class=\"grid\"><tr><th>날짜</th><th>내용</th></tr>");
 		for (DayEntry day : withNotes) {
-			html.append("<tr><td class=\"nowrap\">").append(DATE.format(day.date())).append("</td><td>")
-				.append(escape(day.notes())).append("</td></tr>");
+			html.append("<tr><td class=\"nowrap\">").append(DATE.format(day.date())).append("</td><td>");
+			if (day.notes() != null) {
+				html.append(escape(day.notes()));
+			}
+			if (!day.situationalAnswers().isEmpty()) {
+				html.append("<div class=\"answers\">").append(answersText(day.situationalAnswers())).append("</div>");
+			}
+			html.append("</td></tr>");
 		}
 		html.append("</table>");
+	}
+
+	/** 챗봇 답을 "제목: 답" 한 줄씩 (이스케이프된 XHTML) */
+	private String answersText(List<SituationalAnswerItem> answers) {
+		List<String> lines = new ArrayList<>();
+		for (SituationalAnswerItem answer : answers) {
+			lines.add(escape(answer.title()) + ": " + escape(answer.answer()));
+		}
+		return String.join("<br/>", lines);
 	}
 
 	private void photoSection(StringBuilder html, List<DayEntry> days) {
@@ -338,6 +360,8 @@ class ReportHtmlBuilder {
 			table.grid td { border: 1px solid #c8d0dc; padding: 4pt; vertical-align: top; }
 			td.num { text-align: right; }
 			td.nowrap { white-space: nowrap; }
+			.answers { font-size: 9pt; color: #555555; }
+			td .answers { margin-top: 3pt; }
 			tr { page-break-inside: avoid; }
 			h3 { font-size: 11pt; margin: 0 0 4pt 0; color: #1f3a5f; }
 			ul { margin: 2pt 0 4pt 0; padding-left: 14pt; }

@@ -19,7 +19,21 @@ export type PendingField =
   | 'medication'
   | 'skinSigns'
   | 'notes'
-  | 'signImage';
+  | 'signImage'
+  /** 상황 질문. 조건에 맞을 때만, 수면 시간 다음~특이사항 앞에 하루 1개 나온다 */
+  | 'P01'
+  | 'P02'
+  | 'P03'
+  | 'P04'
+  | 'P05'
+  | 'P06'
+  | 'P07'
+  /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
+  | 'C02';
+
+export type ShortSleepReason = 'ITCH_WOKE' | 'LATE_SLEEP' | 'BOTH' | 'OTHER';
+export type MissedMedicationReason = 'FORGOT' | 'RAN_OUT' | 'AWAY' | 'OTHER';
+export type LongGapAnswer = 'SIMILAR' | 'BETTER' | 'WORSE';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -45,6 +59,8 @@ export interface SendMessageResponse {
   recordId: number | null;
   /** 이 답과 함께 보여 줄 증상 예시 사진. 사용자가 보여 달라고 답했을 때만 온다 */
   imageSign: SkinSign | null;
+  /** 글 입력칸 예시. 특이사항을 묻는 중일 때만 오고, 질문 문구와 같은 조건(재진일·고통 지수)으로 서버가 고른다 */
+  inputPlaceholder?: string | null;
 }
 
 /** GET /chatbot/sessions/{sessionId}/draft — 저장된(닫힌) 세션이면 409 SESSION_CLOSED */
@@ -55,6 +71,8 @@ export interface ChatDraftState {
   requiresConfirmation: boolean;
   editing: boolean;
   recordId: number | null;
+  /** 글 입력칸 예시. 특이사항을 묻는 중일 때만 온다 */
+  inputPlaceholder?: string | null;
 }
 
 /**
@@ -71,6 +89,22 @@ export type ChatChoiceRequest =
   | { field: 'skinSigns'; value: SkinSign[] }
   /** 증상 예시 사진을 보여 줄지 */
   | { field: 'signImage'; value: boolean }
+  /** 상황 질문(P01) 답 — 고통 지수가 언제부터 심해졌는지 */
+  | { field: 'P01'; value: 'TODAY' | 'SINCE_YESTERDAY' | 'FEW_DAYS_AGO' }
+  /** 상황 질문(P02) 답 — 어제 없던 증상·부위가 어떻게 시작됐는지 (글, 200자 이내) */
+  | { field: 'P02'; value: string }
+  /** 상황 질문(P04) 답 — 잠을 적게 잔 이유 */
+  | { field: 'P04'; value: ShortSleepReason }
+  /** 상황 질문(P05) 답 — 약을 못 챙긴 이유 */
+  | { field: 'P05'; value: MissedMedicationReason }
+  /** 상황 질문(P03) 답 — 며칠째 많이 불편한 동안 생활에서 달라진 것 (글, 200자 이내) */
+  | { field: 'P03'; value: string }
+  /** 상황 질문(P06) 답 — 며칠 만에 기록할 때 그동안 피부가 어땠는지, 덧붙인 글은 선택 (200자 이내) */
+  | { field: 'P06'; value: { answer: LongGapAnswer; text?: string } }
+  /** 상황 질문(P07) 답 — 많이 좋아진 날 달라진 것 (글, 200자 이내) */
+  | { field: 'P07'; value: string }
+  /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
+  | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */
   | { field: Exclude<ChoiceField, 'painIndex'>; skip: true };
 

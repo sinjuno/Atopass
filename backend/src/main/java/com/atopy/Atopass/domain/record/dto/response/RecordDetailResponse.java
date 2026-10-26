@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.record.dto.response;
 
+import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
 import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import java.math.BigDecimal;
@@ -22,10 +23,13 @@ public record RecordDetailResponse(
 	String notes,
 	List<PhotoSummary> photos,
 	LocalDateTime createdAt,
-	LocalDateTime updatedAt
+	LocalDateTime updatedAt,
+	/** 그날 챗봇 상황 질문·마무리 질문 답. 메인 기록과 따로 저장되며, 없으면 빈 목록 */
+	List<SituationalAnswerItem> situationalAnswers
 ) {
 
-	public static RecordDetailResponse from(SkinRecord record, List<PhotoSummary> photos) {
+	public static RecordDetailResponse from(SkinRecord record, List<PhotoSummary> photos,
+		List<SituationalAnswerItem> situationalAnswers) {
 		return new RecordDetailResponse(
 			record.getId(),
 			record.getRecordDate(),
@@ -42,7 +46,8 @@ public record RecordDetailResponse(
 			record.getNotes(),
 			photos,
 			record.getCreatedAt(),
-			record.getUpdatedAt());
+			record.getUpdatedAt(),
+			situationalAnswers);
 	}
 
 }

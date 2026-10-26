@@ -81,7 +81,14 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(choice(bearer, session, "medication", false))
 			.andExpect(jsonPath("$.data.draft.medication").value(false))
 			.andExpect(jsonPath("$.data.askingField").value("notes"));
-		String saved = mockMvc.perform(skip(bearer, session, "notes"))
+		// 특이사항 다음에는 마무리 질문(C02)을 묻는다 — 답하기 전까지는 저장하지 않는다.
+		mockMvc.perform(skip(bearer, session, "notes"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("C02"))
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(1))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("C02"))
+			.andExpect(jsonPath("$.data.recordId").doesNotExist());
+		String saved = mockMvc.perform(skip(bearer, session, "C02"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist())
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
@@ -103,15 +110,16 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.skinConditions[1].skinSigns.length()").value(2));
 
 		assertThat(llm.callCount()).isZero();
-		// 대화 내역에는 고른 값이 사람이 읽는 말로 남는다.
+		// 대화 내역에는 고른 값이 사람이 읽는 말로 남는다. (상황 질문은 조건이 안 맞아 나오지 않았다)
 		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
-			.andExpect(jsonPath("$.data.messages.length()").value(12))
+			.andExpect(jsonPath("$.data.messages.length()").value(14))
 			.andExpect(jsonPath("$.data.messages[0].content").value("6점"))
 			.andExpect(jsonPath("$.data.messages[2].content").value("홍반, 건조증"))
 			.andExpect(jsonPath("$.data.messages[4].content").value("얼굴, 왼손"))
 			.andExpect(jsonPath("$.data.messages[6].content").value("7.5시간"))
 			.andExpect(jsonPath("$.data.messages[8].content").value("아니오"))
-			.andExpect(jsonPath("$.data.messages[10].content").value("없어요"));
+			.andExpect(jsonPath("$.data.messages[10].content").value("없어요"))
+			.andExpect(jsonPath("$.data.messages[12].content").value("없어요"));
 		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.askingField").doesNotExist());

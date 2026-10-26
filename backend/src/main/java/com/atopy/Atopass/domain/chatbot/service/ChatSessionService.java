@@ -194,8 +194,8 @@ public class ChatSessionService {
 		return recordRepository.findByMemberIdAndRecordDate(memberId, session.getRecordDate()).map(SkinRecord::getId);
 	}
 
-	/** 새로고침 뒤 초안을 다시 채우기 위한 세션의 현재 초안 상태 */
-	record DraftState(String draftJson, boolean confirmationReady, Long recordId) {
+	/** 새로고침 뒤 초안을 다시 채우기 위한 세션의 현재 초안 상태. recordDate는 이 대화가 기록하는 날짜다. */
+	record DraftState(String draftJson, boolean confirmationReady, Long recordId, LocalDate recordDate) {
 	}
 
 	/**
@@ -210,7 +210,8 @@ public class ChatSessionService {
 		if (session.getMode() != ChatMode.RECORD) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "질의 모드 대화에는 기록 초안이 없습니다.");
 		}
-		return new DraftState(session.getDraft(), session.isConfirmationReady(), session.getEditingRecordId());
+		return new DraftState(session.getDraft(), session.isConfirmationReady(), session.getEditingRecordId(),
+			session.getRecordDate());
 	}
 
 	public List<ChatMessage> messages(Long memberId, String sessionId) {

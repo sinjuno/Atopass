@@ -3,7 +3,14 @@ import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
 import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
-import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
+import {
+  BODY_MAP_PARTS,
+  BODY_PART_LABELS,
+  LONG_GAP_ANSWER_LABELS,
+  MISSED_MEDICATION_REASON_LABELS,
+  SHORT_SLEEP_REASON_LABELS,
+  SKIN_SIGN_LABELS,
+} from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
 /**
@@ -27,7 +34,8 @@ const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
 export function choiceText(choice: ChatChoiceRequest): string {
   if ('skip' in choice) {
     if (choice.field === 'signImage') return '괜찮아요';
-    return choice.field === 'notes' || choice.field === 'bodyParts' ? '없어요' : '넘어갈게요';
+    if (choice.field === 'notes' || choice.field === 'bodyParts' || choice.field === 'C02') return '없어요';
+    return '넘어갈게요';
   }
   switch (choice.field) {
     case 'signImage':
@@ -49,6 +57,24 @@ export function choiceText(choice: ChatChoiceRequest): string {
             .sort((a, b) => SKIN_SIGN_ORDER.indexOf(a) - SKIN_SIGN_ORDER.indexOf(b))
             .map((sign) => SKIN_SIGN_LABELS[sign])
             .join(', ');
+    case 'P01':
+      return { TODAY: '오늘', SINCE_YESTERDAY: '어제부터', FEW_DAYS_AGO: '2~3일 전' }[choice.value];
+    case 'P02':
+    case 'P03':
+    case 'P07':
+      return choice.value.trim();
+    case 'P06': {
+      // 서버의 대화 내역과 같게 "좋아졌어요. 연고를 바꿨어요"처럼 붙인다
+      const text = choice.value.text?.trim();
+      const label = LONG_GAP_ANSWER_LABELS[choice.value.answer];
+      return text ? `${label}. ${text}` : label;
+    }
+    case 'P04':
+      return SHORT_SLEEP_REASON_LABELS[choice.value];
+    case 'P05':
+      return MISSED_MEDICATION_REASON_LABELS[choice.value];
+    case 'C02':
+      return '적어 둘게요';
   }
 }
 
@@ -68,6 +94,8 @@ export function useChatSession(recordDate: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pendingFields, setPendingFields] = useState<PendingField[]>([]);
   const [askingField, setAskingField] = useState<PendingField | null>(null);
+  // 서버가 정한 글 입력칸 예시. 특이사항을 묻는 중일 때만 있다
+  const [inputPlaceholder, setInputPlaceholder] = useState<string | null>(null);
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   // 그날 기록이 저장되었으면 그 ID. 사진을 바로 올릴 때 쓴다
   const [recordId, setRecordId] = useState<number | null>(null);
@@ -100,6 +128,7 @@ export function useChatSession(recordDate: string) {
       setMessages(messages);
       setPendingFields(state.pendingFields);
       setAskingField(state.askingField);
+      setInputPlaceholder(state.inputPlaceholder ?? null);
       setRequiresConfirmation(state.requiresConfirmation);
       setRecordId(state.recordId);
       recordIdRef.current = state.recordId;
@@ -166,6 +195,7 @@ export function useChatSession(recordDate: string) {
         ]);
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
+        setInputPlaceholder(res.inputPlaceholder ?? null);
         setRequiresConfirmation(res.requiresConfirmation);
         if (recordIdRef.current === null && res.recordId !== null) setJustCompleted(true);
         recordIdRef.current = res.recordId;
@@ -219,6 +249,7 @@ export function useChatSession(recordDate: string) {
           const state = await chatbotApi.getDraft(sessionId);
           setPendingFields(state.pendingFields);
           setAskingField(state.askingField);
+          setInputPlaceholder(state.inputPlaceholder ?? null);
           setRequiresConfirmation(state.requiresConfirmation);
           setRecordId(state.recordId);
           setChatDraft(state.draft);
@@ -263,6 +294,7 @@ export function useChatSession(recordDate: string) {
     messages,
     pendingFields,
     askingField,
+    inputPlaceholder,
     requiresConfirmation,
     chatDraft,
     // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null

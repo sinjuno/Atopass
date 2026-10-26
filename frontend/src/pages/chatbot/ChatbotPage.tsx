@@ -26,6 +26,7 @@ export default function ChatbotPage() {
   const {
     messages,
     askingField,
+    inputPlaceholder,
     requiresConfirmation,
     chatDraft,
     painIndex,
@@ -128,8 +129,8 @@ export default function ChatbotPage() {
         right={<span className="text-base text-gray-500">{formatKoreanDate(recordDate)}</span>}
       />
 
-      {/* 아래 선택지 칸이 길어도 대화가 가려지지 않도록 최소 높이를 둔다 */}
-      <div className="min-h-32 flex-1 overflow-y-auto">
+      {/* 아래 선택지 칸이 길어도 대화가 가려지지 않도록 최소 높이를 둔다. 마네킹은 키가 커서 대화를 조금 더 내어 준다 */}
+      <div className={`${choiceField === 'bodyParts' ? 'min-h-12' : 'min-h-32'} flex-1 overflow-y-auto`}>
         {status === 'loading' && <p className="p-6 text-center text-gray-500">대화를 준비하고 있어요…</p>}
         {status === 'error' ? (
           <div className="p-6 text-center">
@@ -157,6 +158,7 @@ export default function ChatbotPage() {
           onChoose={(c) => void handleChoose(c)}
           skinSigns={chatDraft?.skinSigns ?? []}
           onMinimizedChange={setChoicesMinimized}
+          onAttachPhotos={handleAttach}
         />
       )}
 
@@ -188,6 +190,7 @@ export default function ChatbotPage() {
           onSubmit={handleSubmit}
           onAttachPhotos={handleAttach}
           disabled={status !== 'ready'}
+          placeholder={inputPlaceholder ? `예: ${inputPlaceholder}` : undefined}
         />
       )}
 

@@ -89,6 +89,12 @@ public final class ChatDraft {
 	private boolean editing;
 	/** 예시 사진을 보여 줘도 되는지 물어본 증상. 사용자가 답하거나 다른 말을 하면 지운다. 기록 값은 아니다. */
 	private SkinSign offeredSign;
+	/** 상황 질문(P01 등)을 오늘 고를지 이미 정했는지. 하루에 한 번만 정하고 다시 계산하지 않는다. */
+	private boolean situationalDecided;
+	/** 지금 묻고 있는 상황 질문 ID. 정했지만 물을 게 없으면 null, 답했거나 건너뛰면 지운다. */
+	private String situationalQuestionId;
+	/** 마무리 질문(C02)에 답했거나 건너뛰었는지. 매일 특이사항 다음에 한 번 묻는다. */
+	private boolean c02Resolved;
 
 	public static ChatDraft empty() {
 		return new ChatDraft();
@@ -123,6 +129,8 @@ public final class ChatDraft {
 		draft.notes = record.getNotes();
 		draft.skipped.addAll(SKIPPABLE);
 		draft.editing = true;
+		draft.situationalDecided = true;
+		draft.c02Resolved = true;
 		return draft;
 	}
 
@@ -172,6 +180,15 @@ public final class ChatDraft {
 		}
 		if (offeredSign != null) {
 			root.put("offeredSign", offeredSign.name());
+		}
+		if (situationalDecided) {
+			root.put("situationalDecided", true);
+		}
+		if (situationalQuestionId != null) {
+			root.put("situationalQuestionId", situationalQuestionId);
+		}
+		if (c02Resolved) {
+			root.put("c02Resolved", true);
 		}
 		return mapper.writeValueAsString(root);
 	}
@@ -232,6 +249,17 @@ public final class ChatDraft {
 			draft.editing = root.path("editing").asBoolean(false);
 			Set<SkinSign> offered = readSigns(mapper.createArrayNode().add(root.path("offeredSign").asString("")));
 			draft.offeredSign = offered.isEmpty() ? null : offered.iterator().next();
+			draft.situationalDecided = root.path("situationalDecided").asBoolean(false);
+			draft.situationalQuestionId = root.path("situationalQuestionId").isString()
+				? root.path("situationalQuestionId").asString() : null;
+			draft.c02Resolved = root.path("c02Resolved").asBoolean(false);
+			// 이 기능이 배포되기 전에 저장된 "수정 중" 초안에는 이 값들이 없다 — 다른 선택 항목과 똑같이,
+			// 수정 중이면 상황 질문·마무리 질문도 더 묻지 않는다 (startEditing()·fromRecord()와 같은 규칙).
+			if (draft.editing) {
+				draft.situationalDecided = true;
+				draft.situationalQuestionId = null;
+				draft.c02Resolved = true;
+			}
 		} catch (RuntimeException e) {
 			return new ChatDraft();
 		}
@@ -437,6 +465,10 @@ public final class ChatDraft {
 	void startEditing() {
 		this.editing = true;
 		skipped.addAll(SKIPPABLE);
+		// 상황 질문·마무리 질문(C02)도 다른 선택 항목처럼, 조기 완료(마치기)면 더 묻지 않는다.
+		this.situationalDecided = true;
+		this.situationalQuestionId = null;
+		this.c02Resolved = true;
 	}
 
 	/** 기록 내용(초안 값)이 같은지. 진행 상태(건너뜀·되묻기)는 비교하지 않는다. */
@@ -595,7 +627,9 @@ public final class ChatDraft {
 		return pending;
 	}
 
-	private List<String> pendingOptionalFields() {
+	private static final String C02 = "C02";
+
+	private List<String> corePendingFields() {
 		List<String> pending = new ArrayList<>();
 		if (skinSigns == null && !skipped.contains(SKIP_SKIN_SIGNS)) {
 			pending.add("skinSigns");
@@ -611,8 +645,45 @@ public final class ChatDraft {
 		if (medication == null && !skipped.contains(SKIP_MEDICATION)) {
 			pending.add("medication");
 		}
+		return pending;
+	}
+
+	/** 상황 질문 칸을 결정할 때가 됐는지 — 아직 결정하지 않았고, 수면·약 복용까지 선택 항목이 다 끝나 특이사항만 남았을 때. */
+	boolean situationalSlotReady() {
+		return !situationalDecided && requiredSatisfied() && corePendingFields().isEmpty();
+	}
+
+	/** 이번에 고를 상황 질문(또는 없음)을 정한다. 오늘은 다시 고르지 않는다. */
+	void decideSituationalQuestion(String questionId) {
+		this.situationalQuestionId = questionId;
+		this.situationalDecided = true;
+	}
+
+	/** 지금 결정된 상황 질문 ID. 없으면 null */
+	String situationalQuestionId() {
+		return situationalQuestionId;
+	}
+
+	/** 상황 질문에 답했거나 건너뛰었다. */
+	void resolveSituationalQuestion() {
+		this.situationalQuestionId = null;
+	}
+
+	/** 마무리 질문(C02)에 답했거나 건너뛰었다. */
+	void resolveC02() {
+		this.c02Resolved = true;
+	}
+
+	private List<String> pendingOptionalFields() {
+		List<String> pending = new ArrayList<>(corePendingFields());
+		if (situationalQuestionId != null) {
+			pending.add(situationalQuestionId);
+		}
 		if (notes == null && !skipped.contains(SKIP_NOTES)) {
 			pending.add("notes");
+		}
+		if (!c02Resolved) {
+			pending.add(C02);
 		}
 		return pending;
 	}
@@ -728,6 +799,9 @@ public final class ChatDraft {
 		copy.followUp = followUp;
 		copy.editing = editing;
 		copy.offeredSign = offeredSign;
+		copy.situationalDecided = situationalDecided;
+		copy.situationalQuestionId = situationalQuestionId;
+		copy.c02Resolved = c02Resolved;
 		return copy;
 	}
 
@@ -748,6 +822,9 @@ public final class ChatDraft {
 		followUp = next.followUp;
 		editing = next.editing;
 		offeredSign = next.offeredSign;
+		situationalDecided = next.situationalDecided;
+		situationalQuestionId = next.situationalQuestionId;
+		c02Resolved = next.c02Resolved;
 	}
 
 }

@@ -1,4 +1,4 @@
-import type { PendingField } from '@/types/chatbot';
+import type { LongGapAnswer, MissedMedicationReason, PendingField, ShortSleepReason } from '@/types/chatbot';
 import type { BodyPart, OutdoorActivity, SkinSign, SymptomKey } from '@/types/record';
 
 // Swagger BodyPart enum 순서
@@ -80,19 +80,19 @@ export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
 
-/** 0~10점 막대를 누르고 있는 동안 보여 줄 점수별 단계와 예시 (인덱스 = 점수) */
-export const ITCH_SCALE: { stage: string; example: string }[] = [
-  { stage: '가려움 없음', example: '가려움이 전혀 느껴지지 않아요.' },
-  { stage: '거의 없음', example: '가끔 피부가 의식되지만 긁고 싶지는 않아요.' },
-  { stage: '매우 약함', example: '조금 가렵지만 신경 쓰이지 않고 일상생활에 지장이 없어요.' },
-  { stage: '약함', example: '가려움이 느껴지지만 다른 일에 집중하면 잊을 수 있어요.' },
-  { stage: '약간 불편함', example: '가끔 긁고 싶고, 무의식적으로 피부를 만지게 돼요.' },
-  { stage: '중간 정도', example: '가려움이 자주 신경 쓰이고, 집중할 때 방해가 돼요.' },
-  { stage: '꽤 심함', example: '가려움을 참기 어렵고, 하던 일을 잠시 멈추고 긁게 돼요.' },
-  { stage: '심함', example: '공부나 업무에 집중하기 어렵고, 가려움 때문에 자주 중단해요.' },
-  { stage: '매우 심함', example: '가려움이 계속 신경 쓰여 다른 일에 집중하기 매우 어려워요.' },
-  { stage: '극심함', example: '가려움을 견디기 매우 힘들고, 일상생활을 유지하기 어려울 정도예요.' },
-  { stage: '상상할 수 있는 최악', example: '지금까지 경험한 가려움 중 가장 심한 수준으로, 견디기 극도로 힘들어요.' },
+/** 0~10점 막대를 누르고 있는 동안 보여 줄 점수별 단계와 예시 (인덱스 = 점수). 가려움뿐 아니라 통증·화끈거림 등 어떤 불편함이든 해당된다 */
+export const PAIN_SCALE: { stage: string; example: string }[] = [
+  { stage: '불편함 없음', example: '통증이나 불편함이 전혀 느껴지지 않아요.' },
+  { stage: '거의 없음', example: '가끔 피부가 의식되지만 불편하지는 않아요.' },
+  { stage: '매우 약함', example: '조금 불편하지만 신경 쓰이지 않고 일상생활에 지장이 없어요.' },
+  { stage: '약함', example: '불편함이 느껴지지만 다른 일에 집중하면 잊을 수 있어요.' },
+  { stage: '약간 불편함', example: '가끔 신경 쓰이고, 무의식적으로 그 부위를 만지게 돼요.' },
+  { stage: '중간 정도', example: '불편함이 자주 신경 쓰이고, 집중할 때 방해가 돼요.' },
+  { stage: '꽤 심함', example: '참기 어렵고, 하던 일을 잠시 멈추게 돼요.' },
+  { stage: '심함', example: '공부나 업무에 집중하기 어렵고, 자주 중단하게 돼요.' },
+  { stage: '매우 심함', example: '계속 신경 쓰여 다른 일에 집중하기 매우 어려워요.' },
+  { stage: '극심함', example: '견디기 매우 힘들고, 일상생활을 유지하기 어려울 정도예요.' },
+  { stage: '상상할 수 있는 최악', example: '지금까지 경험한 것 중 가장 심한 수준으로, 견디기 극도로 힘들어요.' },
 ];
 
 /** 나타난 증상 7가지 — 이 순서로 보여 준다 (1 홍반 … 7 가려움). 서버 SkinSign 선언 순서와 같다 */
@@ -145,7 +145,41 @@ export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   skinSigns: '나타난 증상',
   notes: '특이사항',
   signImage: '예시 사진',
+  P01: '상황 질문',
+  P02: '상황 질문',
+  P03: '상황 질문',
+  P04: '상황 질문',
+  P05: '상황 질문',
+  P06: '상황 질문',
+  P07: '상황 질문',
+  C02: '마무리 질문',
 };
+
+/** 상황 질문 P04(잠을 적게 잔 이유) 선택지. 서버의 대화 내역 문구와 같다 */
+export const SHORT_SLEEP_REASON_LABELS: Record<ShortSleepReason, string> = {
+  ITCH_WOKE: '가려워서 깸',
+  LATE_SLEEP: '늦게 잠',
+  BOTH: '둘 다',
+  OTHER: '기타',
+};
+
+/** 상황 질문 P05(약을 못 챙긴 이유) 선택지. 이유만 기록하고 복용을 권하지 않는다 */
+export const MISSED_MEDICATION_REASON_LABELS: Record<MissedMedicationReason, string> = {
+  FORGOT: '깜빡함',
+  RAN_OUT: '다 떨어짐',
+  AWAY: '외출 중',
+  OTHER: '기타',
+};
+
+/** 상황 질문 P06(며칠 만에 기록할 때 그동안 피부가 어땠는지) 선택지. 서버의 대화 내역 문구와 같다 */
+export const LONG_GAP_ANSWER_LABELS: Record<LongGapAnswer, string> = {
+  SIMILAR: '비슷했어요',
+  BETTER: '좋아졌어요',
+  WORSE: '나빠졌어요',
+};
+
+/** 글로 답하는 상황 질문(P02 등)의 최대 글자 수. 서버와 같다 */
+export const SITUATIONAL_TEXT_MAX_LENGTH = 200;
 
 /** 챗봇 이용 동의 팝업 문구 */
 export const CHAT_CONSENT_TEXT = [

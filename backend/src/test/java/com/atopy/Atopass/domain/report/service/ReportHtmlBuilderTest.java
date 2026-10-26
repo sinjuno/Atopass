@@ -2,6 +2,7 @@ package com.atopy.Atopass.domain.report.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.report.service.ReportContent.DayEntry;
@@ -111,6 +112,32 @@ class ReportHtmlBuilderTest {
 			.contains("<th>당일</th><td><b>음주 있음</b></td>")
 			.contains("<th>전날</th><td>수면 6시간 · 음주 없음 · 야외활동 보통</td>")
 			.contains("<th>메모</th><td>당일: 회식</td>");
+	}
+
+	@Test
+	void 챗봇_답은_특이사항_표와_심해진_날에_제목과_함께_보여_주고_이스케이프한다() throws Exception {
+		LocalDate start = LocalDate.of(2026, 3, 1);
+		List<SituationalAnswerItem> answers = List.of(
+			new SituationalAnswerItem("P01", "고통이 심해진 때", "어제부터"),
+			new SituationalAnswerItem("C02", "진료 때 물어볼 것", "연고 <계속> 써도 될까요?"));
+		List<DayEntry> days = List.of(
+			new DayEntry(start, new EnumMap<>(BodyPart.class), null, null, null, null, List.of(), 2, null, List.of()),
+			new DayEntry(start.plusDays(1), new EnumMap<>(BodyPart.class), null, null, null, null, List.of(), 7, null,
+				List.of(), answers));
+		ReportContent content = new ReportContent(start, start.plusDays(30), start.plusDays(31), 2, false,
+			ReportContentFactory.flareDays(days), days, new ReportContent.LifestyleSummary(null, 0, 0, 0, Map.of()));
+
+		String html = builder.build(content);
+
+		String lines = "고통이 심해진 때: 어제부터<br/>진료 때 물어볼 것: 연고 &lt;계속&gt; 써도 될까요?";
+		assertThat(html)
+			// 특이사항이 없어도 챗봇 답이 있는 날은 특이사항 표에 나온다.
+			.contains("<td class=\"nowrap\">2026.03.02</td><td><div class=\"answers\">" + lines + "</div></td>")
+			.contains("<th>챗봇 답</th><td>" + lines + "</td>")
+			.doesNotContain("기록된 특이사항이 없습니다.");
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+		factory.newDocumentBuilder().parse(new InputSource(new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8))));
 	}
 
 	@Test

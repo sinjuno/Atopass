@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.record.service;
 
+import com.atopy.Atopass.domain.chatbot.service.SituationalAnswerReader;
 import com.atopy.Atopass.domain.member.entity.Member;
 import com.atopy.Atopass.domain.member.repository.MemberRepository;
 import com.atopy.Atopass.domain.record.dto.request.LifestyleRequest;
@@ -47,6 +48,7 @@ public class RecordService {
 	private final RecordRepository recordRepository;
 	private final MemberRepository memberRepository;
 	private final PhotoRepository photoRepository;
+	private final SituationalAnswerReader situationalAnswerReader;
 	private final ApplicationEventPublisher eventPublisher;
 
 	@Transactional
@@ -170,7 +172,8 @@ public class RecordService {
 	}
 
 	private RecordDetailResponse toDetail(SkinRecord record) {
-		return RecordDetailResponse.from(record, photosOf(record));
+		return RecordDetailResponse.from(record, photosOf(record),
+			situationalAnswerReader.forDay(record.getMember().getId(), record.getRecordDate()));
 	}
 
 	private List<PhotoSummary> photosOf(SkinRecord record) {

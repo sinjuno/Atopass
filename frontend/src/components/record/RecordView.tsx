@@ -1,4 +1,4 @@
-import type { PhotoRef, RecordInput } from '@/types/record';
+import type { PhotoRef, RecordInput, SituationalAnswerItem } from '@/types/record';
 import { allSkinSigns } from '@/utils/bodyMap';
 import {
   EMPTY_TEXT,
@@ -14,6 +14,8 @@ interface Props {
   record: RecordInput;
   recordId: number;
   photos: PhotoRef[];
+  /** 그날 챗봇이 물어 받은 답 (상황 질문·마무리 질문). 없으면 구역을 보여 주지 않는다 */
+  situationalAnswers?: SituationalAnswerItem[];
 }
 
 /** 고통 지수 구간별 색 (0~3 / 4~6 / 7~10) */
@@ -24,7 +26,7 @@ function painTone(score: number) {
 }
 
 /** 저장된 하루 기록 보기 (읽기 전용) */
-export default function RecordView({ record, recordId, photos }: Props) {
+export default function RecordView({ record, recordId, photos, situationalAnswers = [] }: Props) {
   // 부위마다 고른 증상을 합친 그날의 증상 (예: 목 홍반, 왼손 진물/딱지 → 홍반, 진물/딱지)
   const skinSigns = allSkinSigns(record);
   const painIndex = record.painIndex ?? null;
@@ -77,6 +79,19 @@ export default function RecordView({ record, recordId, photos }: Props) {
           <p className="text-gray-400">{EMPTY_TEXT}</p>
         )}
       </Section>
+
+      {situationalAnswers.length > 0 && (
+        <Section title="챗봇에 남긴 이야기">
+          <dl className="flex flex-col gap-3">
+            {situationalAnswers.map((item, i) => (
+              <div key={`${item.questionId}-${i}`}>
+                <dt className="text-sm text-gray-500">{item.title}</dt>
+                <dd className="mt-0.5 whitespace-pre-wrap text-base text-gray-800">{item.answer}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      )}
 
       <Section title="사진">
         {photos.length === 0 ? (

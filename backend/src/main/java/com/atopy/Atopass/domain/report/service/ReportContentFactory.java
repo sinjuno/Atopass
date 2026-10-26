@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.report.service;
 
+import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinCondition;
@@ -30,10 +31,15 @@ class ReportContentFactory {
 	/** 같은 부위·증상이 직전 기록보다 이만큼 이상 오르면 "갑자기 심해진 날"로 본다 */
 	static final int FLARE_JUMP = 3;
 
-	/** @param records 기간 내 기록. 날짜 오름차순이어야 한다. */
-	ReportContent create(List<SkinRecord> records, LocalDate startDate, LocalDate endDate,
-		boolean includePhotos, LocalDate today) {
-		List<DayEntry> days = records.stream().map(r -> dayEntry(r, includePhotos)).toList();
+	/**
+	 * @param records 기간 내 기록. 날짜 오름차순이어야 한다.
+	 * @param situationalAnswers 날짜별 챗봇 상황 질문·마무리 질문 답. 기록이 있는 날의 답만 쓴다.
+	 */
+	ReportContent create(List<SkinRecord> records, Map<LocalDate, List<SituationalAnswerItem>> situationalAnswers,
+		LocalDate startDate, LocalDate endDate, boolean includePhotos, LocalDate today) {
+		List<DayEntry> days = records.stream()
+			.map(r -> dayEntry(r, includePhotos, situationalAnswers.getOrDefault(r.getRecordDate(), List.of())))
+			.toList();
 		return new ReportContent(startDate, endDate, today, records.size(), includePhotos,
 			flareDays(days), days, lifestyleSummary(records));
 	}
@@ -75,7 +81,7 @@ class ReportContentFactory {
 		return flares;
 	}
 
-	private DayEntry dayEntry(SkinRecord record, boolean includePhotos) {
+	private DayEntry dayEntry(SkinRecord record, boolean includePhotos, List<SituationalAnswerItem> situationalAnswers) {
 		Map<BodyPart, Map<Symptom, Integer>> conditions = new EnumMap<>(BodyPart.class);
 		for (SkinCondition condition : record.getConditions()) {
 			Map<Symptom, Integer> scores = new EnumMap<>(Symptom.class);
@@ -87,7 +93,8 @@ class ReportContentFactory {
 		List<ReportPhoto> photos = includePhotos ? photoSource.photosOf(record.getId()) : List.of();
 		return new DayEntry(record.getRecordDate(), conditions, record.getSleepHours(),
 			record.getAlcohol(), record.getOutdoorActivity(), record.getNotes(), photos,
-			record.getPainIndex(), record.getMedication(), record.getSkinSigns().stream().sorted().toList());
+			record.getPainIndex(), record.getMedication(), record.getSkinSigns().stream().sorted().toList(),
+			situationalAnswers);
 	}
 
 	private LifestyleSummary lifestyleSummary(List<SkinRecord> records) {

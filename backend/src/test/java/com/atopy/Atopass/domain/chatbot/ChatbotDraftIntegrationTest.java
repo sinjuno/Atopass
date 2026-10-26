@@ -61,11 +61,12 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4))
 			.andExpect(jsonPath("$.data.draft.lifestyle.alcohol").value(false))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
-			.andExpect(jsonPath("$.data.pendingFields.length()").value(4))
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(5))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"))
 			.andExpect(jsonPath("$.data.pendingFields[1]").value("sleepHours"))
 			.andExpect(jsonPath("$.data.pendingFields[2]").value("medication"))
 			.andExpect(jsonPath("$.data.pendingFields[3]").value("notes"))
+			.andExpect(jsonPath("$.data.pendingFields[4]").value("C02"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
 	}
 
@@ -77,12 +78,15 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 			{"understood": true, "reply": "수면은요?",
 			 "updates": {"painIndex": 4, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS"],
 			 "skipped": ["bodyParts", "notes"]}}""");
+		// 특이사항 다음에는 마무리 질문(C02)이 남아, 아직 확인 단계로 넘어가지 않는다.
 		mockMvc.perform(sendMessage(bearer, session, "고통 4점, 6시간 잤고 약 먹었어요. 건조증만 있고 나머진 없어요"))
-			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("C02"));
 
 		mockMvc.perform(get(draftUrl(session)).header(AUTH, bearer))
-			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.pendingFields.length()").value(1))
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("C02"))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0))
 			.andExpect(jsonPath("$.data.draft.sleepScore").value(4))
 			.andExpect(jsonPath("$.data.draft.medication").value(true))
