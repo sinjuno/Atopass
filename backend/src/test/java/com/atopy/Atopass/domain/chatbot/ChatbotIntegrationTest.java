@@ -550,6 +550,31 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 수정_세션에서_새_부위를_추가하면_증상부터_묻고_저장하지_않는다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		((Map<String, Object>) body.get("record")).put("painIndex", 5);
+		String created = saveRecord(bearer, createSession(bearer, "RECORD"), body)
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+
+		String session = createSession(bearer, "RECORD");
+		// LLM이 새 부위의 점수만 반영하고, 그 부위의 증상을 되묻는 중(followUp)이면 아직 저장해서는 안 된다.
+		llm.enqueue("{\"understood\": true, \"reply\": \"오른팔 상박의 증상은 어떤 것이 나타났나요?\", "
+			+ "\"updates\": {\"conditions\": [{\"bodyPart\": \"RIGHT_UPPER_ARM\", \"pain\": 6}]}, "
+			+ "\"finished\": false, \"followUp\": true}");
+		mockMvc.perform(sendMessage(bearer, session, "오른팔 상박도 아파요, 6점이요"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("symptoms"))
+			.andExpect(jsonPath("$.data.reply").value("오른팔 상박의 증상은 어떤 것이 나타났나요?"));
+
+		// 아직 저장되지 않아, 기존 기록은 그대로다.
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.sleepHours").value(6.0));
+	}
+
+	@Test
 	void 수정_세션에서_자주_쓰는_수정_말투는_LLM_없이_바로_반영한다() throws Exception {
 		String bearer = newMemberBearer();
 		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();

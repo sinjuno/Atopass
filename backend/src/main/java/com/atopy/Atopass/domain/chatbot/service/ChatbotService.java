@@ -497,6 +497,7 @@ public class ChatbotService {
 		boolean explain = false;
 		String reply = null;
 		boolean finished = false;
+		boolean followUpPending = false;
 		if (parsed.isPresent() && parsed.get().understood()) {
 			ModelOutput output = parsed.get();
 			switch (draft.apply(output.updates())) {
@@ -505,7 +506,8 @@ public class ChatbotService {
 					reply = output.reply();
 					finished = output.finished();
 					explain = output.explain() && output.reply() != null;
-					draft.markFollowUp(output.followUp() && output.reply() != null);
+					followUpPending = output.followUp() && output.reply() != null;
+					draft.markFollowUp(followUpPending);
 					// 증상을 설명했으면, 예시 사진을 보여 줘도 되는지 이어서 묻는다.
 					if (explain && output.sign() != null && skinSignImages.has(output.sign())) {
 						draft.offerImage(output.sign());
@@ -520,7 +522,9 @@ public class ChatbotService {
 		}
 
 		int failCount = understood ? 0 : context.failCount() + 1;
-		boolean readyForConfirmation = understood && draft.readyForConfirmation(finished);
+		// 되묻는 중(followUp)이면, 수정 세션처럼 다른 선택 항목이 이미 다 끝나 있어도 아직 확인 단계로 넘기지 않는다.
+		// (예: 수정 중에 새 부위를 말해 점수는 반영됐지만, 그 부위의 증상을 아직 안 받았으면 저장하면 안 된다)
+		boolean readyForConfirmation = understood && !followUpPending && draft.readyForConfirmation(finished);
 		// 저장된 기록을 고치는 중인데 바뀐 값이 없으면("없어요") 다시 저장하지 않고 답만 한다.
 		boolean unchanged = draft.editing() && draft.sameContent(ChatDraft.fromJson(jsonMapper, context.draftJson()));
 		boolean save = readyForConfirmation && !unchanged;
