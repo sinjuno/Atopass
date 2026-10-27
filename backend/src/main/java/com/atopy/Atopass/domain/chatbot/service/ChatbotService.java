@@ -42,7 +42,7 @@ import tools.jackson.databind.node.ObjectNode;
  * DB 작업은 {@link ChatSessionService}의 짧은 트랜잭션으로 앞뒤에서 처리한다.
  * LLM 호출이 실패하면(CHATBOT_UNAVAILABLE) 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
  *
- * <p>기록 모드에서 고통 지수·나타난 증상·그 증상이 나타난 부위·수면 시간·약 복용·특이사항은 서버가 정해진 문장으로 묻고,
+ * <p>기록 모드에서 불편함 지수·나타난 증상·그 증상이 나타난 부위·수면 시간·약 복용·특이사항은 서버가 정해진 문장으로 묻고,
  * 화면은 선택지로 답을 받는다({@link #answerChoice}). 선택지 답은 LLM을 거치지 않고 초안에 바로 반영한다.
  * LLM의 질문 문장은 부위나 증상 점수를 되물을 때만 쓴다.
  *
@@ -62,7 +62,7 @@ public class ChatbotService {
 
 	static final String NOT_UNDERSTOOD = "죄송해요, 잘 이해하지 못했어요. 다시 한 번 말씀해 주시겠어요?";
 	static final String SCORE_OUT_OF_RANGE = "점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
-	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
+	static final String PAIN_INDEX_OUT_OF_RANGE = "불편함 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String CONFIRM = "입력하신 내용을 정리했어요.";
 	static final String SAVED = "오늘 기록을 저장했어요. 오늘의 총정리예요.";
 	static final String THANKS = "오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요.";
@@ -155,7 +155,7 @@ public class ChatbotService {
 		// 저장되기 전(처음 입력하는 중)에는 부위·증상처럼 규칙만으로 못 알아듣는 말이 섞이기 쉬워
 		// 잘못 자르지 않도록, 이미 저장된 기록을 고치는 중(draft.editing())일 때만 쓴다.
 		Optional<ModelOutput> localMatch = context.mode() == ChatMode.RECORD && draft.editing()
-			? localEditParser.parse(userText) : Optional.empty();
+			? localEditParser.parse(userText, "symptoms".equals(draft.askingField())) : Optional.empty();
 		if (localMatch.isPresent()) {
 			outcome = recordOutcome(context, draft, localMatch, memberId);
 		} else {
@@ -497,6 +497,7 @@ public class ChatbotService {
 		boolean explain = false;
 		String reply = null;
 		boolean finished = false;
+		boolean followUpPending = false;
 		if (parsed.isPresent() && parsed.get().understood()) {
 			ModelOutput output = parsed.get();
 			switch (draft.apply(output.updates())) {
@@ -505,7 +506,8 @@ public class ChatbotService {
 					reply = output.reply();
 					finished = output.finished();
 					explain = output.explain() && output.reply() != null;
-					draft.markFollowUp(output.followUp() && output.reply() != null);
+					followUpPending = output.followUp() && output.reply() != null;
+					draft.markFollowUp(followUpPending);
 					// 증상을 설명했으면, 예시 사진을 보여 줘도 되는지 이어서 묻는다.
 					if (explain && output.sign() != null && skinSignImages.has(output.sign())) {
 						draft.offerImage(output.sign());
@@ -520,7 +522,9 @@ public class ChatbotService {
 		}
 
 		int failCount = understood ? 0 : context.failCount() + 1;
-		boolean readyForConfirmation = understood && draft.readyForConfirmation(finished);
+		// 되묻는 중(followUp)이면, 수정 세션처럼 다른 선택 항목이 이미 다 끝나 있어도 아직 확인 단계로 넘기지 않는다.
+		// (예: 수정 중에 새 부위를 말해 점수는 반영됐지만, 그 부위의 증상을 아직 안 받았으면 저장하면 안 된다)
+		boolean readyForConfirmation = understood && !followUpPending && draft.readyForConfirmation(finished);
 		// 저장된 기록을 고치는 중인데 바뀐 값이 없으면("없어요") 다시 저장하지 않고 답만 한다.
 		boolean unchanged = draft.editing() && draft.sameContent(ChatDraft.fromJson(jsonMapper, context.draftJson()));
 		boolean save = readyForConfirmation && !unchanged;
@@ -594,7 +598,7 @@ public class ChatbotService {
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
 			case "medication" -> "오늘 약을 복용하셨나요?";
 			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요.";
-			case P01 -> "고통 지수가 어제보다 많이 올랐네요. 언제부터 이랬어요?";
+			case P01 -> "불편함 지수가 어제보다 많이 올랐네요. 언제부터 이랬어요?";
 			case P02 -> newSignOrPartQuestion(draft, memberId, today);
 			case P03 -> "며칠째 많이 불편하네요. 요즘 생활에서 달라진 게 있어요?";
 			case P04 -> "잠을 적게 잤네요. 가려워서 깼어요, 다른 이유가 있었어요?";

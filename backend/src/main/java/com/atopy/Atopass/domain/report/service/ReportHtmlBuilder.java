@@ -55,7 +55,7 @@ class ReportHtmlBuilder {
 	}
 
 	/**
-	 * 제목·기간 요약. 고통 지수를 기록한 날이 있으면 오른쪽 위에 기간 고통 지수 그래프를 함께 둔다.
+	 * 제목·기간 요약. 불편함 지수를 기록한 날이 있으면 오른쪽 위에 기간 불편함 지수 그래프를 함께 둔다.
 	 * 표 안의 width:100% 요소가 float와 겹칠 수 있어 float 대신 두 칸짜리 표로 나눈다.
 	 */
 	private void header(StringBuilder html, ReportContent content) {
@@ -70,7 +70,7 @@ class ReportHtmlBuilder {
 			.append(row("증상이 갑자기 심해진 날", content.flareDays().size() + "일"));
 		String pain = painSummaryText(content.days());
 		if (pain != null) {
-			html.append(row("고통 지수 (기간 평균·최고)", pain));
+			html.append(row("불편함 지수 (기간 평균·최고)", pain));
 		}
 		html.append(row("평소 생활 (기간 평균)", usualLifestyleText(content.lifestyle())))
 			.append(row("작성일", DATE.format(content.generatedDate())))
@@ -82,19 +82,19 @@ class ReportHtmlBuilder {
 		}
 	}
 
-	/** 고통 지수 그래프 상자: 제목, 왼쪽 눈금(10·5·0), 그래프 이미지, 아래 시작·끝 날짜 */
+	/** 불편함 지수 그래프 상자: 제목, 왼쪽 눈금(10·5·0), 그래프 이미지, 아래 시작·끝 날짜 */
 	private void painChart(StringBuilder html, byte[] png, ReportContent content) {
-		html.append("<div class=\"chart-box\"><p class=\"chart-title\">기간 고통 지수 (0~10)</p>")
+		html.append("<div class=\"chart-box\"><p class=\"chart-title\">기간 불편함 지수 (0~10)</p>")
 			.append("<table class=\"chart\"><tr><td class=\"chart-scale\">")
 			.append("<div class=\"scale-top\">10</div><div class=\"scale-mid\">5</div><div>0</div></td><td>")
-			.append("<img class=\"chart\" alt=\"기간 고통 지수 그래프\" src=\"data:image/png;base64,")
+			.append("<img class=\"chart\" alt=\"기간 불편함 지수 그래프\" src=\"data:image/png;base64,")
 			.append(Base64.getEncoder().encodeToString(png)).append("\"/></td></tr>")
 			.append("<tr><td></td><td><table class=\"chart-dates\"><tr><td>").append(SHORT_DATE.format(content.startDate()))
 			.append("</td><td class=\"end\">").append(SHORT_DATE.format(content.endDate())).append("</td></tr></table></td></tr>")
 			.append("</table><p class=\"chart-note\">점선은 5점, 큰 점은 가장 높은 날입니다. 기록이 없는 날은 선이 끊깁니다.</p></div>");
 	}
 
-	/** 고통 지수를 기록한 날의 평균과 최고. 기록한 날이 없으면 null. 0도 기록한 값이다. */
+	/** 불편함 지수를 기록한 날의 평균과 최고. 기록한 날이 없으면 null. 0도 기록한 값이다. */
 	private String painSummaryText(List<DayEntry> days) {
 		List<Integer> scores = days.stream().map(DayEntry::painIndex).filter(p -> p != null).toList();
 		if (scores.isEmpty()) {
@@ -107,7 +107,7 @@ class ReportHtmlBuilder {
 
 	private void flareSection(StringBuilder html, ReportContent content) {
 		html.append("<h2>증상이 갑자기 심해진 날</h2>")
-			.append("<p class=\"hint\">같은 부위·증상 또는 고통 지수가 직전 기록보다 ").append(ReportContentFactory.FLARE_JUMP)
+			.append("<p class=\"hint\">같은 부위·증상 또는 불편함 지수가 직전 기록보다 ").append(ReportContentFactory.FLARE_JUMP)
 			.append("점 이상 오른 날입니다. 점수는 환자가 느낀 주관적인 정도(0~10)이며 의료적인 중증도가 아닙니다. ")
 			.append("평소와 달랐던 생활은 굵게 표시했습니다.</p>");
 		if (content.flareDays().isEmpty()) {
@@ -200,7 +200,7 @@ class ReportHtmlBuilder {
 
 	private String jumpLabel(ScoreJump jump) {
 		return jump.bodyPart() == null || jump.symptom() == null
-			? "고통 지수" : jump.bodyPart().label() + " " + jump.symptom().label();
+			? "불편함 지수" : jump.bodyPart().label() + " " + jump.symptom().label();
 	}
 
 	private boolean isShortSleep(DayEntry day, Double usualSleep) {

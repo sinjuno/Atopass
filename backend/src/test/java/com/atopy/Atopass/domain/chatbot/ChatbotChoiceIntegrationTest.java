@@ -65,7 +65,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(2))
 			.andExpect(jsonPath("$.data.askingField").value("bodyParts"))
 			.andExpect(jsonPath("$.data.reply").value(SIGN_PARTS_QUESTION));
-		// 고통 지수·증상·부위는 한 묶음이라, 고른 부위에는 고통 지수가 점수로, 방금 고른 증상이 그 부위의 증상으로 들어간다.
+		// 불편함 지수·증상·부위는 한 묶음이라, 고른 부위에는 불편함 지수가 점수로, 방금 고른 증상이 그 부위의 증상으로 들어간다.
 		mockMvc.perform(choice(bearer, session, "bodyParts", List.of("FACE", "LEFT_HAND")))
 			.andExpect(jsonPath("$.data.draft.skinConditions.length()").value(2))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("FACE"))
@@ -95,7 +95,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.recordId").isNumber())
 			.andExpect(jsonPath("$.data.reply").value(
-				"오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 고통 지수: 6점\n- 얼굴: 홍반, 건조증\n- 왼손: 홍반, 건조증\n- 수면 시간: 7.5시간\n- 약 복용: 아니오\n- 나타난 증상: 홍반, 건조증"
+				"오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 불편함 지수: 6점\n- 얼굴: 홍반, 건조증\n- 왼손: 홍반, 건조증\n- 수면 시간: 7.5시간\n- 약 복용: 아니오\n- 나타난 증상: 홍반, 건조증"
 					+ "\n\n오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요."))
 			.andReturn().getResponse().getContentAsString();
 		// 마지막 항목에 답하면 저장 버튼 없이 그날 기록이 바로 저장된다.

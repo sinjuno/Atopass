@@ -29,8 +29,8 @@ public record RecordContent(
 	@Valid
 	List<@NotNull(message = "부위별 증상 항목이 비어 있습니다.") @Valid SkinConditionRequest> skinConditions,
 
-	@Min(value = 0, message = "고통 지수는 0~10 범위여야 합니다.")
-	@Max(value = 10, message = "고통 지수는 0~10 범위여야 합니다.")
+	@Min(value = 0, message = "불편함 지수는 0~10 범위여야 합니다.")
+	@Max(value = 10, message = "불편함 지수는 0~10 범위여야 합니다.")
 	Integer painIndex,
 
 	@DecimalMin(value = "0.0", message = "수면 시간은 0 이상이어야 합니다.")
@@ -56,7 +56,7 @@ public record RecordContent(
 	}
 
 	@JsonIgnore
-	@AssertTrue(message = "부위별 증상이나 고통 지수를 하나 이상 입력해 주세요.")
+	@AssertTrue(message = "부위별 증상이나 불편함 지수를 하나 이상 입력해 주세요.")
 	public boolean isSkinConditionsOrPainIndexPresent() {
 		return painIndex != null || (skinConditions != null && !skinConditions.isEmpty());
 	}

@@ -8,7 +8,7 @@ import { formatFullDate } from '@/utils/dateRange';
 export type DateRange = { startDate: string; endDate: string };
 
 /**
- * 그래프 '직접 선택' 기간을 고르는 달력. 캘린더 탭처럼 기록한 날에 고통 지수 색 점을 찍어,
+ * 그래프 '직접 선택' 기간을 고르는 달력. 캘린더 탭처럼 기록한 날에 불편함 지수 색 점을 찍어,
  * 어느 기간을 볼지 기록을 보면서 고를 수 있게 한다. 첫 번째로 누른 날이 시작, 두 번째로 누른 날이 끝이다(순서는 맞춰 준다).
  */
 export default function RangeDatePicker({ value, onChange }: { value: DateRange; onChange: (range: DateRange) => void }) {

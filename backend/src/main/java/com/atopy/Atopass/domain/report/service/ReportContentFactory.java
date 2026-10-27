@@ -45,7 +45,7 @@ class ReportContentFactory {
 	}
 
 	/**
-	 * 부위·증상, 그리고 고통 지수마다 직전에 기록한 점수와 비교해 {@link #FLARE_JUMP}점 이상 오른 날을 고른다.
+	 * 부위·증상, 그리고 불편함 지수마다 직전에 기록한 점수와 비교해 {@link #FLARE_JUMP}점 이상 오른 날을 고른다.
 	 * 기간 첫 기록은 비교할 직전 기록이 없어 고르지 않는다.
 	 */
 	static List<FlareDay> flareDays(List<DayEntry> days) {

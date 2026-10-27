@@ -58,8 +58,8 @@ class ReportHtmlBuilderTest {
 
 		assertThat(html)
 			// 0도 기록한 값이므로 평균에 들어간다: (0 + 7) / 2
-			.contains("고통 지수 (기간 평균·최고)").contains("평균 3.5 · 최고 7 (2일 기록)")
-			.contains("고통 지수 <b>0점 → 7점</b>")
+			.contains("불편함 지수 (기간 평균·최고)").contains("평균 3.5 · 최고 7 (2일 기록)")
+			.contains("불편함 지수 <b>0점 → 7점</b>")
 			.contains("약 복용").contains("나타난 증상 건조증, 긁은 자국");
 	}
 
@@ -67,7 +67,7 @@ class ReportHtmlBuilderTest {
 	void 고통_지수를_기록한_날이_없으면_고통_지수_행과_그래프를_넣지_않는다() {
 		String html = builder.build(ReportSamples.content(false, "메모", List.of()));
 
-		assertThat(html).doesNotContain("고통 지수 (기간 평균·최고)").doesNotContain("기간 고통 지수 그래프");
+		assertThat(html).doesNotContain("불편함 지수 (기간 평균·최고)").doesNotContain("기간 불편함 지수 그래프");
 	}
 
 	@Test
@@ -82,8 +82,8 @@ class ReportHtmlBuilderTest {
 
 		assertThat(html)
 			.contains("<td class=\"header-chart\">")
-			.contains("기간 고통 지수 (0~10)")
-			.contains("alt=\"기간 고통 지수 그래프\" src=\"data:image/png;base64,")
+			.contains("기간 불편함 지수 (0~10)")
+			.contains("alt=\"기간 불편함 지수 그래프\" src=\"data:image/png;base64,")
 			.contains("03.01").contains("03.31");
 	}
 

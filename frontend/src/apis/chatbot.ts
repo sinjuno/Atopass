@@ -32,7 +32,7 @@ export const chatbotApi = {
       .post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/choices`, body)
       .then(unwrap),
 
-  /** "기록 마치기" — 필수 항목(고통 지수)이 채워졌으면 확인 단계로 넘어간다 */
+  /** "기록 마치기" — 필수 항목(불편함 지수)이 채워졌으면 확인 단계로 넘어간다 */
   finish: (sessionId: string) =>
     client.post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/finish`).then(unwrap),
 

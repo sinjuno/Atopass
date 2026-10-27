@@ -250,6 +250,20 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 프롬프트가_부위의_증상은_그_부위의_기록에_넣도록_안내한다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		llm.enqueue("{\"understood\": true, \"reply\": \"얼굴의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?\", \"updates\": {}}");
+		mockMvc.perform(sendMessage(bearer, session, "얼굴도 아파요"));
+
+		assertThat(llm.lastSystemPrompt())
+			.contains("{부위}의 증상은 어떤 것이 나타났나요?")
+			.contains("전체 나타난 증상(최상위 skinSigns)이 아니라 그 부위의 기록")
+			.contains("부위, 부위의 고통 점수, 또는 부위의 증상을 되묻는 질문이면 followUp을 true로");
+	}
+
+	@Test
 	void 점수가_범위를_벗어나면_초안에_반영하지_않고_다시_묻는다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
@@ -273,7 +287,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통 11점"))
 			.andExpect(jsonPath("$.data.understood").value(false))
-			.andExpect(jsonPath("$.data.reply").value("고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)"))
+			.andExpect(jsonPath("$.data.reply").value("불편함 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)"))
 			.andExpect(jsonPath("$.data.draft.painIndex").doesNotExist());
 	}
 
@@ -531,7 +545,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.recordId").value(recordId))
 			.andExpect(jsonPath("$.data.reply").value(
-				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 불편함 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
 		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
 		// 글로 고치면 저장 버튼 없이 바로 기존 기록이 수정된다.
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
@@ -547,6 +561,41 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		assertThat(createSession(bearer, "RECORD")).isEqualTo(session);
 		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.messages.length()").value(5));
+	}
+
+	@Test
+	void 수정_세션에서_새_부위를_추가하면_그_부위의_증상부터_묻고_답하면_그_부위에_들어간다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		((Map<String, Object>) body.get("record")).put("painIndex", 5);
+		String created = saveRecord(bearer, createSession(bearer, "RECORD"), body)
+			.andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+
+		String session = createSession(bearer, "RECORD");
+		// LLM이 새 부위의 점수만 반영하고, 그 부위의 증상을 되묻는 중(followUp)이면 아직 저장해서는 안 된다.
+		llm.enqueue("{\"understood\": true, \"reply\": \"오른팔 상박의 증상은 어떤 것이 나타났나요?\", "
+			+ "\"updates\": {\"conditions\": [{\"bodyPart\": \"RIGHT_UPPER_ARM\", \"pain\": 6}]}, "
+			+ "\"finished\": false, \"followUp\": true}");
+		mockMvc.perform(sendMessage(bearer, session, "오른팔 상박도 아파요, 6점이요"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("symptoms"))
+			.andExpect(jsonPath("$.data.reply").value("오른팔 상박의 증상은 어떤 것이 나타났나요?"));
+
+		// 아직 저장되지 않아, 기존 기록은 그대로다.
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.sleepHours").value(6.0));
+
+		// 되물은 증상에 답하면(프롬프트 규칙대로라면) 전체 나타난 증상이 아니라 그 부위의 기록에 들어가고, 그제야 저장된다.
+		llm.enqueue("{\"understood\": true, \"reply\": \"기록했어요.\", "
+			+ "\"updates\": {\"conditions\": [{\"bodyPart\": \"RIGHT_UPPER_ARM\", \"skinSigns\": [\"ITCHING\"]}]}, "
+			+ "\"finished\": false, \"followUp\": false}");
+		mockMvc.perform(sendMessage(bearer, session, "가려움"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.draft.skinSigns").isEmpty())
+			.andExpect(jsonPath("$.data.draft.skinConditions[?(@.bodyPart=='RIGHT_UPPER_ARM')].skinSigns[0]")
+				.value("ITCHING"));
 	}
 
 	@Test
@@ -568,7 +617,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.editing").value(true))
 			.andExpect(jsonPath("$.data.recordId").value(recordId))
 			.andExpect(jsonPath("$.data.reply").value(
-				"바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+				"바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 불편함 지수: 5점\n- 팔: 증상 없음\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
 		assertThat(llm.callCount()).isEqualTo(callsBefore);
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.sleepHours").value(8.0));
@@ -1411,7 +1460,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isCreated());
 	}
 
-	/** 상황 질문(P01) 조건 판정에 쓰는 "어제 고통 지수"만 가진 기록을 직접 만든다. */
+	/** 상황 질문(P01) 조건 판정에 쓰는 "어제 불편함 지수"만 가진 기록을 직접 만든다. */
 	private void createRecordWithPainIndex(String bearer, LocalDate date, int painIndex) throws Exception {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
@@ -1420,7 +1469,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isCreated());
 	}
 
-	/** 상황 질문 조건 판정에 쓰는 지난 기록. bodyPart가 있으면 그 부위에 고통 지수를 점수로 넣는다. */
+	/** 상황 질문 조건 판정에 쓰는 지난 기록. bodyPart가 있으면 그 부위에 불편함 지수를 점수로 넣는다. */
 	private void createFullRecord(String bearer, LocalDate date, int painIndex, int sleepHours, Boolean medication,
 		String bodyPart, List<String> skinSigns) throws Exception {
 		Map<String, Object> body = new LinkedHashMap<>();

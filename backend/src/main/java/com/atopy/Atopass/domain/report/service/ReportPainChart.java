@@ -19,7 +19,7 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 
 /**
- * 보고서 첫 장 오른쪽 위에 넣는 기간 고통 지수(0~10) 그래프를 PNG로 그린다.
+ * 보고서 첫 장 오른쪽 위에 넣는 기간 불편함 지수(0~10) 그래프를 PNG로 그린다.
  * PDF 변환기가 SVG를 그리지 못해 이미지로 만든다. 서버에 글꼴이 없어도 그릴 수 있도록 글자(눈금·날짜·제목)는 넣지 않고 PDF 쪽(HTML)에서 쓴다.
  * 기록하지 않은 날은 선을 끊고, 앞뒤가 비어 있는 하루는 점으로 찍는다. 가장 높은 날에는 큰 점을 찍는다.
  */
@@ -41,7 +41,7 @@ final class ReportPainChart {
 	private ReportPainChart() {
 	}
 
-	/** 기간 안에 고통 지수를 기록한 날이 하나도 없으면 null */
+	/** 기간 안에 불편함 지수를 기록한 날이 하나도 없으면 null */
 	static byte[] png(LocalDate startDate, LocalDate endDate, List<DayEntry> days) {
 		Map<LocalDate, Integer> painByDate = new HashMap<>();
 		days.stream().filter(d -> d.painIndex() != null).forEach(d -> painByDate.put(d.date(), d.painIndex()));
@@ -66,7 +66,7 @@ final class ReportPainChart {
 			ImageIO.write(image, "png", out);
 			return out.toByteArray();
 		} catch (IOException e) {
-			throw new UncheckedIOException("고통 지수 그래프를 만들지 못했습니다.", e);
+			throw new UncheckedIOException("불편함 지수 그래프를 만들지 못했습니다.", e);
 		}
 	}
 

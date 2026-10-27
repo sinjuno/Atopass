@@ -34,7 +34,7 @@ const AUX_CENTER = 0.5;
 const AUX_AMPLITUDE = 0.4;
 
 interface Props {
-  /** 날짜별 고통 지수. 기록 없는 날은 null. 이 날짜들이 그래프의 가로축이 된다 */
+  /** 날짜별 불편함 지수. 기록 없는 날은 null. 이 날짜들이 그래프의 가로축이 된다 */
   pain: DailyValue[];
   aux: Record<AuxKey, DailyValue[]>;
   /** 그래프에서 날짜를 눌렀을 때 */
@@ -60,7 +60,7 @@ function normalizer(data: DailyValue[], swing: number) {
 }
 
 /**
- * '전체' 탭 그래프. 고통 지수(0~10)를 굵은 빨간 선으로 크게 그리고,
+ * '전체' 탭 그래프. 불편함 지수(0~10)를 굵은 빨간 선으로 크게 그리고,
  * 보조 지표(수면 시간·기온·습도)는 처음부터 모두, 기간 평균을 가운데에 두고 보이지 않는 보조 축에 얇은 점선으로 겹친다.
  * 마우스를 올린 날의 실제 값은 그래프 아래에 보여 주고(기본 툴팁 대신), 날짜를 누르면 onDateClick으로 알린다.
  */
@@ -78,7 +78,7 @@ export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
   const auxByDate = Object.fromEntries(
     AUX_METRICS.map((m) => [m.key, new Map(aux[m.key].map((d) => [d.date, d.value]))]),
   ) as Record<AuxKey, Map<string, number | null>>;
-  // 날씨는 그래프 날짜와 어긋날 수 있어 고통 지수 날짜에 맞춰 다시 줄을 세운 뒤 정규화한다.
+  // 날씨는 그래프 날짜와 어긋날 수 있어 불편함 지수 날짜에 맞춰 다시 줄을 세운 뒤 정규화한다.
   const aligned = Object.fromEntries(
     AUX_METRICS.map((m) => [m.key, pain.map((p) => ({ date: p.date, value: auxByDate[m.key].get(p.date) ?? null }))]),
   ) as Record<AuxKey, DailyValue[]>;
@@ -116,7 +116,7 @@ export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-2">
-        <SummaryCard label="평균 고통 지수" value={painAverage === null ? '-' : painAverage.toFixed(1)} />
+        <SummaryCard label="평균 불편함 지수" value={painAverage === null ? '-' : painAverage.toFixed(1)} />
         <SummaryCard
           label="최고값"
           value={peak?.value != null ? String(peak.value) : '-'}
@@ -135,7 +135,7 @@ export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
           style={emphasis === 'pain' ? { boxShadow: `0 0 0 2px ${painColor}` } : undefined}
         >
           <LineIcon color={painColor} />
-          고통 지수
+          불편함 지수
         </button>
         {AUX_METRICS.map((m) => {
           const isEmphasized = emphasis === m.key;
@@ -158,14 +158,14 @@ export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
       </div>
 
       <p className="text-sm text-gray-400 dark:text-gray-400">
-        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 범례를
+        왼쪽 눈금은 불편함 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 범례를
         누르면 그 지표만 또렷하게 보이고, 다시 누르면 모두 함께 보여요. 날짜를 누르면 그날 기록으로 넘어가요.
       </p>
 
       <div
         className={`h-64 [&_*:focus:not(:focus-visible)]:outline-none ${onDateClick ? 'cursor-pointer' : ''}`}
         role="img"
-        aria-label="고통 지수와 수면 시간·기온·습도를 겹친 변화 그래프"
+        aria-label="불편함 지수와 수면 시간·기온·습도를 겹친 변화 그래프"
       >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: -20 }} onMouseMove={pick} onClick={click}>
@@ -200,12 +200,12 @@ export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
               />
             ))}
             {shownDate && <ReferenceLine yAxisId="score" x={shownDate} stroke={theme.cursor} strokeDasharray="3 3" />}
-            {/* 고통 지수는 맨 마지막에 그려 항상 다른 선 위에 오게 한다 */}
+            {/* 불편함 지수는 맨 마지막에 그려 항상 다른 선 위에 오게 한다 */}
             <Area
               yAxisId="score"
               type="monotone"
               dataKey="pain"
-              name="고통 지수"
+              name="불편함 지수"
               stroke={painColor}
               strokeWidth={3}
               strokeOpacity={dimmed('pain') ? 0.25 : 1}
@@ -227,7 +227,7 @@ export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
         <div aria-live="polite" className="rounded-xl bg-gray-50 px-3 py-2.5 text-sm dark:bg-gray-800">
           <p className="mb-1 font-semibold text-gray-900 dark:text-gray-100">{formatKoreanDate(shownDate)}</p>
           <p className="text-gray-700 dark:text-gray-200">
-            고통 지수{' '}
+            불편함 지수{' '}
             {shownPain === null ? (
               <span className="text-gray-400">기록 없음</span>
             ) : (
@@ -285,7 +285,7 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
   );
 }
 
-/** 칩 앞의 선 모양 아이콘. 고통 지수는 실선, 보조 지표는 점선 */
+/** 칩 앞의 선 모양 아이콘. 불편함 지수는 실선, 보조 지표는 점선 */
 function LineIcon({ color, dashed = false }: { color: string; dashed?: boolean }) {
   return (
     <svg aria-hidden="true" width="16" height="4" className="shrink-0">

@@ -90,7 +90,7 @@ export default function AnalysisPage() {
   );
   const hasWeather = temperatureSeries.some((d) => d.value !== null) || humiditySeries.some((d) => d.value !== null);
 
-  // '전체' 탭용 고통 지수·수면 시간(날씨와 같은 날짜 범위를 써서 날짜가 맞물리게 한다).
+  // '전체' 탭용 불편함 지수·수면 시간(날씨와 같은 날짜 범위를 써서 날짜가 맞물리게 한다).
   const overlayScoreSeries = useMemo(() => {
     if (!range) return [];
     const items = (records.data ?? []).map((r) => ({

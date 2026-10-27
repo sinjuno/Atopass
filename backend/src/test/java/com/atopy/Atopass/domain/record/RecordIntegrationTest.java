@@ -155,7 +155,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 			.andReturn().getResponse().getContentAsString();
 		long id = jsonMapper.readTree(response).get("data").get("recordId").asLong();
 
-		// 부위별 증상 없이 고통 지수만 있어도 저장된다. 증상은 중복 없이 정의된 순서로 내려간다.
+		// 부위별 증상 없이 불편함 지수만 있어도 저장된다. 증상은 중복 없이 정의된 순서로 내려간다.
 		mockMvc.perform(get("/api/v1/records/" + id).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.skinConditions").isEmpty())
 			.andExpect(jsonPath("$.data.painIndex").value(6))
@@ -205,7 +205,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 	void 입력이_잘못되면_INVALID_INPUT을_반환한다() throws Exception {
 		String bearer = newMemberBearer();
 
-		// 날짜 없음, 부위 목록과 고통 지수 모두 없음, 수면 시간 범위 초과
+		// 날짜 없음, 부위 목록과 불편함 지수 모두 없음, 수면 시간 범위 초과
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("skinConditions", List.of());
 		body.put("sleepHours", 25);

@@ -18,7 +18,7 @@ interface Props {
   situationalAnswers?: SituationalAnswerItem[];
 }
 
-/** 고통 지수 구간별 색 (0~3 / 4~6 / 7~10) */
+/** 불편함 지수 구간별 색 (0~3 / 4~6 / 7~10) */
 function painTone(score: number) {
   if (score <= 3) return 'bg-emerald-50 text-emerald-700';
   if (score <= 6) return 'bg-amber-50 text-amber-700';
@@ -37,7 +37,7 @@ export default function RecordView({ record, recordId, photos, situationalAnswer
     <>
       <div className="px-4 pt-4">
         <div className="flex items-center justify-between rounded-2xl bg-gray-50 p-4">
-          <p className="text-gray-600">고통 지수</p>
+          <p className="text-gray-600">불편함 지수</p>
           {painIndex === null ? (
             <p className="text-gray-400">{EMPTY_TEXT}</p>
           ) : (

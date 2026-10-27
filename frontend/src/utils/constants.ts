@@ -76,7 +76,7 @@ export const HUMIDITY_MIN = 0;
 export const HUMIDITY_MAX = 100;
 export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
 
-/** 고통 지수 0~10 (0은 없음) */
+/** 불편함 지수 0~10 (0은 없음) */
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
 
@@ -137,7 +137,7 @@ export const CHAT_SLEEP_HOURS_DEFAULT = 7;
 
 /** 챗봇이 묻는 항목 이름 (예: 내려 둔 선택지 탭의 "수면 시간 고르기") */
 export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
-  painIndex: '고통 지수',
+  painIndex: '불편함 지수',
   bodyParts: '고통 부위',
   symptoms: '부위별 점수',
   sleepHours: '수면 시간',

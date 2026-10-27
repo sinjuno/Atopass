@@ -92,9 +92,9 @@ function RecordSummary({ date }: { date: string }) {
   const handleSave = async () => {
     setMessage(null);
     setFieldErrors({});
-    // RecordRequest: 부위별 증상과 고통 지수 중 하나 이상 필요
+    // RecordRequest: 부위별 증상과 불편함 지수 중 하나 이상 필요
     if (form.skinConditions.length === 0 && form.painIndex == null) {
-      setFieldErrors({ painIndex: '고통 지수를 골라 주세요.' });
+      setFieldErrors({ painIndex: '불편함 지수를 골라 주세요.' });
       return;
     }
     setSaving(true);
@@ -132,7 +132,7 @@ function RecordSummary({ date }: { date: string }) {
     }
   };
 
-  // 고통 지수와 부위는 한 묶음이라, 고통 지수를 바꾸면 기록한 부위의 고통 점수도 같이 바뀐다
+  // 불편함 지수와 부위는 한 묶음이라, 불편함 지수를 바꾸면 기록한 부위의 고통 점수도 같이 바뀐다
   const setPainIndex = (painIndex: number) =>
     setForm({
       ...form,
@@ -160,7 +160,7 @@ function RecordSummary({ date }: { date: string }) {
       />
       <p className="bg-gray-50 px-4 py-2 text-sm text-gray-600">{MODE_LABEL[mode]}</p>
 
-      <Section title="고통 지수·고통 부위">
+      <Section title="불편함 지수·고통 부위">
         <div className="flex flex-col gap-4">
           <PainIndexSlider value={form.painIndex ?? null} onChange={setPainIndex} />
           <SkinConditionEditor
