@@ -1026,6 +1026,32 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void P02를_묻는_중에_입력창에_글로_답해도_답으로_받고_같은_질문을_되풀이하지_않는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createFullRecord(bearer, today.minusDays(1), 3, 7, null, "NECK", List.of("ITCHING"));
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 4));
+		mockMvc.perform(choice(bearer, session, "skinSigns", List.of("ITCHING", "ERYTHEMA")));
+		mockMvc.perform(choice(bearer, session, "bodyParts", List.of("NECK")));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P02"));
+
+		mockMvc.perform(sendMessage(bearer, session, "섬유유연제를 바꾸자마자 시작됐어"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> assertThat(jsonMapper.readTree(answer.getAnswerJson()).get("text").asString())
+				.isEqualTo("섬유유연제를 바꾸자마자 시작됐어"));
+	}
+
+	@Test
 	void 어제와_증상_부위가_같으면_P02가_나오지_않는다() throws Exception {
 		String bearer = newMemberBearer();
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));

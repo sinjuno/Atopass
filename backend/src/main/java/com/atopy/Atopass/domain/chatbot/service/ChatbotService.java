@@ -147,6 +147,14 @@ public class ChatbotService {
 				return withNotesPlaceholder(
 					signQuestionTurn(context, draft, userText, asked.get(), memberId), memberId, context.today());
 			}
+			// 글로 답하는 상황 질문(P02·P03·P07)을 묻는 중이면, 입력창에 쓴 말을 그 질문의 답으로 받는다.
+			// (선택지 칸을 내려 두고 글로 답한 경우. LLM을 부르면 답으로 인식하지 못해 같은 질문을 되풀이한다)
+			String asking = draft.askingField();
+			if (asking != null && SITUATIONAL_TEXT_FIELDS.contains(asking)) {
+				return withNotesPlaceholder(
+					situationalTurn(context, draft, new ChatChoiceRequest(asking, userText, null), memberId),
+					memberId, context.today());
+			}
 		}
 
 		Outcome outcome;
