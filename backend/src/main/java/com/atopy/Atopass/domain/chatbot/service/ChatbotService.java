@@ -155,7 +155,7 @@ public class ChatbotService {
 		// 저장되기 전(처음 입력하는 중)에는 부위·증상처럼 규칙만으로 못 알아듣는 말이 섞이기 쉬워
 		// 잘못 자르지 않도록, 이미 저장된 기록을 고치는 중(draft.editing())일 때만 쓴다.
 		Optional<ModelOutput> localMatch = context.mode() == ChatMode.RECORD && draft.editing()
-			? localEditParser.parse(userText) : Optional.empty();
+			? localEditParser.parse(userText, "symptoms".equals(draft.askingField())) : Optional.empty();
 		if (localMatch.isPresent()) {
 			outcome = recordOutcome(context, draft, localMatch, memberId);
 		} else {

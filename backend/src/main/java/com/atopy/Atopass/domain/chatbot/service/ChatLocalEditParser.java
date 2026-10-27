@@ -58,8 +58,14 @@ class ChatLocalEditParser {
 		this.jsonMapper = jsonMapper;
 	}
 
-	/** 알아들은 항목이 하나도 없으면 비어 있다. */
-	Optional<ChatReplyParser.ModelOutput> parse(String text) {
+	/**
+	 * 알아들은 항목이 하나도 없으면 비어 있다.
+	 *
+	 * @param symptomsPending 지금 특정 부위의 증상을 되묻는 중(askingField가 symptoms)이면 true.
+	 *                        이때는 "가려움" 같은 말이 어느 부위의 증상인지 이 규칙만으로는 알 수 없으므로
+	 *                        증상 말투는 알아듣지 않고 LLM에 맡긴다(그 부위의 conditions에 바로 넣도록).
+	 */
+	Optional<ChatReplyParser.ModelOutput> parse(String text, boolean symptomsPending) {
 		if (text == null || text.isBlank()) {
 			return Optional.empty();
 		}
@@ -98,15 +104,17 @@ class ChatLocalEditParser {
 			matchedAny = true;
 		}
 
-		boolean removalContext = REMOVED_CONTEXT.matcher(trimmed).find();
-		List<SkinSign> matchedSigns = SIGN_KEYWORDS.entrySet().stream()
-			.filter(e -> e.getValue().stream().anyMatch(trimmed::contains))
-			.map(Map.Entry::getKey)
-			.toList();
-		if (!matchedSigns.isEmpty()) {
-			ArrayNode array = updates.putArray(removalContext ? "removeSkinSigns" : "skinSigns");
-			matchedSigns.forEach(sign -> array.add(sign.name()));
-			matchedAny = true;
+		if (!symptomsPending) {
+			boolean removalContext = REMOVED_CONTEXT.matcher(trimmed).find();
+			List<SkinSign> matchedSigns = SIGN_KEYWORDS.entrySet().stream()
+				.filter(e -> e.getValue().stream().anyMatch(trimmed::contains))
+				.map(Map.Entry::getKey)
+				.toList();
+			if (!matchedSigns.isEmpty()) {
+				ArrayNode array = updates.putArray(removalContext ? "removeSkinSigns" : "skinSigns");
+				matchedSigns.forEach(sign -> array.add(sign.name()));
+				matchedAny = true;
+			}
 		}
 
 		if (REMOVE_PART_CONTEXT.matcher(trimmed).find()) {
