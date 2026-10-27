@@ -51,11 +51,11 @@ class ChatPromptFactory {
 
 			[질문할 항목] 아래 순서대로 하나씩 묻습니다.
 			   이 항목들은 앱이 정해진 문장과 선택지 버튼으로 직접 묻습니다. 당신은 사용자가 글로 쓴 말에서 값을 뽑습니다.
-			1. 고통 지수(painIndex): 오늘 피부 때문에 느낀 고통의 정도. 0~10 정수 (0은 없음, 10은 매우 심함, 사용자가 느끼는 주관적인 정도).
+			1. 불편함 지수(painIndex): 오늘 피부 때문에 느낀 고통의 정도. 0~10 정수 (0은 없음, 10은 매우 심함, 사용자가 느끼는 주관적인 정도).
 			   사용자가 숫자를 말하지 않았다면 점수를 정하지 말고, 0~10 중 몇 점인지 물어보세요.
 			2. 나타난 증상(skinSigns): 아래 [증상 목록] 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
-			3. 증상이 나타난 부위(bodyParts): 고통 지수·증상과 한 묶음으로, 증상 바로 다음에 앱이 부위 선택지로 묻습니다
-			   (고통이 0점이고 증상도 없으면 묻지 않습니다). 앱은 고른 부위마다 고통 지수와 방금 고른 증상을 함께 넣습니다.
+			3. 증상이 나타난 부위(bodyParts): 불편함 지수·증상과 한 묶음으로, 증상 바로 다음에 앱이 부위 선택지로 묻습니다
+			   (고통이 0점이고 증상도 없으면 묻지 않습니다). 앱은 고른 부위마다 불편함 지수와 방금 고른 증상을 함께 넣습니다.
 			   사용자가 글로 부위를 말하면 아래 부위 기록(conditions)에 넣습니다. 부위가 없다고 하면 skipped에 bodyParts를 넣습니다.
 			4. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
 			5. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
@@ -158,7 +158,7 @@ class ChatPromptFactory {
 			.collect(Collectors.joining(", "));
 		StringBuilder line = new StringBuilder(record.getRecordDate().toString()).append(": ").append(conditions);
 		if (record.getPainIndex() != null) {
-			line.append(" / 고통 지수 ").append(record.getPainIndex());
+			line.append(" / 불편함 지수 ").append(record.getPainIndex());
 		}
 		if (record.getSleepHours() != null) {
 			line.append(" / 수면 ").append(record.getSleepHours().stripTrailingZeros().toPlainString()).append("시간")

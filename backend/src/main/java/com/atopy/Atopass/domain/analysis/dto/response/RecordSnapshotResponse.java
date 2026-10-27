@@ -15,7 +15,7 @@ public record RecordSnapshotResponse(
 	LocalDate date,
 	Long recordId,
 	List<SkinConditionResponse> skinConditions,
-	/** 고통 지수 0~10. 기록하지 않았으면 null */
+	/** 불편함 지수 0~10. 기록하지 않았으면 null */
 	Integer painIndex,
 	BigDecimal sleepHours,
 	/** 수면 점수 1~5. 수면 시간을 기록하지 않았으면 null */

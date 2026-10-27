@@ -36,7 +36,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 하루 한 건의 피부 기록. 기록하지 않은 값(고통 지수, 수면, 약 복용, 음주, 야외활동, 메모)은 null이다.
+ * 하루 한 건의 피부 기록. 기록하지 않은 값(불편함 지수, 수면, 약 복용, 음주, 야외활동, 메모)은 null이다.
  * 이름이 java.lang.Record와 겹치지 않도록 SkinRecord로 둔다.
  */
 @Getter
@@ -57,7 +57,7 @@ public class SkinRecord extends BaseTimeEntity {
 	@Column(nullable = false)
 	private LocalDate recordDate;
 
-	/** 고통 지수 0~10 (사용자가 느끼는 주관적인 정도. 0은 없음) */
+	/** 불편함 지수 0~10 (사용자가 느끼는 주관적인 정도. 0은 없음) */
 	private Integer painIndex;
 
 	@Column(precision = 3, scale = 1)

@@ -2,7 +2,7 @@ package com.atopy.Atopass.domain.chatbot.service;
 
 import org.springframework.stereotype.Component;
 
-/** P01: 오늘 고통 지수가 어제보다 많이(설정값 이상) 오르면 "언제부터 이랬어요?"를 묻는다. */
+/** P01: 오늘 불편함 지수가 어제보다 많이(설정값 이상) 오르면 "언제부터 이랬어요?"를 묻는다. */
 @Component
 class PainJumpRule implements SituationalQuestionRule {
 

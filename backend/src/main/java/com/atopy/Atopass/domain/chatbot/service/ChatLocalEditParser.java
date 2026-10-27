@@ -14,7 +14,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * LLM 없이, 자주 쓰는 수정 말투(예: "수면 시간을 6시간으로 고쳐줘", "고통 지수는 7점이야",
+ * LLM 없이, 자주 쓰는 수정 말투(예: "수면 시간을 6시간으로 고쳐줘", "불편함 지수는 7점이야",
  * "약 안 먹었어", "가려움은 없어졌어요")를 알아듣는다. LLM이 쓰는 것과 같은 updates 형식을 만들어
  * {@link ChatDraft#apply}로 바로 넘긴다.
  *
@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 class ChatLocalEditParser {
 
-	private static final Pattern PAIN_INDEX = Pattern.compile("고통[^0-9]{0,8}(\\d{1,2})\\s*점");
+	private static final Pattern PAIN_INDEX = Pattern.compile("(?:고통|불편함)[^0-9]{0,8}(\\d{1,2})\\s*점");
 	private static final Pattern SLEEP_WITH_KEYWORD =
 		Pattern.compile("(?:수면\\s*시간|잠)[^0-9]{0,8}(\\d{1,2}(?:\\.\\d)?)\\s*시간");
 	private static final Pattern SLEEP_BARE =

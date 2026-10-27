@@ -288,7 +288,7 @@ class ChatDraftTest {
 	@Test
 	void 고통_지수_증상_다음에_부위를_묻고_고른_부위에는_고통_지수와_증상이_들어간다() {
 		ChatDraft draft = ChatDraft.empty();
-		// 고통 지수가 없으면 부위를 반영하지 않는다.
+		// 불편함 지수가 없으면 부위를 반영하지 않는다.
 		assertThat(draft.applyBodyParts(json("[\"FACE\"]"))).isEqualTo(ApplyResult.INVALID_VALUE);
 
 		draft.apply(json("{\"painIndex\": 7}"));
@@ -372,7 +372,7 @@ class ChatDraftTest {
 
 	@Test
 	void 고통_지수가_아직_없으면_다른_선택_항목이_다_끝나도_상황_질문_칸이_준비되지_않는다() {
-		// 자유 입력으로 수면·약 복용·증상만 먼저 말하고 고통 지수는 아직 말하지 않은 경우 (필수 항목이 비어 있다).
+		// 자유 입력으로 수면·약 복용·증상만 먼저 말하고 불편함 지수는 아직 말하지 않은 경우 (필수 항목이 비어 있다).
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
 			{"sleepHours": 7, "medication": false, "skinSigns": [], "skipped": ["bodyParts"]}"""));

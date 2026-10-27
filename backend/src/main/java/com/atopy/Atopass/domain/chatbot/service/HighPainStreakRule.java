@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
- * P03: 고통 지수가 높은 날(설정값 이상)이 오늘을 포함해 며칠(설정값) 연속이면 "요즘 생활에서 달라진 게 있어요?"를 묻는다.
+ * P03: 불편함 지수가 높은 날(설정값 이상)이 오늘을 포함해 며칠(설정값) 연속이면 "요즘 생활에서 달라진 게 있어요?"를 묻는다.
  * 사이에 기록하지 않은 날이 있으면 연속이 아니다.
  */
 @Component

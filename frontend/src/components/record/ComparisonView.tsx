@@ -59,7 +59,7 @@ export default function ComparisonView({ dateA, dateB, comparison }: Props) {
         <>
           <CompareSection title="오늘의 상태">
             <CompareRow
-              label="고통 지수"
+              label="불편함 지수"
               valueA={scoreText(a?.painIndex ?? null)}
               valueB={scoreText(b?.painIndex ?? null)}
               scoreA={a?.painIndex ?? null}
