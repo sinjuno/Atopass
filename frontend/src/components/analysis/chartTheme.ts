@@ -26,10 +26,10 @@ export const CHART_DARK = {
 
 export const SCORE_TICKS = [0, 2, 4, 6, 8, 10];
 
-/** '전체' 탭의 고통 지수 선 색 */
+/** '전체' 탭의 불편함 지수 선 색 */
 export const PAIN_COLOR = { light: '#E34948', dark: '#E66767' } as const;
 
-/** '전체' 탭 보조 지표 점선 색. 고통 지수 빨강과 헷갈리지 않는 색으로 고정한다 */
+/** '전체' 탭 보조 지표 점선 색. 불편함 지수 빨강과 헷갈리지 않는 색으로 고정한다 */
 export const AUX_COLORS = {
   sleep: '#6250D6',
   temperature: '#1BAF7A',

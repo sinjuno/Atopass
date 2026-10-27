@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import org.springframework.stereotype.Component;
 
 /**
- * 특이사항 질문 문구와 입력칸 예시(S01)를 고른다. 재진일이 가까우면 의사 선생님께 전할 말, 아니면 고통 지수가 높으면
+ * 특이사항 질문 문구와 입력칸 예시(S01)를 고른다. 재진일이 가까우면 의사 선생님께 전할 말, 아니면 불편함 지수가 높으면
  * 가장 불편했던 순간, 그 외에는 남겨둘 일을 묻는다. 저장하는 값(특이사항)은 어느 문구든 같다.
  */
 @Component

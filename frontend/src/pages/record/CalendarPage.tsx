@@ -185,7 +185,7 @@ export default function CalendarPage() {
               점수 없음
             </li>
           </ul>
-          <p className="mt-2 text-gray-400">점은 그날 기록한 고통 지수예요. {comparing ? '비교 모드에서는 기록이 없는 날도 고를 수 있어요.' : '날짜를 누르면 그날 기록을 볼 수 있어요.'}</p>
+          <p className="mt-2 text-gray-400">점은 그날 기록한 불편함 지수예요. {comparing ? '비교 모드에서는 기록이 없는 날도 고를 수 있어요.' : '날짜를 누르면 그날 기록을 볼 수 있어요.'}</p>
         </section>
       </div>
     </>

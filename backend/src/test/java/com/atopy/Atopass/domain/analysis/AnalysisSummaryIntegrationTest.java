@@ -69,7 +69,7 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 	@Test
 	void 고통_지수가_평소보다_크게_오른_구간도_알려준다() throws Exception {
 		String bearer = newMemberBearer();
-		// 부위별 점수 없이 고통 지수만 기록: 6일은 2점, 마지막 이틀은 9점
+		// 부위별 점수 없이 불편함 지수만 기록: 6일은 2점, 마지막 이틀은 9점
 		for (int day = 0; day < 8; day++) {
 			createPainRecord(bearer, START.plusDays(day), day >= 6 ? 9 : 2);
 		}
@@ -83,7 +83,7 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.insights[0].startDate").value("2026-03-07"))
 			.andExpect(jsonPath("$.data.insights[0].endDate").value("2026-03-08"))
 			.andExpect(jsonPath("$.data.insights[0].message")
-				.value("고통 지수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
+				.value("불편함 지수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
 	}
 
 	@Test
@@ -98,7 +98,7 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.insights[0].type").value("PAIN_INDEX_CHANGE"))
 			.andExpect(jsonPath("$.data.insights[0].message")
-				.value("고통 지수가 평소(평균 2.0)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
+				.value("불편함 지수가 평소(평균 2.0)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
 	}
 
 	@Test

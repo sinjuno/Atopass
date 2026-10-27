@@ -7,7 +7,7 @@ import BodyMap, { BodyMapLegend } from './BodyMap';
 interface Props {
   value: SkinCondition[];
   onChange: (value: SkinCondition[]) => void;
-  /** 그날의 고통 지수 — 고통 지수와 부위는 한 묶음이라, 고른 부위의 고통 점수로 그대로 들어간다 */
+  /** 그날의 불편함 지수 — 불편함 지수와 부위는 한 묶음이라, 고른 부위의 고통 점수로 그대로 들어간다 */
   painIndex: number | null;
 }
 
@@ -15,7 +15,7 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
 
 /**
  * 고통이 있는 부위와 그 부위에 나타난 증상. 마네킹에서 부위를 누르면 기록하고, 그 부위에 나타난 증상을 고른다.
- * 부위마다 점수를 따로 받지 않고 그날의 고통 지수를 부위의 고통 점수(symptoms.pain)로 저장한다.
+ * 부위마다 점수를 따로 받지 않고 그날의 불편함 지수를 부위의 고통 점수(symptoms.pain)로 저장한다.
  * 부위 색은 나타난 증상 개수에 비례한다(0개 하얀색 → 7개 새빨간색, 기록 없음은 회색).
  */
 export default function SkinConditionEditor({ value, onChange, painIndex }: Props) {
@@ -25,7 +25,7 @@ export default function SkinConditionEditor({ value, onChange, painIndex }: Prop
   const selectedCondition = value.find((c) => c.bodyPart === selected);
   const selectedSigns = selectedCondition?.skinSigns ?? [];
 
-  // 기록하지 않은 부위를 누르면 고통 지수로 기록하고 고른다. 고통 지수를 아직 안 골랐으면 고르기만 한다.
+  // 기록하지 않은 부위를 누르면 불편함 지수로 기록하고 고른다. 불편함 지수를 아직 안 골랐으면 고르기만 한다.
   const select = (part: BodyPart) => {
     setSelected(part);
     if (painIndex === null || value.some((c) => c.bodyPart === part)) return;
@@ -86,7 +86,7 @@ export default function SkinConditionEditor({ value, onChange, painIndex }: Prop
       ) : (
         <p className="text-center text-sm text-gray-500">
           {painIndex === null
-            ? '고통 지수를 먼저 고른 뒤 마네킹에서 고통이 있는 부위를 눌러 주세요.'
+            ? '불편함 지수를 먼저 고른 뒤 마네킹에서 고통이 있는 부위를 눌러 주세요.'
             : '마네킹에서 고통이 있는 부위를 누르고 나타난 증상을 골라 주세요.'}
         </p>
       )}

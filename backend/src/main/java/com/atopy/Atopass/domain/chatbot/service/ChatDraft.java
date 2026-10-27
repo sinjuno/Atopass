@@ -39,9 +39,9 @@ import tools.jackson.databind.node.ObjectNode;
  * 챗봇이 대화로 모아 가는 기록 초안. 사용자가 말한 값만 담고, 말하지 않은 값은 비워 둔다.
  * 세션에는 JSON으로 저장된다. LLM이 준 값은 {@link #apply}에서 모두 검증한 뒤에만 반영한다.
  *
- * <p>챗봇이 묻는 항목: 고통 지수(필수), 나타난 증상, 그 증상이 나타난 부위, 수면 시간, 약 복용 여부, 특이사항.
- * 고통 지수·증상·부위는 한 묶음이라, 고통 지수 다음에 증상을, 증상 다음에 바로 부위를 묻는다.
- * 고른 부위에는 고통 지수가 점수로, 방금 고른 증상이 그 부위의 증상으로 들어간다. (고통이 0점이고 증상도 없으면 부위는 묻지 않는다)
+ * <p>챗봇이 묻는 항목: 불편함 지수(필수), 나타난 증상, 그 증상이 나타난 부위, 수면 시간, 약 복용 여부, 특이사항.
+ * 불편함 지수·증상·부위는 한 묶음이라, 불편함 지수 다음에 증상을, 증상 다음에 바로 부위를 묻는다.
+ * 고른 부위에는 불편함 지수가 점수로, 방금 고른 증상이 그 부위의 증상으로 들어간다. (고통이 0점이고 증상도 없으면 부위는 묻지 않는다)
  * 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
  * 사용자가 증상을 물어 예시 사진을 보여 줄지 묻는 중이면({@link #offeredSign}) 그 답(signImage)을 먼저 받는다.
@@ -283,7 +283,7 @@ public final class ChatDraft {
 
 	/**
 	 * LLM 응답의 updates를 검증한 뒤 반영한다. 하나라도 규칙에 어긋나면 아무것도 반영하지 않는다.
-	 * 부위 고통 점수와 고통 지수는 0~10 정수만 허용하고, 모르는 부위·증상 이름은 값 오류로 본다.
+	 * 부위 고통 점수와 불편함 지수는 0~10 정수만 허용하고, 모르는 부위·증상 이름은 값 오류로 본다.
 	 */
 	ApplyResult apply(JsonNode updates) {
 		if (updates == null || updates.isMissingNode() || updates.isNull()) {
@@ -576,9 +576,9 @@ public final class ChatDraft {
 	}
 
 	/**
-	 * 증상 다음에 고른 부위를 반영한다. 고통 지수·증상·부위는 한 묶음이라, 고른 부위마다 고통 지수를 그 부위의 고통 점수로,
+	 * 증상 다음에 고른 부위를 반영한다. 불편함 지수·증상·부위는 한 묶음이라, 고른 부위마다 불편함 지수를 그 부위의 고통 점수로,
 	 * 방금 고른 증상을 그 부위의 증상으로 넣는다. (예: 홍반·가려움을 고르고 얼굴·왼손을 고르면 두 부위 모두 홍반·가려움)
-	 * 고통 지수가 없거나 부위 이름이 하나라도 틀리면 아무것도 반영하지 않는다.
+	 * 불편함 지수가 없거나 부위 이름이 하나라도 틀리면 아무것도 반영하지 않는다.
 	 */
 	ApplyResult applyBodyParts(JsonNode parts) {
 		if (painIndex == null || parts == null || !parts.isArray() || parts.isEmpty()) {
@@ -608,7 +608,7 @@ public final class ChatDraft {
 
 	/**
 	 * 기록으로 저장하려면 꼭 필요한 항목이 모두 채워졌는지.
-	 * 고통 지수가 있어야 하고, 사용자가 말한 부위가 있다면 그 부위마다 고통 점수가 있어야 한다.
+	 * 불편함 지수가 있어야 하고, 사용자가 말한 부위가 있다면 그 부위마다 고통 점수가 있어야 한다.
 	 */
 	public boolean requiredSatisfied() {
 		return painIndex != null && conditions.values().stream().noneMatch(Map::isEmpty);
@@ -695,7 +695,7 @@ public final class ChatDraft {
 
 	/**
 	 * 지금 물어볼 항목. 아직 입력되지 않은 항목 중 가장 먼저 필요한 것이고, 모두 채워졌으면 null이다.
-	 * 챗봇이 부위나 부위 고통 점수를 되묻는 중이거나 점수가 빠진 부위가 있으면, 이어서 묻도록 고통 지수보다 먼저 symptoms다.
+	 * 챗봇이 부위나 부위 고통 점수를 되묻는 중이거나 점수가 빠진 부위가 있으면, 이어서 묻도록 불편함 지수보다 먼저 symptoms다.
 	 * 증상의 예시 사진을 보여 줄지 묻는 중이면 그 답(signImage)이 가장 먼저다.
 	 */
 	public String askingField() {
@@ -737,13 +737,13 @@ public final class ChatDraft {
 	}
 
 	/**
-	 * 사람이 읽는 초안 요약(챗봇의 일일 총정리). 기록된 항목만 한 줄씩 보여 준다. (예: "- 고통 지수: 6점")
-	 * 고통 지수는 한 줄로 따로 두고, 부위 줄에는 부위 고통 점수 없이 그 부위에 나타난 증상만 보여 준다. (예: "- 얼굴: 홍반, 건조증")
+	 * 사람이 읽는 초안 요약(챗봇의 일일 총정리). 기록된 항목만 한 줄씩 보여 준다. (예: "- 불편함 지수: 6점")
+	 * 불편함 지수는 한 줄로 따로 두고, 부위 줄에는 부위 고통 점수 없이 그 부위에 나타난 증상만 보여 준다. (예: "- 얼굴: 홍반, 건조증")
 	 */
 	public String summary() {
 		StringJoiner lines = new StringJoiner("\n");
 		if (painIndex != null) {
-			lines.add("- 고통 지수: " + painIndex + "점");
+			lines.add("- 불편함 지수: " + painIndex + "점");
 		}
 		conditions.keySet().stream()
 			.sorted(Comparator.comparingInt(Enum::ordinal))

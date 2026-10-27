@@ -42,7 +42,7 @@ import tools.jackson.databind.node.ObjectNode;
  * DB 작업은 {@link ChatSessionService}의 짧은 트랜잭션으로 앞뒤에서 처리한다.
  * LLM 호출이 실패하면(CHATBOT_UNAVAILABLE) 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
  *
- * <p>기록 모드에서 고통 지수·나타난 증상·그 증상이 나타난 부위·수면 시간·약 복용·특이사항은 서버가 정해진 문장으로 묻고,
+ * <p>기록 모드에서 불편함 지수·나타난 증상·그 증상이 나타난 부위·수면 시간·약 복용·특이사항은 서버가 정해진 문장으로 묻고,
  * 화면은 선택지로 답을 받는다({@link #answerChoice}). 선택지 답은 LLM을 거치지 않고 초안에 바로 반영한다.
  * LLM의 질문 문장은 부위나 증상 점수를 되물을 때만 쓴다.
  *
@@ -62,7 +62,7 @@ public class ChatbotService {
 
 	static final String NOT_UNDERSTOOD = "죄송해요, 잘 이해하지 못했어요. 다시 한 번 말씀해 주시겠어요?";
 	static final String SCORE_OUT_OF_RANGE = "점수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
-	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
+	static final String PAIN_INDEX_OUT_OF_RANGE = "불편함 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String CONFIRM = "입력하신 내용을 정리했어요.";
 	static final String SAVED = "오늘 기록을 저장했어요. 오늘의 총정리예요.";
 	static final String THANKS = "오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요.";
@@ -594,7 +594,7 @@ public class ChatbotService {
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
 			case "medication" -> "오늘 약을 복용하셨나요?";
 			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요.";
-			case P01 -> "고통 지수가 어제보다 많이 올랐네요. 언제부터 이랬어요?";
+			case P01 -> "불편함 지수가 어제보다 많이 올랐네요. 언제부터 이랬어요?";
 			case P02 -> newSignOrPartQuestion(draft, memberId, today);
 			case P03 -> "며칠째 많이 불편하네요. 요즘 생활에서 달라진 게 있어요?";
 			case P04 -> "잠을 적게 잤네요. 가려워서 깼어요, 다른 이유가 있었어요?";

@@ -43,7 +43,7 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
 /**
  * 챗봇이 지금 묻는 항목(askingField)의 선택지. 고른 값은 LLM을 거치지 않고 바로 초안에 반영된다.
  * 특이사항은 글로 받으므로 "없어요"만 보여 준다.
- * 고통 지수·증상·부위는 한 묶음이라, 고통 지수 다음에 증상을 고르고, 바로 이어서 마네킹에서 그 증상이 나타난 부위를 고른다.
+ * 불편함 지수·증상·부위는 한 묶음이라, 불편함 지수 다음에 증상을 고르고, 바로 이어서 마네킹에서 그 증상이 나타난 부위를 고른다.
  * 고른 부위는 증상 개수만큼 붉게 칠해, 저장될 모습을 미리 보여 준다.
  *
  * 질문이 오면 화면 아래에서 올라오고, 답을 고르면 알아서 내려간 뒤 답을 보낸다. 위의 대화는 계속 보인다.
@@ -331,10 +331,10 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
         </div>
       );
     case 'P01':
-      // 고통 지수가 어제보다 많이 오른 날만 나오는 상황 질문. 사진도 바로 붙일 수 있게 둔다.
+      // 불편함 지수가 어제보다 많이 오른 날만 나오는 상황 질문. 사진도 바로 붙일 수 있게 둔다.
       return (
         <div className="flex flex-col gap-2">
-          <div className="flex gap-2" role="group" aria-label="고통 지수가 언제부터 심해졌는지">
+          <div className="flex gap-2" role="group" aria-label="불편함 지수가 언제부터 심해졌는지">
             <ChoiceButton onClick={() => onChoose({ field, value: 'TODAY' })} disabled={disabled} wide>
               오늘
             </ChoiceButton>
@@ -379,7 +379,7 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
         />
       );
     case 'P03':
-      // 고통 지수가 높은 날이 며칠 이어질 때만 나오는 상황 질문. 칩은 "요즘 " 뒤에 커서를 둔다.
+      // 불편함 지수가 높은 날이 며칠 이어질 때만 나오는 상황 질문. 칩은 "요즘 " 뒤에 커서를 둔다.
       return (
         <SituationalTextAnswer
           disabled={disabled}
@@ -397,7 +397,7 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
       // 직전 기록이 며칠 전일 때만 나오는 상황 질문. 하나 고르고, 덧붙일 말은 적어도 되고 안 적어도 된다.
       return <LongGapChoices disabled={disabled} onPick={(value) => onChoose({ field, value })} skip={skip} />;
     case 'P07':
-      // 고통 지수가 어제보다 많이 내린 날만 나오는 상황 질문
+      // 불편함 지수가 어제보다 많이 내린 날만 나오는 상황 질문
       return (
         <SituationalTextAnswer
           disabled={disabled}
@@ -411,7 +411,7 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
         />
       );
     case 'P04':
-      // 잠을 적게 자고 고통 지수도 높은 날만 나오는 상황 질문
+      // 잠을 적게 자고 불편함 지수도 높은 날만 나오는 상황 질문
       return (
         <ReasonChoices
           labels={SHORT_SLEEP_REASON_LABELS}
