@@ -139,6 +139,28 @@ class MedicationIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 사진_인식_결과를_그대로_보내도_모르는_칸은_무시하고_저장한다() throws Exception {
+		String bearer = newMemberBearer();
+		Map<String, Object> read = new LinkedHashMap<>();
+		read.put("name", "아토케어정");
+		read.put("type", "oral");
+		read.put("dose", null);
+		read.put("times", List.of());
+		read.put("timesText", "1일 2회");
+		read.put("days", 7);
+		read.put("startDate", TODAY.toString());
+		read.put("endDate", null);
+		read.put("memo", null);
+		read.put("isOtherCondition", false);
+
+		mockMvc.perform(withJson(post("/api/v1/medications/bulk").header(AUTH, bearer),
+				Map.of("items", List.of(read), "source", "photo")))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data[0].timesText").value("1일 2회"))
+			.andExpect(jsonPath("$.data[0].times.length()").value(0));
+	}
+
+	@Test
 	void 하나라도_잘못되면_아무것도_저장하지_않는다() throws Exception {
 		String bearer = newMemberBearer();
 		long before = medicationRepository.count();
