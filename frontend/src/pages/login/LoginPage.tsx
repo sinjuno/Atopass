@@ -4,6 +4,7 @@ import { ApiError } from "@/apis/client";
 import { authApi } from "@/apis/auth";
 import heroImage from "@/assets/atomi/hero.png";
 import TextField from "@/components/common/TextField";
+import { resetOnboardingGate } from "@/components/medication/OnboardingGate";
 import { getErrorMessage, getFieldErrors } from "@/utils/errorMessage";
 
 type Mode = "login" | "signup";
@@ -110,6 +111,7 @@ export default function LoginPage() {
       }
       // 가입 후에는 바로 로그인한다. 액세스 토큰은 authApi.login 이 메모리에 보관한다.
       await authApi.login({ email, password: values.password });
+      resetOnboardingGate();
       navigate(from, { replace: true });
     } catch (error) {
       if (signedUp) {
