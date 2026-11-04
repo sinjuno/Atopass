@@ -28,12 +28,18 @@ export type PendingField =
   | 'P05'
   | 'P06'
   | 'P07'
+  | 'P08'
+  | 'P09'
+  | 'P10'
+  | 'P11'
+  | 'P12'
   /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
   | 'C02';
 
 export type ShortSleepReason = 'ITCH_WOKE' | 'LATE_SLEEP' | 'BOTH' | 'OTHER';
 export type MissedMedicationReason = 'FORGOT' | 'RAN_OUT' | 'AWAY' | 'OTHER';
 export type LongGapAnswer = 'SIMILAR' | 'BETTER' | 'WORSE';
+export type RevisitChangeAnswer = 'CHANGED' | 'SAME' | 'NOT_YET';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -103,6 +109,16 @@ export type ChatChoiceRequest =
   | { field: 'P06'; value: { answer: LongGapAnswer; text?: string } }
   /** 상황 질문(P07) 답 — 많이 좋아진 날 달라진 것 (글, 200자 이내) */
   | { field: 'P07'; value: string }
+  /** 상황 질문(P08) 답 — 재진 날 처방·연고가 바뀐 게 있는지, 덧붙인 글은 선택 (200자 이내) */
+  | { field: 'P08'; value: { answer: RevisitChangeAnswer; text?: string } }
+  /** 상황 질문(P09) 답 — 어제 있던 증상이 오늘 없을 때 달라진 것 (글, 200자 이내) */
+  | { field: 'P09'; value: string }
+  /** 상황 질문(P10) 답 — 처방이 바뀐 지 며칠 뒤 그동안 피부가 어땠는지(P06과 같은 선택지), 덧붙인 글은 선택 (200자 이내) */
+  | { field: 'P10'; value: { answer: LongGapAnswer; text?: string } }
+  /** 상황 질문(P11) 답 — 불편함이 낮은 날이 며칠 이어질 때 생활에서 달라진 것 (글, 200자 이내) */
+  | { field: 'P11'; value: string }
+  /** 상황 질문(P12) 답 — 같은 부위가 며칠 동안 불편할 때 언제부터였는지 (글, 200자 이내) */
+  | { field: 'P12'; value: string }
   /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
   | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */

@@ -14,7 +14,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 상황 질문 P02~P07의 조건 판정과 순위 */
+/** 상황 질문 P02~P08의 조건 판정과 순위 */
 class SituationalRulesTest {
 
 	private final JsonMapper mapper = JsonMapper.builder().build();
@@ -22,8 +22,8 @@ class SituationalRulesTest {
 	private final LocalDate today = LocalDate.of(2026, 10, 23);
 
 	static SituationalQuestionProperties defaultProperties() {
-		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3,
-			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7));
+		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3, 3, 5, 2, 5, 7, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11));
 	}
 
 	private ChatDraft draft(String json) {
@@ -215,6 +215,212 @@ class SituationalRulesTest {
 		assertThat(rule.matches(context(painDraft(2), painDay(2, 9)))).isFalse();
 	}
 
+	// ── P08 ──
+
+	@Test
+	void P08은_오늘이_재진_날일_때만_나온다() {
+		RevisitDayRule rule = new RevisitDayRule(properties);
+
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), null, true))).isTrue();
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), null, false))).isFalse();
+		// 재진 날 정보를 따로 주지 않으면(다른 질문 테스트 등) 재진 날이 아닌 것으로 본다.
+		assertThat(rule.matches(context(painDraft(3)))).isFalse();
+	}
+
+	@Test
+	void P08은_기록이_처음이어도_다른_조건이_없어도_나온다() {
+		SituationalQuestionSelector selector =
+			new SituationalQuestionSelector(List.of(new RevisitDayRule(properties)), properties);
+
+		assertThat(selector.select(new SituationalQuestionContext(painDraft(0), today, List.of(), null, true), Map.of(),
+			today)).contains("P08");
+	}
+
+	@Test
+	void P08은_다른_상황_질문보다_먼저_나오고_3일_안에_다시_나오지_않는다() {
+		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(
+			new PainJumpRule(properties), new LongGapRule(properties), new RevisitDayRule(properties)), properties);
+		// 어제보다 5점 오름(P01) + 직전 기록이 4일 전이 아니라 어제이므로 P06은 아님 + 재진 날
+		SituationalQuestionContext context = new SituationalQuestionContext(
+			painDraft(8), today, List.of(painDay(1, 3)), today.minusDays(1), true);
+
+		assertThat(selector.select(context, Map.of(), today)).contains("P08");
+		// 같은 질문이 최근에 나왔으면 다음 순위로 넘어간다.
+		assertThat(selector.select(context, Map.of("P08", today.minusDays(2)), today)).contains("P01");
+	}
+
+	// ── P09 ──
+
+	private ChatDraft signDraft(String signs) {
+		return draft("{\"painIndex\": 3, \"skinSigns\": [" + signs + "]}");
+	}
+
+	@Test
+	void P09는_어제_있던_증상이_오늘_없으면_나온다() {
+		VanishedSignRule rule = new VanishedSignRule(properties);
+		SituationalDay yesterday = day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA, SkinSign.XEROSIS));
+
+		// 홍반만 남고 건조증이 사라짐
+		assertThat(rule.matches(context(signDraft("\"ERYTHEMA\""), yesterday))).isTrue();
+		// 증상이 하나도 없음
+		assertThat(rule.matches(context(signDraft(""), yesterday))).isTrue();
+		// 어제 증상이 모두 오늘도 있음
+		assertThat(rule.matches(context(signDraft("\"ERYTHEMA\", \"XEROSIS\""), yesterday))).isFalse();
+		// 새로 생긴 증상만 더해졌으면 사라진 게 아니다(P02 쪽).
+		assertThat(rule.matches(context(signDraft("\"ERYTHEMA\", \"XEROSIS\", \"ITCHING\""), yesterday))).isFalse();
+	}
+
+	@Test
+	void P09는_부위별로_고른_증상도_오늘_있는_증상으로_본다() {
+		VanishedSignRule rule = new VanishedSignRule(properties);
+		SituationalDay yesterday = day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA));
+		ChatDraft today = draft("""
+			{"painIndex": 3, "skinSigns": [], "conditions": {"NECK": {"pain": 3, "skinSigns": ["ERYTHEMA"]}}}""");
+
+		assertThat(rule.matches(context(today, yesterday))).isFalse();
+	}
+
+	@Test
+	void P09는_어제_기록이_없거나_오늘_증상을_아직_묻지_않았으면_나오지_않는다() {
+		VanishedSignRule rule = new VanishedSignRule(properties);
+
+		assertThat(rule.matches(context(signDraft("")))).isFalse();
+		assertThat(rule.matches(context(signDraft(""), day(2, null, Set.of(), Set.of(SkinSign.ERYTHEMA))))).isFalse();
+		// 오늘 증상을 아직 묻지 않음(skinSigns 없음)
+		assertThat(rule.matches(context(painDraft(3), day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA))))).isFalse();
+	}
+
+	@Test
+	void P09의_이름은_사라진_증상_중_앞의_것이다() {
+		SituationalDay yesterday = day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA));
+
+		assertThat(VanishedSignRule.subject(signDraft(""), Optional.of(yesterday))).contains("홍반");
+		assertThat(VanishedSignRule.subject(signDraft("\"ERYTHEMA\""), Optional.of(yesterday))).isEmpty();
+	}
+
+	// ── P10 ──
+
+	private SituationalQuestionContext changedOn(int daysAgo) {
+		return new SituationalQuestionContext(painDraft(3), today, List.of(), null, false, today.minusDays(daysAgo));
+	}
+
+	@Test
+	void P10은_처방이_바뀐_지_3일에서_5일_사이일_때만_나온다() {
+		PrescriptionFollowUpRule rule = new PrescriptionFollowUpRule(properties);
+
+		assertThat(rule.matches(changedOn(2))).isFalse();
+		assertThat(rule.matches(changedOn(3))).isTrue();
+		assertThat(rule.matches(changedOn(5))).isTrue();
+		assertThat(rule.matches(changedOn(6))).isFalse();
+	}
+
+	@Test
+	void P10은_처방이_바뀐_날이_없으면_나오지_않는다() {
+		PrescriptionFollowUpRule rule = new PrescriptionFollowUpRule(properties);
+
+		assertThat(rule.matches(context(painDraft(3)))).isFalse();
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), null, true))).isFalse();
+	}
+
+	@Test
+	void P10은_재진_날_P08_다음으로_순위가_높고_3일_안에_다시_나오지_않는다() {
+		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(
+			new PrescriptionFollowUpRule(properties), new LongGapRule(properties)), properties);
+		// 직전 기록이 10일 전(P06 조건도 맞음) + 처방이 바뀐 지 4일
+		SituationalQuestionContext context = new SituationalQuestionContext(
+			painDraft(3), today, List.of(), today.minusDays(10), false, today.minusDays(4));
+
+		// P06이 P10보다 순위가 높다(1~7이 먼저). P10은 그 뒤다.
+		assertThat(selector.select(context, Map.of(), today)).contains("P06");
+		assertThat(selector.select(context, Map.of("P06", today.minusDays(1)), today)).contains("P10");
+		assertThat(selector.select(context, Map.of("P06", today.minusDays(1), "P10", today.minusDays(2)), today))
+			.isEmpty();
+	}
+
+	// ── P11 ──
+
+	@Test
+	void P11은_불편함이_낮은_날이_오늘을_포함해_5일_연속이면_나온다() {
+		LowPainStreakRule rule = new LowPainStreakRule(properties);
+
+		assertThat(rule.matches(context(painDraft(1), painDay(4, 2), painDay(3, 1), painDay(2, 0), painDay(1, 2))))
+			.isTrue();
+		// 오늘이 낮지 않음
+		assertThat(rule.matches(context(painDraft(3), painDay(4, 2), painDay(3, 1), painDay(2, 0), painDay(1, 2))))
+			.isFalse();
+		// 4일째에 높은 날이 있음
+		assertThat(rule.matches(context(painDraft(1), painDay(4, 2), painDay(3, 5), painDay(2, 0), painDay(1, 2))))
+			.isFalse();
+		// 4일 연속뿐
+		assertThat(rule.matches(context(painDraft(1), painDay(3, 1), painDay(2, 0), painDay(1, 2)))).isFalse();
+	}
+
+	@Test
+	void P11은_사이에_기록하지_않은_날이_있으면_연속이_아니다() {
+		LowPainStreakRule rule = new LowPainStreakRule(properties);
+
+		// 3일 전 기록이 없음
+		assertThat(rule.matches(context(painDraft(1), painDay(5, 1), painDay(4, 1), painDay(2, 1), painDay(1, 1))))
+			.isFalse();
+	}
+
+	@Test
+	void P11은_P03과_함께_나올_수_없고_지난_기록은_연속_일수보다_짧게_읽지_않는다() {
+		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
+			3, 2, 6, 3, 3, 3, 3, 5, 2, 10, 7, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11));
+
+		assertThat(longStreak.historyDays()).isEqualTo(9);
+		// 높은 날 연속(P03)과 낮은 날 연속(P11)은 오늘의 불편함 지수 하나로 갈려 동시에 맞지 않는다.
+		SituationalQuestionContext context = context(painDraft(7), painDay(2, 7), painDay(1, 7));
+		assertThat(new HighPainStreakRule(properties).matches(context)).isTrue();
+		assertThat(new LowPainStreakRule(properties).matches(context)).isFalse();
+	}
+
+	// ── P12 ──
+
+	private SituationalDay neckDay(int daysAgo) {
+		return day(daysAgo, null, Set.of(BodyPart.NECK), Set.of());
+	}
+
+	private ChatDraft neckDraft() {
+		return draft("{\"painIndex\": 3, \"conditions\": {\"NECK\": {\"pain\": 3}}}");
+	}
+
+	@Test
+	void P12는_같은_부위가_오늘을_포함해_최근_7일_중_5일_이상이면_나온다() {
+		RepeatedPartRule rule = new RepeatedPartRule(properties);
+
+		// 오늘 + 지난 4일 = 5일
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(2), neckDay(3), neckDay(4)))).isTrue();
+		// 사이에 쉰 날이 있어도 7일 안이면 센다.
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(3), neckDay(5), neckDay(6)))).isTrue();
+		// 4일뿐
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(2), neckDay(3)))).isFalse();
+		// 7일 밖(8일 전)은 세지 않는다.
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(2), neckDay(3), neckDay(8)))).isFalse();
+	}
+
+	@Test
+	void P12는_오늘_그_부위를_고르지_않았거나_다른_부위면_나오지_않는다() {
+		RepeatedPartRule rule = new RepeatedPartRule(properties);
+		SituationalDay[] days = {neckDay(1), neckDay(2), neckDay(3), neckDay(4)};
+
+		assertThat(rule.matches(context(painDraft(3), days))).isFalse();
+		assertThat(rule.matches(context(
+			draft("{\"painIndex\": 3, \"conditions\": {\"FACE\": {\"pain\": 3}}}"), days))).isFalse();
+	}
+
+	@Test
+	void P12는_가장_많이_기록된_부위의_이름을_쓴다() {
+		ChatDraft both = draft("{\"painIndex\": 3, \"conditions\": {\"NECK\": {\"pain\": 3}, \"FACE\": {\"pain\": 3}}}");
+		List<SituationalDay> days = List.of(neckDay(1), neckDay(2), neckDay(3), neckDay(4),
+			day(5, null, Set.of(BodyPart.FACE), Set.of()));
+
+		assertThat(RepeatedPartRule.subject(both, today, days, 5, 7)).contains(BodyPart.NECK.label());
+		assertThat(RepeatedPartRule.subject(neckDraft(), today, List.of(), 5, 7)).isEmpty();
+	}
+
 	// ── 순위 ──
 
 	@Test
@@ -236,7 +442,8 @@ class SituationalRulesTest {
 	@Test
 	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7));
+			3, 2, 6, 10, 3, 3, 3, 5, 2, 5, 7, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		assertThat(properties.historyDays()).isEqualTo(7);

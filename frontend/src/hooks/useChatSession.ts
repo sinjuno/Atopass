@@ -8,6 +8,7 @@ import {
   BODY_PART_LABELS,
   LONG_GAP_ANSWER_LABELS,
   MISSED_MEDICATION_REASON_LABELS,
+  REVISIT_CHANGE_LABELS,
   SHORT_SLEEP_REASON_LABELS,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
@@ -62,11 +63,19 @@ export function choiceText(choice: ChatChoiceRequest): string {
     case 'P02':
     case 'P03':
     case 'P07':
+    case 'P09':
+    case 'P11':
+    case 'P12':
       return choice.value.trim();
-    case 'P06': {
+    case 'P06':
+    case 'P08':
+    case 'P10': {
       // 서버의 대화 내역과 같게 "좋아졌어요. 연고를 바꿨어요"처럼 붙인다
       const text = choice.value.text?.trim();
-      const label = LONG_GAP_ANSWER_LABELS[choice.value.answer];
+      const label =
+        choice.field === 'P08'
+          ? REVISIT_CHANGE_LABELS[choice.value.answer]
+          : LONG_GAP_ANSWER_LABELS[choice.value.answer];
       return text ? `${label}. ${text}` : label;
     }
     case 'P04':

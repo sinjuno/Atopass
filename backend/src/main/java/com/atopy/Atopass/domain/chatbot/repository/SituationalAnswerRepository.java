@@ -13,6 +13,10 @@ public interface SituationalAnswerRepository extends JpaRepository<SituationalAn
 	/** 기간 안의 답. (재진 PDF에서 사용) */
 	List<SituationalAnswer> findByMemberIdAndRecordDateBetween(Long memberId, LocalDate startDate, LocalDate endDate);
 
+	/** 기간 안에 한 질문의 답. (처방이 바뀐 날을 찾을 때 사용) */
+	List<SituationalAnswer> findByMemberIdAndQuestionIdAndRecordDateBetween(
+		Long memberId, String questionId, LocalDate startDate, LocalDate endDate);
+
 	Optional<SituationalAnswer> findByMemberIdAndRecordDateAndQuestionId(
 		Long memberId, LocalDate recordDate, String questionId);
 
