@@ -23,7 +23,7 @@ class SituationalRulesTest {
 
 	static SituationalQuestionProperties defaultProperties() {
 		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3,
-			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0));
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8));
 	}
 
 	private ChatDraft draft(String json) {
@@ -249,6 +249,55 @@ class SituationalRulesTest {
 		assertThat(selector.select(context, Map.of("P08", today.minusDays(2)), today)).contains("P01");
 	}
 
+	// ── P09 ──
+
+	private ChatDraft signDraft(String signs) {
+		return draft("{\"painIndex\": 3, \"skinSigns\": [" + signs + "]}");
+	}
+
+	@Test
+	void P09는_어제_있던_증상이_오늘_없으면_나온다() {
+		VanishedSignRule rule = new VanishedSignRule(properties);
+		SituationalDay yesterday = day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA, SkinSign.XEROSIS));
+
+		// 홍반만 남고 건조증이 사라짐
+		assertThat(rule.matches(context(signDraft("\"ERYTHEMA\""), yesterday))).isTrue();
+		// 증상이 하나도 없음
+		assertThat(rule.matches(context(signDraft(""), yesterday))).isTrue();
+		// 어제 증상이 모두 오늘도 있음
+		assertThat(rule.matches(context(signDraft("\"ERYTHEMA\", \"XEROSIS\""), yesterday))).isFalse();
+		// 새로 생긴 증상만 더해졌으면 사라진 게 아니다(P02 쪽).
+		assertThat(rule.matches(context(signDraft("\"ERYTHEMA\", \"XEROSIS\", \"ITCHING\""), yesterday))).isFalse();
+	}
+
+	@Test
+	void P09는_부위별로_고른_증상도_오늘_있는_증상으로_본다() {
+		VanishedSignRule rule = new VanishedSignRule(properties);
+		SituationalDay yesterday = day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA));
+		ChatDraft today = draft("""
+			{"painIndex": 3, "skinSigns": [], "conditions": {"NECK": {"pain": 3, "skinSigns": ["ERYTHEMA"]}}}""");
+
+		assertThat(rule.matches(context(today, yesterday))).isFalse();
+	}
+
+	@Test
+	void P09는_어제_기록이_없거나_오늘_증상을_아직_묻지_않았으면_나오지_않는다() {
+		VanishedSignRule rule = new VanishedSignRule(properties);
+
+		assertThat(rule.matches(context(signDraft("")))).isFalse();
+		assertThat(rule.matches(context(signDraft(""), day(2, null, Set.of(), Set.of(SkinSign.ERYTHEMA))))).isFalse();
+		// 오늘 증상을 아직 묻지 않음(skinSigns 없음)
+		assertThat(rule.matches(context(painDraft(3), day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA))))).isFalse();
+	}
+
+	@Test
+	void P09의_이름은_사라진_증상_중_앞의_것이다() {
+		SituationalDay yesterday = day(1, null, Set.of(), Set.of(SkinSign.ERYTHEMA));
+
+		assertThat(VanishedSignRule.subject(signDraft(""), Optional.of(yesterday))).contains("홍반");
+		assertThat(VanishedSignRule.subject(signDraft("\"ERYTHEMA\""), Optional.of(yesterday))).isEmpty();
+	}
+
 	// ── 순위 ──
 
 	@Test
@@ -270,7 +319,7 @@ class SituationalRulesTest {
 	@Test
 	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0));
+			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		assertThat(properties.historyDays()).isEqualTo(7);

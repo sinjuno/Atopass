@@ -405,6 +405,20 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           skip={skip}
         />
       );
+    case 'P09':
+      // 어제 있던 증상이 오늘은 없을 때만 나오는 상황 질문
+      return (
+        <SituationalTextAnswer
+          disabled={disabled}
+          placeholder="예: 보습제를 바꿨어요"
+          template="했어요"
+          templateLabel="~했어요"
+          unknownLabel="잘 모르겠어요"
+          ariaLabel="증상이 사라지기 전에 달라진 것"
+          onSubmit={(text) => onChoose({ field, value: text })}
+          skip={skip}
+        />
+      );
     case 'P08':
       // 오늘이 등록해 둔 재진 날일 때만 나오는 상황 질문. 바뀐 게 있다고 고르면 뭐가 바뀌었는지 적을 칸이 열린다(안 적어도 된다).
       return (

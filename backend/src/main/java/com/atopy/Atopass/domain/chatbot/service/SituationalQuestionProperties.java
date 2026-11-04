@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * 상황 질문(P01~P08) 선택에 쓰는 숫자 조건과 순위.
+ * 상황 질문(P01~P09) 선택에 쓰는 숫자 조건과 순위.
  *
  * @param painIndexJumpThreshold 오늘 불편함 지수가 어제보다 이만큼 이상 오르면 P01 조건을 만족한다.
  * @param sameQuestionCooldownDays 같은 상황 질문이 마지막으로 나온 지 이 일수 이상 지나야 다시 고를 수 있다.
@@ -48,7 +48,8 @@ public record SituationalQuestionProperties(
 		@DefaultValue("5") int p05,
 		@DefaultValue("6") int p06,
 		@DefaultValue("7") int p07,
-		@DefaultValue("0") int p08
+		@DefaultValue("0") int p08,
+		@DefaultValue("8") int p09
 	) {
 	}
 
