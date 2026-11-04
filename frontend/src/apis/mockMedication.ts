@@ -73,7 +73,13 @@ export const mockMedicationApi = {
       });
     });
     write(HISTORY_KEY, history);
-    const updated = { ...target, ...patch };
+    // 백엔드처럼 dose·timesText·memo 는 ''이면 비우고(null 로 저장), null 은 "안 바꿈"으로 본다.
+    const next: Partial<MedicationInput> = { ...patch };
+    (['dose', 'timesText', 'memo'] as const).forEach((key) => {
+      if (next[key] === null) delete next[key];
+      else if (next[key] === '') next[key] = null;
+    });
+    const updated = { ...target, ...next };
     write(MEDS_KEY, all.map((m) => (m.id === id ? updated : m)));
     return updated;
   },
