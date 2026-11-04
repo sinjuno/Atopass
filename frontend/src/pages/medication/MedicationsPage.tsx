@@ -9,23 +9,9 @@ import MedicationPhotoFlow from '@/components/medication/MedicationPhotoFlow';
 import { useAsync } from '@/hooks/useAsync';
 import type { Medication, MedicationInput } from '@/types/medication';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { medicationErrorMessage } from '@/utils/medication';
+import { changedFields, medicationErrorMessage } from '@/utils/medication';
 
 type View = { kind: 'list' } | { kind: 'photo' } | { kind: 'add' } | { kind: 'edit'; medication: Medication };
-
-/** 비운 값을 null 로 보내면 백엔드가 "안 바꿈"으로 처리하므로, 이 필드들은 빈 문자열 ''로 보내야 비워진다. (times 는 빈 배열이면 비워진다) */
-const CLEARED_WITH_EMPTY_STRING: (keyof MedicationInput)[] = ['dose', 'timesText', 'memo'];
-
-/** 바뀐 필드만 골라 PATCH 본문을 만든다. */
-function changedFields(before: Medication, after: MedicationInput): Partial<MedicationInput> {
-  const patch: Partial<MedicationInput> = {};
-  (Object.keys(after) as (keyof MedicationInput)[]).forEach((key) => {
-    if (JSON.stringify(after[key]) === JSON.stringify(before[key])) return;
-    const cleared = after[key] === null && CLEARED_WITH_EMPTY_STRING.includes(key);
-    (patch as Record<string, unknown>)[key] = cleared ? '' : after[key];
-  });
-  return patch;
-}
 
 /** 내 약 관리 — /medications */
 export default function MedicationsPage() {

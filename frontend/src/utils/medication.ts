@@ -1,5 +1,5 @@
 import { ApiError } from '@/apis/client';
-import type { MedicationTime, MedicationType } from '@/types/medication';
+import type { Medication, MedicationInput, MedicationTime, MedicationType } from '@/types/medication';
 import { getErrorMessage } from './errorMessage';
 
 export const MED_PHOTO_MAX_COUNT = 3;
@@ -39,4 +39,18 @@ export function medicationErrorMessage(error: unknown): string {
     if (error.status === 429) return '오늘 사진 인식 횟수를 다 썼어요. 직접 입력해 주세요.';
   }
   return getErrorMessage(error);
+}
+
+/** 비운 값을 null 로 보내면 백엔드가 "안 바꿈"으로 처리하므로, 이 필드들은 빈 문자열 ''로 보내야 비워진다. (times 는 빈 배열이면 비워진다) */
+const CLEARED_WITH_EMPTY_STRING: (keyof MedicationInput)[] = ['dose', 'timesText', 'memo'];
+
+/** 바뀐 필드만 골라 PATCH 본문을 만든다. */
+export function changedFields(before: Medication, after: MedicationInput): Partial<MedicationInput> {
+  const patch: Partial<MedicationInput> = {};
+  (Object.keys(after) as (keyof MedicationInput)[]).forEach((key) => {
+    if (JSON.stringify(after[key]) === JSON.stringify(before[key])) return;
+    const cleared = after[key] === null && CLEARED_WITH_EMPTY_STRING.includes(key);
+    (patch as Record<string, unknown>)[key] = cleared ? '' : after[key];
+  });
+  return patch;
 }
