@@ -1263,6 +1263,8 @@ paths:
       summary: 약 정보 수정
       description: |
         전달한 필드만 수정한다. 값이 실제로 바뀐 필드마다 변경 이력이 자동으로 쌓인다.
+        보내지 않은(`null`) 필드는 그대로 두고, 용량·복용 시간 원문·메모를 비우려면 빈 문자열(`""`)을 보낸다.
+        시간대(`times`)를 빈 배열로 보내면 비운다. 아무 필드도 보내지 않으면 400이다.
         종료일(`endDate`)은 `POST /medications/{medicationId}/stop`으로 정하고, 여기서는 고치지 않는다.
       requestBody:
         required: true
