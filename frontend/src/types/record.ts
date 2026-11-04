@@ -95,7 +95,7 @@ export interface RecordDetail extends RecordInput {
   situationalAnswers?: SituationalAnswerItem[];
 }
 
-/** 챗봇 상황 질문(P01~P10)·마무리 질문(C02) 답 한 줄. C02는 적은 항목마다 한 줄 */
+/** 챗봇 상황 질문(P01~P11)·마무리 질문(C02) 답 한 줄. C02는 적은 항목마다 한 줄 */
 export interface SituationalAnswerItem {
   questionId: string;
   /** 무엇에 대한 답인지 (예: "잠을 적게 잔 이유") */

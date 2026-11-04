@@ -22,8 +22,8 @@ class SituationalRulesTest {
 	private final LocalDate today = LocalDate.of(2026, 10, 23);
 
 	static SituationalQuestionProperties defaultProperties() {
-		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3, 3, 5,
-			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9));
+		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3, 3, 5, 2, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10));
 	}
 
 	private ChatDraft draft(String json) {
@@ -337,6 +337,45 @@ class SituationalRulesTest {
 			.isEmpty();
 	}
 
+	// ── P11 ──
+
+	@Test
+	void P11은_불편함이_낮은_날이_오늘을_포함해_5일_연속이면_나온다() {
+		LowPainStreakRule rule = new LowPainStreakRule(properties);
+
+		assertThat(rule.matches(context(painDraft(1), painDay(4, 2), painDay(3, 1), painDay(2, 0), painDay(1, 2))))
+			.isTrue();
+		// 오늘이 낮지 않음
+		assertThat(rule.matches(context(painDraft(3), painDay(4, 2), painDay(3, 1), painDay(2, 0), painDay(1, 2))))
+			.isFalse();
+		// 4일째에 높은 날이 있음
+		assertThat(rule.matches(context(painDraft(1), painDay(4, 2), painDay(3, 5), painDay(2, 0), painDay(1, 2))))
+			.isFalse();
+		// 4일 연속뿐
+		assertThat(rule.matches(context(painDraft(1), painDay(3, 1), painDay(2, 0), painDay(1, 2)))).isFalse();
+	}
+
+	@Test
+	void P11은_사이에_기록하지_않은_날이_있으면_연속이_아니다() {
+		LowPainStreakRule rule = new LowPainStreakRule(properties);
+
+		// 3일 전 기록이 없음
+		assertThat(rule.matches(context(painDraft(1), painDay(5, 1), painDay(4, 1), painDay(2, 1), painDay(1, 1))))
+			.isFalse();
+	}
+
+	@Test
+	void P11은_P03과_함께_나올_수_없고_지난_기록은_연속_일수보다_짧게_읽지_않는다() {
+		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
+			3, 2, 6, 3, 3, 3, 3, 5, 2, 10, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10));
+
+		assertThat(longStreak.historyDays()).isEqualTo(9);
+		// 높은 날 연속(P03)과 낮은 날 연속(P11)은 오늘의 불편함 지수 하나로 갈려 동시에 맞지 않는다.
+		SituationalQuestionContext context = context(painDraft(7), painDay(2, 7), painDay(1, 7));
+		assertThat(new HighPainStreakRule(properties).matches(context)).isTrue();
+		assertThat(new LowPainStreakRule(properties).matches(context)).isFalse();
+	}
+
 	// ── 순위 ──
 
 	@Test
@@ -358,7 +397,7 @@ class SituationalRulesTest {
 	@Test
 	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 10, 3, 3, 3, 5, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9));
+			3, 2, 6, 10, 3, 3, 3, 5, 2, 5, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		assertThat(properties.historyDays()).isEqualTo(7);

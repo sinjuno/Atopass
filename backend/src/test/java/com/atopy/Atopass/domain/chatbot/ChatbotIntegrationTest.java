@@ -1132,6 +1132,64 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 불편함이_낮은_날이_5일_연속이면_P11이_나오고_적은_글을_따로_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		for (int daysAgo = 4; daysAgo >= 1; daysAgo--) {
+			createFullRecord(bearer, today.minusDays(daysAgo), 1, 7, null, null, List.of());
+		}
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 1));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P11"))
+			.andExpect(jsonPath("$.data.reply").value("며칠째 편안하네요. 요즘 생활에서 달라진 게 있어요?"));
+
+		mockMvc.perform(choice(bearer, session, "P11", "   ")).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P11", "보습을 자주 해요"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> {
+				assertThat(answer.getQuestionId()).isEqualTo("P11");
+				assertThat(answer.getAnswerJson()).isEqualTo("{\"text\":\"보습을 자주 해요\"}");
+			});
+	}
+
+	@Test
+	void 낮은_날이_4일뿐이거나_오늘이_낮지_않으면_P11이_나오지_않는다() throws Exception {
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		// 지난 3일 + 오늘 = 4일뿐
+		String fourDays = newMemberBearer();
+		for (int daysAgo = 3; daysAgo >= 1; daysAgo--) {
+			createFullRecord(fourDays, today.minusDays(daysAgo), 1, 7, null, null, List.of());
+		}
+		// 지난 4일은 낮았지만 오늘은 3점(어제보다 1점 올라 P01도 아니다)
+		String notLowToday = newMemberBearer();
+		for (int daysAgo = 4; daysAgo >= 1; daysAgo--) {
+			createFullRecord(notLowToday, today.minusDays(daysAgo), 2, 7, null, null, List.of());
+		}
+
+		for (Map.Entry<String, Integer> setup : Map.of(fourDays, 1, notLowToday, 3).entrySet()) {
+			String bearer = setup.getKey();
+			String session = createSession(bearer, "RECORD");
+			mockMvc.perform(choice(bearer, session, "painIndex", setup.getValue()));
+			mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+			mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+			mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+			mockMvc.perform(choice(bearer, session, "medication", true))
+				.andExpect(jsonPath("$.data.askingField").value("notes"));
+		}
+	}
+
+	@Test
 	void P02를_묻는_중에_입력창에_글로_답해도_답으로_받고_같은_질문을_되풀이하지_않는다() throws Exception {
 		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
 		String bearer = newMemberBearer(email);

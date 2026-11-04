@@ -90,12 +90,14 @@ public class ChatbotService {
 	private static final String P09 = "P09";
 	/** 처방이 바뀐 지 며칠 뒤, 그동안 피부가 어땠는지 */
 	private static final String P10 = "P10";
+	/** 불편함이 낮은 날이 며칠 이어질 때 */
+	private static final String P11 = "P11";
 	private static final Set<String> SITUATIONAL_FIELDS =
-		Set.of(P01, P02, P03, P04, P05, P06, P07, P08, P09, P10);
+		Set.of(P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, P11);
 	/** 선택지와 덧붙인 글(선택)로 답하는 상황 질문 */
 	private static final Set<String> SITUATIONAL_CHOICE_WITH_TEXT_FIELDS = Set.of(P06, P08, P10);
 	/** 글로 답하는 상황 질문 */
-	private static final Set<String> SITUATIONAL_TEXT_FIELDS = Set.of(P02, P03, P07, P09);
+	private static final Set<String> SITUATIONAL_TEXT_FIELDS = Set.of(P02, P03, P07, P09, P11);
 	/** 선택지로 답하는 상황 질문의 답 코드와 대화 내역에 남길 말. 화면의 버튼 글자와 같다. */
 	private static final Map<String, Map<String, String>> SITUATIONAL_CHOICE_LABELS = Map.of(
 		P01, Map.of("TODAY", "오늘", "SINCE_YESTERDAY", "어제부터", "FEW_DAYS_AGO", "2~3일 전"),
@@ -113,7 +115,7 @@ public class ChatbotService {
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
 	private static final Set<String> CHOICE_FIELDS =
 		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE,
-			P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, C02);
+			P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, P11, C02);
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -332,8 +334,8 @@ public class ChatbotService {
 	}
 
 	/**
-	 * 상황 질문(P01~P10) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
-	 * P02·P03·P07·P09는 글로, P06·P08·P10은 선택지 코드와 덧붙인 글(선택)로, 나머지는 선택지 코드로 답한다.
+	 * 상황 질문(P01~P11) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
+	 * P02·P03·P07·P09·P11은 글로, P06·P08·P10은 선택지 코드와 덧붙인 글(선택)로, 나머지는 선택지 코드로 답한다.
 	 * LLM을 부르지 않으므로 이용 한도에 세지 않는다.
 	 */
 	private ChatReplyResponse situationalTurn(
@@ -637,6 +639,7 @@ public class ChatbotService {
 			case P08 -> "오늘 재진 날이네요. 처방이나 연고가 바뀐 게 있어요?";
 			case P09 -> vanishedSignQuestion(draft, memberId, today);
 			case P10 -> "처방이 바뀐 지 며칠 됐어요. 그동안 피부는 어땠어요?";
+			case P11 -> "며칠째 편안하네요. 요즘 생활에서 달라진 게 있어요?";
 			case C02 -> "오늘 같이 남겨둘 게 있어요?";
 			// 특이사항. 문구만 상황에 따라 바꾸고 저장하는 값은 같다.
 			default -> notesPromptSelector.select(memberId, draft.toResponse().painIndex(), today).question()

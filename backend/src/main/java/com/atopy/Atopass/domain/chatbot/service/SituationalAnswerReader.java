@@ -16,7 +16,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 상황 질문(P01~P10)·마무리 질문(C02) 답을 기록 화면·재진 PDF에 보여 줄 글로 바꿔 읽는다.
+ * 상황 질문(P01~P11)·마무리 질문(C02) 답을 기록 화면·재진 PDF에 보여 줄 글로 바꿔 읽는다.
  * 하루 안에서는 상황 질문을 먼저, 마무리 질문을 나중에 둔다(챗봇이 물은 순서).
  */
 @Service
@@ -35,7 +35,8 @@ public class SituationalAnswerReader {
 		Map.entry("P07", "좋아지기 전에 달라진 것"),
 		Map.entry("P08", "재진 날, 바뀐 처방·연고"),
 		Map.entry("P09", "사라진 증상"),
-		Map.entry("P10", "처방이 바뀐 뒤 피부"));
+		Map.entry("P10", "처방이 바뀐 뒤 피부"),
+		Map.entry("P11", "편안한 동안 달라진 것"));
 	/** 선택지 답 코드의 글자. 챗봇 화면의 버튼 글자(ChatbotService의 SITUATIONAL_CHOICE_LABELS)와 같다. */
 	private static final Map<String, Map<String, String>> CHOICE_LABELS = Map.of(
 		"P01", Map.of("TODAY", "오늘", "SINCE_YESTERDAY", "어제부터", "FEW_DAYS_AGO", "2~3일 전"),

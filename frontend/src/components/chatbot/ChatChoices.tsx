@@ -405,6 +405,21 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           skip={skip}
         />
       );
+    case 'P11':
+      // 불편함이 낮은 날이 며칠 이어질 때만 나오는 상황 질문. 칩은 P03처럼 "요즘 " 뒤에 커서를 둔다.
+      return (
+        <SituationalTextAnswer
+          disabled={disabled}
+          placeholder="예: 보습을 더 자주 해요"
+          template="요즘 해요"
+          templateLabel="요즘 ~해요"
+          templateCursor={3}
+          unknownLabel="특별히 없어요"
+          ariaLabel="편안한 동안 달라진 것"
+          onSubmit={(text) => onChoose({ field, value: text })}
+          skip={skip}
+        />
+      );
     case 'P10':
       // 재진 날 처방이 바뀌었다고 답한 지 며칠 뒤에만 나오는 상황 질문. 약의 효과가 아니라 그동안 피부가 어땠는지를 묻는다.
       return (
