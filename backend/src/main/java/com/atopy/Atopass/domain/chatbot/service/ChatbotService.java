@@ -11,7 +11,6 @@ import com.atopy.Atopass.domain.chatbot.entity.ChatMode;
 import com.atopy.Atopass.domain.chatbot.entity.ChatRole;
 import com.atopy.Atopass.domain.chatbot.llm.ChatModelClient;
 import com.atopy.Atopass.domain.chatbot.llm.ChatTurn;
-import com.atopy.Atopass.domain.chatbot.llm.LlmProperties;
 import com.atopy.Atopass.domain.chatbot.entity.SituationalQuestionLog;
 import com.atopy.Atopass.domain.chatbot.repository.SituationalQuestionLogRepository;
 import com.atopy.Atopass.domain.chatbot.service.ChatReplyParser.ModelOutput;
@@ -23,7 +22,6 @@ import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.global.exception.BusinessException;
 import com.atopy.Atopass.global.exception.ErrorCode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -112,7 +110,7 @@ public class ChatbotService {
 	private final ChatReplyParser replyParser;
 	private final ChatLocalEditParser localEditParser;
 	private final JsonMapper jsonMapper;
-	private final LlmProperties llmProperties;
+	private final LlmUsageService usageService;
 	private final SkinSignImages skinSignImages;
 	private final SituationalQuestionSelector situationalQuestionSelector;
 	private final SituationalAnswerService situationalAnswerService;
@@ -475,12 +473,9 @@ public class ChatbotService {
 		};
 	}
 
-	/** 최근 24시간 동안 보낸 메시지가 한도에 도달했으면 LLM을 부르기 전에 막는다. (비용 보호) */
+	/** 최근 24시간 동안의 LLM 이용(챗봇 메시지와 사진 읽기 호출)이 한도에 도달했으면 LLM을 부르기 전에 막는다. (비용 보호) */
 	private void requireWithinDailyLimit(Long memberId) {
-		long used = sessionService.countUserMessagesSince(memberId, LocalDateTime.now().minusHours(24));
-		if (used >= llmProperties.dailyMessageLimit()) {
-			throw new BusinessException(ErrorCode.CHAT_LIMIT_EXCEEDED);
-		}
+		usageService.requireWithinDailyLimit(memberId);
 	}
 
 	/** 세션에 쌓인 초안과 진행 상태. 마지막 메시지 응답의 draft·pendingFields·requiresConfirmation과 같은 값이다. */

@@ -1,7 +1,9 @@
 package com.atopy.Atopass.domain.member.controller;
 
 import com.atopy.Atopass.domain.member.dto.request.MemberUpdateRequest;
+import com.atopy.Atopass.domain.member.dto.request.OnboardingUpdateRequest;
 import com.atopy.Atopass.domain.member.dto.response.MemberResponse;
+import com.atopy.Atopass.domain.member.dto.response.OnboardingResponse;
 import com.atopy.Atopass.domain.member.service.MemberService;
 import com.atopy.Atopass.global.response.ApiResponse;
 import com.atopy.Atopass.global.security.CurrentMember;
@@ -23,6 +25,17 @@ public class MemberController {
 	@GetMapping("/me")
 	public ApiResponse<MemberResponse> getMe(@CurrentMember Long memberId) {
 		return ApiResponse.ok(memberService.getMe(memberId));
+	}
+
+	@GetMapping("/me/onboarding")
+	public ApiResponse<OnboardingResponse> getOnboarding(@CurrentMember Long memberId) {
+		return ApiResponse.ok(memberService.getOnboarding(memberId));
+	}
+
+	@PatchMapping("/me/onboarding")
+	public ApiResponse<OnboardingResponse> updateOnboarding(
+		@CurrentMember Long memberId, @Valid @RequestBody OnboardingUpdateRequest request) {
+		return ApiResponse.ok(memberService.updateOnboarding(memberId, request));
 	}
 
 	@PatchMapping("/me")
