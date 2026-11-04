@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
- * 상황 질문(P01~P09) 선택에 쓰는 숫자 조건과 순위.
+ * 상황 질문(P01~P10) 선택에 쓰는 숫자 조건과 순위.
  *
  * @param painIndexJumpThreshold 오늘 불편함 지수가 어제보다 이만큼 이상 오르면 P01 조건을 만족한다.
  * @param sameQuestionCooldownDays 같은 상황 질문이 마지막으로 나온 지 이 일수 이상 지나야 다시 고를 수 있다.
@@ -17,6 +17,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param highPainStreakDays 오늘을 포함해 이 일수만큼 연속이면 P03 조건을 만족한다.
  * @param longGapDays 직전 기록이 이 일수 이상 전이면 P06 조건을 만족한다.
  * @param painIndexDropThreshold 오늘 불편함 지수가 어제보다 이만큼 이상 내리면 P07 조건을 만족한다.
+ * @param prescriptionFollowUpMinDays 처방이 바뀐 날(P08 답)로부터 이 일수 이상 지나고
+ * @param prescriptionFollowUpMaxDays 이 일수 이하일 때 P10 조건을 만족한다. 같은 질문 제외 기간보다 짧게 둬서 한 번만 나오게 한다.
  * @param priority 질문별 순위. 낮을수록 먼저 고른다. 재진 날(P08)은 드물고 그날만 물을 수 있어 가장 먼저 둔다.
  */
 @ConfigurationProperties(prefix = "app.chatbot.situational")
@@ -31,6 +33,8 @@ public record SituationalQuestionProperties(
 	@DefaultValue("3") int highPainStreakDays,
 	@DefaultValue("3") int longGapDays,
 	@DefaultValue("3") int painIndexDropThreshold,
+	@DefaultValue("3") int prescriptionFollowUpMinDays,
+	@DefaultValue("5") int prescriptionFollowUpMaxDays,
 	@DefaultValue Priority priority
 ) {
 
@@ -49,7 +53,8 @@ public record SituationalQuestionProperties(
 		@DefaultValue("6") int p06,
 		@DefaultValue("7") int p07,
 		@DefaultValue("0") int p08,
-		@DefaultValue("8") int p09
+		@DefaultValue("8") int p09,
+		@DefaultValue("9") int p10
 	) {
 	}
 

@@ -405,6 +405,18 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           skip={skip}
         />
       );
+    case 'P10':
+      // 재진 날 처방이 바뀌었다고 답한 지 며칠 뒤에만 나오는 상황 질문. 약의 효과가 아니라 그동안 피부가 어땠는지를 묻는다.
+      return (
+        <ChoiceWithTextAnswer
+          disabled={disabled}
+          labels={LONG_GAP_ANSWER_LABELS}
+          groupLabel="처방이 바뀐 뒤 피부는 어땠는지"
+          placeholder="(선택) 느낀 점을 적어 주세요"
+          onPick={(value) => onChoose({ field, value })}
+          skip={skip}
+        />
+      );
     case 'P09':
       // 어제 있던 증상이 오늘은 없을 때만 나오는 상황 질문
       return (

@@ -7,8 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.atopy.Atopass.domain.chatbot.entity.SituationalAnswer;
 import com.atopy.Atopass.domain.chatbot.service.ChatMessageCleaner;
 import com.atopy.Atopass.domain.chatbot.service.ChatSessionService;
+import com.atopy.Atopass.domain.member.entity.Member;
 import com.atopy.Atopass.support.ApiTestSupport;
 import com.atopy.Atopass.support.FakeChatModelClient;
 import com.atopy.Atopass.support.FakeLlmConfig;
@@ -1076,6 +1078,60 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 재진_날_처방이_바뀌었다고_답한_지_4일_뒤에는_P10이_나오고_고른_답과_덧붙인_글을_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Member member = memberRepository.findByEmail(email).orElseThrow();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		savePrescriptionAnswer(member, today.minusDays(4), "CHANGED");
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P10"))
+			.andExpect(jsonPath("$.data.reply").value("처방이 바뀐 지 며칠 됐어요. 그동안 피부는 어땠어요?"));
+
+		mockMvc.perform(choice(bearer, session, "P10", "BETTER")).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P10", Map.of("answer", "CHANGED"))).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P10", Map.of("answer", "BETTER", "text", " 가려움이 덜했어요 ")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDateAndQuestionId(member.getId(), today, "P10"))
+			.get()
+			.satisfies(answer -> assertThat(answer.getAnswerJson())
+				.isEqualTo("{\"answer\":\"BETTER\",\"text\":\"가려움이 덜했어요\"}"));
+	}
+
+	@Test
+	void 처방이_바뀌지_않았거나_3일에서_5일_사이가_아니면_P10이_나오지_않는다() throws Exception {
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		List<String> bearers = new java.util.ArrayList<>();
+		// 바뀌지 않았다고 답함, 2일 전(이름), 6일 전(너무 오래됨), 바뀐 적 없음
+		for (Object[] setup : new Object[][] {{"SAME", 4}, {"CHANGED", 2}, {"CHANGED", 6}, {null, 0}}) {
+			String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+			bearers.add(newMemberBearer(email));
+			if (setup[0] != null) {
+				savePrescriptionAnswer(memberRepository.findByEmail(email).orElseThrow(),
+					today.minusDays((Integer) setup[1]), (String) setup[0]);
+			}
+		}
+
+		for (String bearer : bearers) {
+			String session = createSession(bearer, "RECORD");
+			mockMvc.perform(choice(bearer, session, "painIndex", 3));
+			mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+			mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+			mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+			mockMvc.perform(choice(bearer, session, "medication", true))
+				.andExpect(jsonPath("$.data.askingField").value("notes"));
+		}
+	}
+
+	@Test
 	void P02를_묻는_중에_입력창에_글로_답해도_답으로_받고_같은_질문을_되풀이하지_않는다() throws Exception {
 		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
 		String bearer = newMemberBearer(email);
@@ -1569,6 +1625,12 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	// ── 헬퍼 ──
+
+	/** 재진 날 P08에 답한 기록을 바로 만든다(챗봇은 오늘 기록만 받으므로 지난 날짜는 이렇게 준비한다). */
+	private void savePrescriptionAnswer(Member member, LocalDate date, String answer) {
+		situationalAnswerRepository.save(SituationalAnswer.create(member, date, "P08", "{\"answer\":\"" + answer + "\"}"));
+	}
+
 
 	private void createVisit(String bearer, LocalDate date) throws Exception {
 		mockMvc.perform(withJson(post("/api/v1/visits").header(AUTH, bearer), Map.of("visitDate", date.toString())))

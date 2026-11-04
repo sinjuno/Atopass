@@ -88,8 +88,12 @@ public class ChatbotService {
 	private static final String P08 = "P08";
 	/** 어제 있던 증상이 오늘은 없을 때 */
 	private static final String P09 = "P09";
+	/** 처방이 바뀐 지 며칠 뒤, 그동안 피부가 어땠는지 */
+	private static final String P10 = "P10";
 	private static final Set<String> SITUATIONAL_FIELDS =
-		Set.of(P01, P02, P03, P04, P05, P06, P07, P08, P09);
+		Set.of(P01, P02, P03, P04, P05, P06, P07, P08, P09, P10);
+	/** 선택지와 덧붙인 글(선택)로 답하는 상황 질문 */
+	private static final Set<String> SITUATIONAL_CHOICE_WITH_TEXT_FIELDS = Set.of(P06, P08, P10);
 	/** 글로 답하는 상황 질문 */
 	private static final Set<String> SITUATIONAL_TEXT_FIELDS = Set.of(P02, P03, P07, P09);
 	/** 선택지로 답하는 상황 질문의 답 코드와 대화 내역에 남길 말. 화면의 버튼 글자와 같다. */
@@ -98,7 +102,8 @@ public class ChatbotService {
 		P04, Map.of("ITCH_WOKE", "가려워서 깸", "LATE_SLEEP", "늦게 잠", "BOTH", "둘 다", "OTHER", "기타"),
 		P05, Map.of("FORGOT", "깜빡함", "RAN_OUT", "다 떨어짐", "AWAY", "외출 중", "OTHER", "기타"),
 		P06, Map.of("SIMILAR", "비슷했어요", "BETTER", "좋아졌어요", "WORSE", "나빠졌어요"),
-		P08, Map.of("CHANGED", "바뀐 게 있어요", "SAME", "그대로예요", "NOT_YET", "아직 진료 전이에요"));
+		P08, Map.of("CHANGED", "바뀐 게 있어요", "SAME", "그대로예요", "NOT_YET", "아직 진료 전이에요"),
+		P10, Map.of("SIMILAR", "비슷했어요", "BETTER", "좋아졌어요", "WORSE", "나빠졌어요"));
 	/** P02 질문에 넣을 이름을 찾지 못했을 때(예: 묻는 사이 글로 증상을 지운 경우) 쓰는 말 */
 	private static final String P02_FALLBACK_SUBJECT = "증상";
 	/** 마무리 질문. 매일, 특이사항 다음에 묻는다. */
@@ -108,7 +113,7 @@ public class ChatbotService {
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
 	private static final Set<String> CHOICE_FIELDS =
 		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE,
-			P01, P02, P03, P04, P05, P06, P07, P08, P09, C02);
+			P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, C02);
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -327,8 +332,8 @@ public class ChatbotService {
 	}
 
 	/**
-	 * 상황 질문(P01~P09) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
-	 * P02·P03·P07·P09는 글로, P06·P08은 선택지 코드와 덧붙인 글(선택)로, 나머지는 선택지 코드로 답한다.
+	 * 상황 질문(P01~P10) 답. "넘어갈게요"면 저장 없이 끝내고, 아니면 검증해 메인 기록과 별도로 저장한 뒤 끝낸다.
+	 * P02·P03·P07·P09는 글로, P06·P08·P10은 선택지 코드와 덧붙인 글(선택)로, 나머지는 선택지 코드로 답한다.
 	 * LLM을 부르지 않으므로 이용 한도에 세지 않는다.
 	 */
 	private ChatReplyResponse situationalTurn(
@@ -338,7 +343,7 @@ public class ChatbotService {
 			return choiceTurn(context, draft, "넘어갈게요", false, memberId);
 		}
 		String field = request.field();
-		if (P06.equals(field) || P08.equals(field)) {
+		if (SITUATIONAL_CHOICE_WITH_TEXT_FIELDS.contains(field)) {
 			String userText = choiceWithTextAnswer(context, field, request.value(), memberId);
 			draft.resolveSituationalQuestion();
 			return choiceTurn(context, draft, userText, false, memberId);
@@ -367,7 +372,7 @@ public class ChatbotService {
 	}
 
 	/**
-	 * 선택지와 덧붙인 글(선택)로 답하는 상황 질문(P06·P08)의 답을 저장하고 대화 내역에 남길 말을 돌려준다.
+	 * 선택지와 덧붙인 글(선택)로 답하는 상황 질문(P06·P08·P10)의 답을 저장하고 대화 내역에 남길 말을 돌려준다.
 	 * 값은 {"answer": 선택지 코드, "text": 덧붙인 글(선택)}이고, 대화 내역에는 "좋아졌어요. 연고를 바꿨어요"처럼 남긴다.
 	 */
 	private String choiceWithTextAnswer(TurnContext context, String field, Object rawValue, Long memberId) {
@@ -444,8 +449,12 @@ public class ChatbotService {
 			? situationalHistoryLoader.previousRecordDate(memberId, today)
 			: recentDays.get(recentDays.size() - 1).date();
 		boolean revisitToday = clinicVisitRepository.existsByMemberIdAndVisitDate(memberId, today);
+		LocalDate prescriptionChangedOn = situationalHistoryLoader.prescriptionChangedOn(memberId,
+			today.minusDays(situationalQuestionProperties.prescriptionFollowUpMaxDays()),
+			today.minusDays(situationalQuestionProperties.prescriptionFollowUpMinDays()));
 		Optional<String> selected = situationalQuestionSelector.select(
-			new SituationalQuestionContext(draft, today, recentDays, previousRecordDate, revisitToday), lastShown, today);
+			new SituationalQuestionContext(draft, today, recentDays, previousRecordDate, revisitToday,
+				prescriptionChangedOn), lastShown, today);
 		draft.decideSituationalQuestion(selected.orElse(null));
 		selected.ifPresent(id -> markSituationalShown(memberId, id, today));
 	}
@@ -627,6 +636,7 @@ public class ChatbotService {
 			case P07 -> "많이 좋아졌네요! 달라진 게 있었어요?";
 			case P08 -> "오늘 재진 날이네요. 처방이나 연고가 바뀐 게 있어요?";
 			case P09 -> vanishedSignQuestion(draft, memberId, today);
+			case P10 -> "처방이 바뀐 지 며칠 됐어요. 그동안 피부는 어땠어요?";
 			case C02 -> "오늘 같이 남겨둘 게 있어요?";
 			// 특이사항. 문구만 상황에 따라 바꾸고 저장하는 값은 같다.
 			default -> notesPromptSelector.select(memberId, draft.toResponse().painIndex(), today).question()

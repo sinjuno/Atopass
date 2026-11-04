@@ -22,8 +22,8 @@ class SituationalRulesTest {
 	private final LocalDate today = LocalDate.of(2026, 10, 23);
 
 	static SituationalQuestionProperties defaultProperties() {
-		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3,
-			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8));
+		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3, 3, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9));
 	}
 
 	private ChatDraft draft(String json) {
@@ -298,6 +298,45 @@ class SituationalRulesTest {
 		assertThat(VanishedSignRule.subject(signDraft("\"ERYTHEMA\""), Optional.of(yesterday))).isEmpty();
 	}
 
+	// ── P10 ──
+
+	private SituationalQuestionContext changedOn(int daysAgo) {
+		return new SituationalQuestionContext(painDraft(3), today, List.of(), null, false, today.minusDays(daysAgo));
+	}
+
+	@Test
+	void P10은_처방이_바뀐_지_3일에서_5일_사이일_때만_나온다() {
+		PrescriptionFollowUpRule rule = new PrescriptionFollowUpRule(properties);
+
+		assertThat(rule.matches(changedOn(2))).isFalse();
+		assertThat(rule.matches(changedOn(3))).isTrue();
+		assertThat(rule.matches(changedOn(5))).isTrue();
+		assertThat(rule.matches(changedOn(6))).isFalse();
+	}
+
+	@Test
+	void P10은_처방이_바뀐_날이_없으면_나오지_않는다() {
+		PrescriptionFollowUpRule rule = new PrescriptionFollowUpRule(properties);
+
+		assertThat(rule.matches(context(painDraft(3)))).isFalse();
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), null, true))).isFalse();
+	}
+
+	@Test
+	void P10은_재진_날_P08_다음으로_순위가_높고_3일_안에_다시_나오지_않는다() {
+		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(
+			new PrescriptionFollowUpRule(properties), new LongGapRule(properties)), properties);
+		// 직전 기록이 10일 전(P06 조건도 맞음) + 처방이 바뀐 지 4일
+		SituationalQuestionContext context = new SituationalQuestionContext(
+			painDraft(3), today, List.of(), today.minusDays(10), false, today.minusDays(4));
+
+		// P06이 P10보다 순위가 높다(1~7이 먼저). P10은 그 뒤다.
+		assertThat(selector.select(context, Map.of(), today)).contains("P06");
+		assertThat(selector.select(context, Map.of("P06", today.minusDays(1)), today)).contains("P10");
+		assertThat(selector.select(context, Map.of("P06", today.minusDays(1), "P10", today.minusDays(2)), today))
+			.isEmpty();
+	}
+
 	// ── 순위 ──
 
 	@Test
@@ -319,7 +358,7 @@ class SituationalRulesTest {
 	@Test
 	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8));
+			3, 2, 6, 10, 3, 3, 3, 5, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		assertThat(properties.historyDays()).isEqualTo(7);

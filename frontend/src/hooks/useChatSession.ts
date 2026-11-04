@@ -66,13 +66,14 @@ export function choiceText(choice: ChatChoiceRequest): string {
     case 'P09':
       return choice.value.trim();
     case 'P06':
-    case 'P08': {
+    case 'P08':
+    case 'P10': {
       // 서버의 대화 내역과 같게 "좋아졌어요. 연고를 바꿨어요"처럼 붙인다
       const text = choice.value.text?.trim();
       const label =
-        choice.field === 'P06'
-          ? LONG_GAP_ANSWER_LABELS[choice.value.answer]
-          : REVISIT_CHANGE_LABELS[choice.value.answer];
+        choice.field === 'P08'
+          ? REVISIT_CHANGE_LABELS[choice.value.answer]
+          : LONG_GAP_ANSWER_LABELS[choice.value.answer];
       return text ? `${label}. ${text}` : label;
     }
     case 'P04':

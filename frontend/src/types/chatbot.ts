@@ -30,6 +30,7 @@ export type PendingField =
   | 'P07'
   | 'P08'
   | 'P09'
+  | 'P10'
   /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
   | 'C02';
 
@@ -110,6 +111,8 @@ export type ChatChoiceRequest =
   | { field: 'P08'; value: { answer: RevisitChangeAnswer; text?: string } }
   /** 상황 질문(P09) 답 — 어제 있던 증상이 오늘 없을 때 달라진 것 (글, 200자 이내) */
   | { field: 'P09'; value: string }
+  /** 상황 질문(P10) 답 — 처방이 바뀐 지 며칠 뒤 그동안 피부가 어땠는지(P06과 같은 선택지), 덧붙인 글은 선택 (200자 이내) */
+  | { field: 'P10'; value: { answer: LongGapAnswer; text?: string } }
   /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
   | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */
