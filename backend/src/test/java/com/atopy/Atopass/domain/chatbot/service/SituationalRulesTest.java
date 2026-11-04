@@ -14,7 +14,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 상황 질문 P02~P07의 조건 판정과 순위 */
+/** 상황 질문 P02~P08의 조건 판정과 순위 */
 class SituationalRulesTest {
 
 	private final JsonMapper mapper = JsonMapper.builder().build();
@@ -23,7 +23,7 @@ class SituationalRulesTest {
 
 	static SituationalQuestionProperties defaultProperties() {
 		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3,
-			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7));
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0));
 	}
 
 	private ChatDraft draft(String json) {
@@ -215,6 +215,40 @@ class SituationalRulesTest {
 		assertThat(rule.matches(context(painDraft(2), painDay(2, 9)))).isFalse();
 	}
 
+	// ── P08 ──
+
+	@Test
+	void P08은_오늘이_재진_날일_때만_나온다() {
+		RevisitDayRule rule = new RevisitDayRule(properties);
+
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), null, true))).isTrue();
+		assertThat(rule.matches(new SituationalQuestionContext(painDraft(3), today, List.of(), null, false))).isFalse();
+		// 재진 날 정보를 따로 주지 않으면(다른 질문 테스트 등) 재진 날이 아닌 것으로 본다.
+		assertThat(rule.matches(context(painDraft(3)))).isFalse();
+	}
+
+	@Test
+	void P08은_기록이_처음이어도_다른_조건이_없어도_나온다() {
+		SituationalQuestionSelector selector =
+			new SituationalQuestionSelector(List.of(new RevisitDayRule(properties)), properties);
+
+		assertThat(selector.select(new SituationalQuestionContext(painDraft(0), today, List.of(), null, true), Map.of(),
+			today)).contains("P08");
+	}
+
+	@Test
+	void P08은_다른_상황_질문보다_먼저_나오고_3일_안에_다시_나오지_않는다() {
+		SituationalQuestionSelector selector = new SituationalQuestionSelector(List.of(
+			new PainJumpRule(properties), new LongGapRule(properties), new RevisitDayRule(properties)), properties);
+		// 어제보다 5점 오름(P01) + 직전 기록이 4일 전이 아니라 어제이므로 P06은 아님 + 재진 날
+		SituationalQuestionContext context = new SituationalQuestionContext(
+			painDraft(8), today, List.of(painDay(1, 3)), today.minusDays(1), true);
+
+		assertThat(selector.select(context, Map.of(), today)).contains("P08");
+		// 같은 질문이 최근에 나왔으면 다음 순위로 넘어간다.
+		assertThat(selector.select(context, Map.of("P08", today.minusDays(2)), today)).contains("P01");
+	}
+
 	// ── 순위 ──
 
 	@Test
@@ -236,7 +270,7 @@ class SituationalRulesTest {
 	@Test
 	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7));
+			3, 2, 6, 10, 3, 3, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		assertThat(properties.historyDays()).isEqualTo(7);

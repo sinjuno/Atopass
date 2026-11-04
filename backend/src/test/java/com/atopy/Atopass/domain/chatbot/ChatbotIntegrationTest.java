@@ -1278,6 +1278,96 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 오늘이_재진_날이면_P08이_나오고_고른_답과_덧붙인_글을_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createVisit(bearer, today);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P08"))
+			.andExpect(jsonPath("$.data.reply").value("오늘 재진 날이네요. 처방이나 연고가 바뀐 게 있어요?"));
+
+		// 선택지가 아니거나 다른 질문의 선택지면 받지 않는다.
+		mockMvc.perform(choice(bearer, session, "P08", "CHANGED")).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P08", Map.of("answer", "FORGOT"))).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P08", Map.of("answer", "CHANGED", "text", " 연고를 바꿨어요 ")))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> {
+				assertThat(answer.getQuestionId()).isEqualTo("P08");
+				assertThat(answer.getAnswerJson()).isEqualTo("{\"answer\":\"CHANGED\",\"text\":\"연고를 바꿨어요\"}");
+			});
+	}
+
+	@Test
+	void P08은_글_없이_답만_골라도_저장하고_건너뛰면_저장하지_않는다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		createVisit(bearer, today);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P08"));
+		mockMvc.perform(skipChoice(bearer, session, "P08"))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today)).isEmpty();
+	}
+
+	@Test
+	void 재진_날이_오늘이_아니면_P08이_나오지_않는다() throws Exception {
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		String tomorrow = newMemberBearer();
+		createVisit(tomorrow, today.plusDays(1));
+		String yesterday = newMemberBearer();
+		createVisit(yesterday, today.minusDays(1));
+		String none = newMemberBearer();
+
+		for (String bearer : List.of(tomorrow, yesterday, none)) {
+			String session = createSession(bearer, "RECORD");
+			mockMvc.perform(choice(bearer, session, "painIndex", 3));
+			mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+			mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+			mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+			mockMvc.perform(choice(bearer, session, "medication", true))
+				.andExpect(jsonPath("$.data.askingField").value("notes"));
+		}
+	}
+
+	@Test
+	void 재진_날에는_다른_상황_질문보다_P08을_먼저_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		// 직전 기록이 20일 전이라 P06 조건도 맞지만, 재진 날이라 P08이 먼저다.
+		createFullRecord(bearer, today.minusDays(20), 3, 7, null, null, List.of());
+		createVisit(bearer, today);
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P08"));
+	}
+
+	@Test
 	void 고통_지수가_어제보다_3_이상_내리면_P07이_나오고_건너뛰면_저장하지_않는다() throws Exception {
 		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
 		String bearer = newMemberBearer(email);

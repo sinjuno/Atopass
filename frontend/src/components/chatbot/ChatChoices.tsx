@@ -5,7 +5,6 @@ import SleepHoursSlider from '@/components/record/SleepHoursSlider';
 import type {
   ChatChoiceRequest,
   ChoiceField,
-  LongGapAnswer,
   MissedMedicationReason,
   ShortSleepReason,
 } from '@/types/chatbot';
@@ -20,6 +19,7 @@ import {
   PAIN_INDEX_MIN,
   PENDING_FIELD_LABELS,
   PHOTO_ACCEPT,
+  REVISIT_CHANGE_LABELS,
   SHORT_SLEEP_REASON_LABELS,
   SITUATIONAL_TEXT_MAX_LENGTH,
   SKIN_SIGN_DESCRIPTIONS,
@@ -395,7 +395,29 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
       );
     case 'P06':
       // 직전 기록이 며칠 전일 때만 나오는 상황 질문. 하나 고르고, 덧붙일 말은 적어도 되고 안 적어도 된다.
-      return <LongGapChoices disabled={disabled} onPick={(value) => onChoose({ field, value })} skip={skip} />;
+      return (
+        <ChoiceWithTextAnswer
+          disabled={disabled}
+          labels={LONG_GAP_ANSWER_LABELS}
+          groupLabel="그동안 피부는 어땠는지"
+          placeholder="(선택) 예: 연고를 바꿨어요"
+          onPick={(value) => onChoose({ field, value })}
+          skip={skip}
+        />
+      );
+    case 'P08':
+      // 오늘이 등록해 둔 재진 날일 때만 나오는 상황 질문. 바뀐 게 있다고 고르면 뭐가 바뀌었는지 적을 칸이 열린다(안 적어도 된다).
+      return (
+        <ChoiceWithTextAnswer
+          disabled={disabled}
+          labels={REVISIT_CHANGE_LABELS}
+          groupLabel="처방이나 연고가 바뀐 게 있는지"
+          placeholder="(선택) 예: 연고가 바뀌었어요"
+          textFor={(answer) => answer === 'CHANGED'}
+          onPick={(value) => onChoose({ field, value })}
+          skip={skip}
+        />
+      );
     case 'P07':
       // 불편함 지수가 어제보다 많이 내린 날만 나오는 상황 질문
       return (
@@ -517,26 +539,35 @@ function ReasonChoices<T extends string>({
 }
 
 /**
- * 며칠 만에 기록할 때 그동안 피부가 어땠는지 묻는 상황 질문(P06). 하나 고르면 덧붙일 말을 적는 칸이 열리고,
- * 적지 않아도 "적어 둘게요"로 보낼 수 있다.
+ * 선택지 하나를 고르고 덧붙일 말을 적는 상황 질문(P06 그동안 피부가 어땠는지, P08 재진 날 처방·연고가 바뀐 게 있는지).
+ * 하나 고르면 덧붙일 말을 적는 칸이 열리고(textFor로 어떤 답일 때 열지 정할 수 있다), 적지 않아도 "적어 둘게요"로 보낼 수 있다.
  */
-function LongGapChoices({
+function ChoiceWithTextAnswer<T extends string>({
   disabled,
+  labels,
+  groupLabel,
+  placeholder,
+  textFor = () => true,
   onPick,
   skip,
 }: {
   disabled?: boolean;
-  onPick: (value: { answer: LongGapAnswer; text?: string }) => void;
+  labels: Record<T, string>;
+  groupLabel: string;
+  placeholder: string;
+  textFor?: (answer: T) => boolean;
+  onPick: (value: { answer: T; text?: string }) => void;
   skip: ReactNode;
 }) {
-  const [answer, setAnswer] = useState<LongGapAnswer | null>(null);
+  const [answer, setAnswer] = useState<T | null>(null);
   const [text, setText] = useState('');
   const trimmed = text.trim();
+  const showText = answer !== null && textFor(answer);
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-2" role="group" aria-label="그동안 피부는 어땠는지">
-        {(Object.keys(LONG_GAP_ANSWER_LABELS) as LongGapAnswer[]).map((value) => {
+      <div className="flex gap-2" role="group" aria-label={groupLabel}>
+        {(Object.keys(labels) as T[]).map((value) => {
           const selected = answer === value;
           return (
             <button
@@ -549,19 +580,19 @@ function LongGapChoices({
                 selected ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-800'
               }`}
             >
-              {LONG_GAP_ANSWER_LABELS[value]}
+              {labels[value]}
             </button>
           );
         })}
       </div>
-      {answer && (
+      {showText && (
         <>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             maxLength={SITUATIONAL_TEXT_MAX_LENGTH}
             rows={2}
-            placeholder="(선택) 예: 연고를 바꿨어요"
+            placeholder={placeholder}
             disabled={disabled}
             aria-label="덧붙일 말"
             className="resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-base"
@@ -573,7 +604,7 @@ function LongGapChoices({
       )}
       <div className="flex gap-2">
         <ChoiceButton
-          onClick={() => answer && onPick(trimmed ? { answer, text: trimmed } : { answer })}
+          onClick={() => answer && onPick(showText && trimmed ? { answer, text: trimmed } : { answer })}
           disabled={disabled || !answer}
           primary
           wide

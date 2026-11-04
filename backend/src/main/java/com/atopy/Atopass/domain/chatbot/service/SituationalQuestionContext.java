@@ -7,10 +7,17 @@ import java.util.Optional;
 /**
  * 상황 질문 조건을 판정하는 데 필요한 정보. 오늘 초안과 최근 기록(오늘은 빼고, 날짜 오름차순).
  * recentDays에는 기록한 날만 들어 있다. previousRecordDate는 기간과 상관없이 오늘 전 가장 최근 기록의 날짜이고,
- * 처음 기록하는 날이면 null이다.
+ * 처음 기록하는 날이면 null이다. revisitToday는 오늘이 등록해 둔 재진 날짜인지(P08)이다.
  */
 record SituationalQuestionContext(
-	ChatDraft draft, LocalDate today, List<SituationalDay> recentDays, LocalDate previousRecordDate) {
+	ChatDraft draft, LocalDate today, List<SituationalDay> recentDays, LocalDate previousRecordDate,
+	boolean revisitToday) {
+
+	/** 재진 날이 아닌 날(테스트 등) */
+	SituationalQuestionContext(
+		ChatDraft draft, LocalDate today, List<SituationalDay> recentDays, LocalDate previousRecordDate) {
+		this(draft, today, recentDays, previousRecordDate, false);
+	}
 
 	/** 직전 기록이 recentDays 안에 있을 때(테스트 등). recentDays가 비어 있으면 처음 기록하는 날로 본다. */
 	SituationalQuestionContext(ChatDraft draft, LocalDate today, List<SituationalDay> recentDays) {
