@@ -45,13 +45,13 @@ const realApi = {
 
   getOnboarding: () =>
     client
-      .get<ApiSuccess<{ medicationStep: OnboardingStep }>>('/me/onboarding')
+      .get<ApiSuccess<{ medicationStep: OnboardingStep }>>('/members/me/onboarding')
       .then(unwrap)
       .then((d) => d.medicationStep),
 
   setOnboarding: (step: 'done' | 'skipped') =>
     client
-      .patch<ApiSuccess<{ medicationStep: OnboardingStep }>>('/me/onboarding', { medicationStep: step })
+      .patch<ApiSuccess<{ medicationStep: OnboardingStep }>>('/members/me/onboarding', { medicationStep: step })
       .then(unwrap)
       .then((d) => d.medicationStep),
 };

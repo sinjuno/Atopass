@@ -1,5 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { chatbotApi } from '@/apis/chatbot';
+import { ApiError } from '@/apis/client';
 import { medicationApi } from '@/apis/medication';
+import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { LoadingMessage } from '@/components/common/StatusMessage';
 import type { ExtractedMedication, MedicationInput } from '@/types/medication';
@@ -25,11 +28,34 @@ interface ReviewItem {
 export default function MedicationPhotoFlow({ onSaved, onCancel, onManual }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [stage, setStage] = useState<'pick' | 'uploading' | 'review'>('pick');
+  const [stage, setStage] = useState<'checking' | 'consent' | 'pick' | 'uploading' | 'review'>('checking');
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // 사진은 외부 AI로 전달되므로 챗봇 이용 동의를 한 사용자만 쓸 수 있다. 동의가 없으면 안내를 먼저 보여 준다.
+  // 확인 자체가 실패하면 막지 않고 진행한다(서버가 403 CONSENT_REQUIRED 로 다시 막는다).
+  useEffect(() => {
+    let cancelled = false;
+    chatbotApi
+      .getConsent()
+      .then((consent) => !cancelled && setStage(consent.agreed ? 'pick' : 'consent'))
+      .catch(() => !cancelled && setStage('pick'));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleAgree = async () => {
+    try {
+      await chatbotApi.agreeConsent();
+      setError(null);
+      setStage('pick');
+    } catch (e) {
+      setError(medicationErrorMessage(e));
+    }
+  };
 
   const addFiles = (picked: File[]) => {
     const next = [...files, ...picked];
@@ -55,6 +81,12 @@ export default function MedicationPhotoFlow({ onSaved, onCancel, onManual }: Pro
       setShowErrors(false);
       setStage('review');
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'CONSENT_REQUIRED') {
+        // 다른 기기에서 동의를 철회한 경우 등
+        setError(null);
+        setStage('consent');
+        return;
+      }
       setError(medicationErrorMessage(e));
       setStage('pick');
     }
@@ -87,6 +119,26 @@ export default function MedicationPhotoFlow({ onSaved, onCancel, onManual }: Pro
       setSaving(false);
     }
   };
+
+  if (stage === 'checking') {
+    return <LoadingMessage />;
+  }
+
+  if (stage === 'consent') {
+    return (
+      <ConsentDialog
+        title="사진 인식 이용 동의"
+        lines={[
+          '복약 안내문 사진이 약 정보를 읽기 위해 외부 AI(Claude)로 전달돼요.',
+          '챗봇 이용 동의와 같은 동의예요. 이메일 같은 식별정보는 전달되지 않아요.',
+        ]}
+        note="동의하지 않아도 약을 직접 입력할 수 있어요."
+        onAgree={handleAgree}
+        onDecline={onManual}
+        error={error}
+      />
+    );
+  }
 
   if (stage === 'uploading') {
     return <LoadingMessage message="복약 안내문을 읽고 있어요…" />;

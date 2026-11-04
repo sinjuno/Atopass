@@ -16,7 +16,7 @@ export const resetOnboardingGate = () => {
 };
 
 /**
- * 홈 진입 시 GET /me/onboarding 을 확인해서 "pending" 이면 약 등록 단계로 보낸다.
+ * 홈 진입 시 GET /members/me/onboarding 을 확인해서 "pending" 이면 약 등록 단계로 보낸다.
  * 확인에 실패하면 홈을 막지 않고 그대로 보여준다.
  */
 export default function OnboardingGate({ children }: { children: ReactNode }) {
