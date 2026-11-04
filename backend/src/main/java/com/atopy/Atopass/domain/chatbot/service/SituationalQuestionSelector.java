@@ -9,7 +9,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * 상황 질문(P01~P07) 중 오늘 물을 것을 고른다. 조건이 맞는 것 중 순위가 가장 높은 것 하나,
+ * 상황 질문(P01~P08) 중 오늘 물을 것을 고른다. 조건이 맞는 것 중 순위가 가장 높은 것 하나,
  * 그마저도 최근({@link SituationalQuestionProperties#sameQuestionCooldownDays}일 이내)에 나왔으면 다음 순위로 넘긴다.
  */
 @Component

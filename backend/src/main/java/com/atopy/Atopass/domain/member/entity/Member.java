@@ -3,6 +3,8 @@ package com.atopy.Atopass.domain.member.entity;
 import com.atopy.Atopass.global.entity.BaseTimeEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,6 +14,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Getter
 @Entity
@@ -36,6 +39,12 @@ public class Member extends BaseTimeEntity {
 	/** 챗봇 이용(대화·기록 내용을 외부 LLM에 전달)에 동의한 시각. 동의하지 않았거나 철회했으면 null */
 	private LocalDateTime llmConsentedAt;
 
+	/** 약 등록 화면을 어디까지 거쳤는지. 기존 회원도 처음에는 PENDING이다. */
+	@Enumerated(EnumType.STRING)
+	@ColumnDefault("'PENDING'")
+	@Column(nullable = false, length = 10)
+	private MedicationStep medicationStep = MedicationStep.PENDING;
+
 	@Builder
 	private Member(String email, String password, String nickname) {
 		this.email = email;
@@ -49,6 +58,10 @@ public class Member extends BaseTimeEntity {
 
 	public void changePassword(String encodedPassword) {
 		this.password = encodedPassword;
+	}
+
+	public void changeMedicationStep(MedicationStep medicationStep) {
+		this.medicationStep = medicationStep;
 	}
 
 	public boolean hasLlmConsent() {

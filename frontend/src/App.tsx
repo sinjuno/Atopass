@@ -1,11 +1,14 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router';
 import AppLayout from '@/components/common/AppLayout';
 import RequireAuth from '@/components/common/RequireAuth';
+import OnboardingGate from '@/components/medication/OnboardingGate';
 import { RecordDraftProvider } from '@/hooks/useRecordDraft';
 import AnalysisPage from '@/pages/analysis/AnalysisPage';
 import ChatbotPage from '@/pages/chatbot/ChatbotPage';
 import HomePage from '@/pages/home/HomePage';
 import LoginPage from '@/pages/login/LoginPage';
+import MedicationsPage from '@/pages/medication/MedicationsPage';
+import OnboardingMedicationPage from '@/pages/medication/OnboardingMedicationPage';
 import MyPage from '@/pages/mypage/MyPage';
 import OnboardingPage from '@/pages/onboarding/OnboardingPage';
 import CalendarPage from '@/pages/record/CalendarPage';
@@ -20,10 +23,12 @@ const router = createBrowserRouter([
     children: [
       // 첫 로그인 뒤 한 번 보는 소개 화면 (하단 메뉴 없이 전체 화면)
       { path: '/onboarding', element: <OnboardingPage /> },
+      { path: '/onboarding/medications', element: <OnboardingMedicationPage /> },
       {
         element: <AppLayout />,
         children: [
-          { path: '/', element: <HomePage /> },
+          { path: '/', element: <OnboardingGate><HomePage /></OnboardingGate> },
+          { path: '/medications', element: <MedicationsPage /> },
           { path: '/mypage', element: <MyPage /> },
           { path: '/chatbot', element: <ChatbotPage /> },
           { path: '/record/:date', element: <RecordSummaryPage /> },

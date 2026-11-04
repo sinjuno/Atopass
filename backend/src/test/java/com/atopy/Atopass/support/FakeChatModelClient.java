@@ -2,6 +2,7 @@ package com.atopy.Atopass.support;
 
 import com.atopy.Atopass.domain.chatbot.llm.ChatModelClient;
 import com.atopy.Atopass.domain.chatbot.llm.ChatTurn;
+import com.atopy.Atopass.domain.chatbot.llm.LlmImage;
 import com.atopy.Atopass.global.exception.BusinessException;
 import com.atopy.Atopass.global.exception.ErrorCode;
 import java.util.ArrayDeque;
@@ -20,12 +21,16 @@ public class FakeChatModelClient implements ChatModelClient {
 	private String lastSystemPrompt;
 	private List<ChatTurn> lastMessages;
 	private int callCount;
+	private String lastUserText;
+	private List<LlmImage> lastImages;
 
 	public synchronized void reset() {
 		responses.clear();
 		lastSystemPrompt = null;
 		lastMessages = null;
 		callCount = 0;
+		lastUserText = null;
+		lastImages = null;
 	}
 
 	/** 다음 호출에서 돌려줄 응답 텍스트 */
@@ -48,6 +53,27 @@ public class FakeChatModelClient implements ChatModelClient {
 			throw e;
 		}
 		return (String) next;
+	}
+
+	@Override
+	public synchronized String completeWithImages(String systemPrompt, String userText, List<LlmImage> images) {
+		callCount++;
+		lastSystemPrompt = systemPrompt;
+		lastUserText = userText;
+		lastImages = List.copyOf(images);
+		Object next = responses.isEmpty() ? DEFAULT_RESPONSE : responses.poll();
+		if (next instanceof BusinessException e) {
+			throw e;
+		}
+		return (String) next;
+	}
+
+	public synchronized String lastUserText() {
+		return lastUserText;
+	}
+
+	public synchronized List<LlmImage> lastImages() {
+		return lastImages;
 	}
 
 	public synchronized String lastSystemPrompt() {

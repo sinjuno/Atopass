@@ -16,6 +16,7 @@ public class ChatMessageCleaner {
 	static final int RETENTION_DAYS = 30;
 
 	private final ChatSessionService sessionService;
+	private final LlmUsageService usageService;
 	private final Clock clock;
 
 	/** 매일 새벽 3시 30분(한국 시간)에 실행한다. */
@@ -23,6 +24,8 @@ public class ChatMessageCleaner {
 	public void deleteExpiredMessages() {
 		int deleted = sessionService.deleteMessagesOlderThan(LocalDateTime.now(clock).minusDays(RETENTION_DAYS));
 		log.info("보존 기간이 지난 챗봇 메시지 {}건을 삭제했습니다.", deleted);
+		// 이용 한도는 최근 24시간만 세므로 이틀이 지난 호출 기록은 필요 없다.
+		usageService.deleteOlderThan(LocalDateTime.now(clock).minusDays(2));
 	}
 
 }

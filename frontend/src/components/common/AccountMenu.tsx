@@ -70,6 +70,14 @@ export default function AccountMenu() {
           </Link>
           <Link
             role="menuitem"
+            to="/medications"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2.5 text-base text-gray-700 hover:bg-gray-50"
+          >
+            내 약 관리
+          </Link>
+          <Link
+            role="menuitem"
             to="/mypage"
             onClick={() => setOpen(false)}
             className="block px-4 py-2.5 text-base text-gray-700 hover:bg-gray-50"
