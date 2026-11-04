@@ -1,7 +1,10 @@
 package com.atopy.Atopass.domain.member.service;
 
 import com.atopy.Atopass.domain.member.dto.request.MemberUpdateRequest;
+import com.atopy.Atopass.domain.member.dto.request.OnboardingUpdateRequest;
 import com.atopy.Atopass.domain.member.dto.response.MemberResponse;
+import com.atopy.Atopass.domain.member.dto.response.OnboardingResponse;
+import com.atopy.Atopass.domain.member.entity.MedicationStep;
 import com.atopy.Atopass.domain.member.entity.Member;
 import com.atopy.Atopass.domain.member.repository.MemberRepository;
 import com.atopy.Atopass.global.exception.BusinessException;
@@ -39,6 +42,20 @@ public class MemberService {
 		}
 
 		return MemberResponse.from(member);
+	}
+
+	public OnboardingResponse getOnboarding(Long memberId) {
+		return OnboardingResponse.of(findMember(memberId).getMedicationStep());
+	}
+
+	/** 약 등록을 마쳤거나(done) 건너뛴(skipped) 것으로 바꾼다. pending으로 되돌리는 요청은 검증에서 막힌다. */
+	@Transactional
+	public OnboardingResponse updateOnboarding(Long memberId, OnboardingUpdateRequest request) {
+		MedicationStep step = MedicationStep.fromCode(request.medicationStep())
+			.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT));
+		Member member = findMember(memberId);
+		member.changeMedicationStep(step);
+		return OnboardingResponse.of(step);
 	}
 
 	private Member findMember(Long memberId) {
