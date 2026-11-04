@@ -32,6 +32,7 @@ export type PendingField =
   | 'P09'
   | 'P10'
   | 'P11'
+  | 'P12'
   /** 마무리 질문. 매일, 특이사항 다음에 나온다 */
   | 'C02';
 
@@ -116,6 +117,8 @@ export type ChatChoiceRequest =
   | { field: 'P10'; value: { answer: LongGapAnswer; text?: string } }
   /** 상황 질문(P11) 답 — 불편함이 낮은 날이 며칠 이어질 때 생활에서 달라진 것 (글, 200자 이내) */
   | { field: 'P11'; value: string }
+  /** 상황 질문(P12) 답 — 같은 부위가 며칠 동안 불편할 때 언제부터였는지 (글, 200자 이내) */
+  | { field: 'P12'; value: string }
   /** 마무리 질문(C02) 답 — 체크한 항목만 보낸다 */
   | { field: 'C02'; value: { productNote?: string; unusualNote?: string; clinicQuestion?: string } }
   /** 넘어가기. 부위·특이사항은 "없어요" */

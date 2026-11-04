@@ -65,6 +65,7 @@ export function choiceText(choice: ChatChoiceRequest): string {
     case 'P07':
     case 'P09':
     case 'P11':
+    case 'P12':
       return choice.value.trim();
     case 'P06':
     case 'P08':

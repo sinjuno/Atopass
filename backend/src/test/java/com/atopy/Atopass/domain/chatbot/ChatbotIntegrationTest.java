@@ -1190,6 +1190,57 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 같은_부위가_5일_이상_불편하면_P12가_그_부위_이름으로_나오고_적은_글을_따로_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		for (int daysAgo = 4; daysAgo >= 1; daysAgo--) {
+			createFullRecord(bearer, today.minusDays(daysAgo), 3, 7, null, "NECK", List.of());
+		}
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(choice(bearer, session, "bodyParts", List.of("NECK")));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("P12"))
+			.andExpect(jsonPath("$.data.reply").value("목이 계속 불편하네요. 언제부터예요?"));
+
+		mockMvc.perform(choice(bearer, session, "P12", "   ")).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P12", "지난주부터 계속 그래요"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> {
+				assertThat(answer.getQuestionId()).isEqualTo("P12");
+				assertThat(jsonMapper.readTree(answer.getAnswerJson()).get("subject").asString()).isEqualTo("목");
+				assertThat(jsonMapper.readTree(answer.getAnswerJson()).get("text").asString())
+					.isEqualTo("지난주부터 계속 그래요");
+			});
+	}
+
+	@Test
+	void 같은_부위가_4일뿐이면_P12가_나오지_않는다() throws Exception {
+		String bearer = newMemberBearer();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		for (int daysAgo = 3; daysAgo >= 1; daysAgo--) {
+			createFullRecord(bearer, today.minusDays(daysAgo), 3, 7, null, "NECK", List.of());
+		}
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(choice(bearer, session, "bodyParts", List.of("NECK")));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", true))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+	}
+
+	@Test
 	void P02를_묻는_중에_입력창에_글로_답해도_답으로_받고_같은_질문을_되풀이하지_않는다() throws Exception {
 		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
 		String bearer = newMemberBearer(email);

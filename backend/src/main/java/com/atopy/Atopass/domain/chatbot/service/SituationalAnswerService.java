@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** 상황 질문(P01~P11)·마무리 질문(C02)의 답을 메인 기록과 별도로 저장한다. */
+/** 상황 질문(P01~P12)·마무리 질문(C02)의 답을 메인 기록과 별도로 저장한다. */
 @Service
 @RequiredArgsConstructor
 class SituationalAnswerService {
@@ -43,7 +43,7 @@ class SituationalAnswerService {
 	}
 
 	/**
-	 * 글로 답하는 상황 질문(P02·P03·P07·P09·P11)의 답. subject는 질문에 넣은 이름(P02의 새로 생긴 증상, P09의 사라진 증상)이고, 없으면 null이다.
+	 * 글로 답하는 상황 질문(P02·P03·P07·P09·P11·P12)의 답. subject는 질문에 넣은 이름(P02의 새로 생긴 증상, P09의 사라진 증상, P12의 계속 불편한 부위)이고, 없으면 null이다.
 	 * 예: {"subject":"홍반","text":"..."}
 	 */
 	@Transactional

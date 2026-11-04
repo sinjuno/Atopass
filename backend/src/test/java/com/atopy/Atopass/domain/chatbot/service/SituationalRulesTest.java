@@ -22,8 +22,8 @@ class SituationalRulesTest {
 	private final LocalDate today = LocalDate.of(2026, 10, 23);
 
 	static SituationalQuestionProperties defaultProperties() {
-		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3, 3, 5, 2, 5,
-			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10));
+		return new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4, 7, 4, 6, 3, 3, 3, 3, 5, 2, 5, 7, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11));
 	}
 
 	private ChatDraft draft(String json) {
@@ -367,13 +367,58 @@ class SituationalRulesTest {
 	@Test
 	void P11은_P03과_함께_나올_수_없고_지난_기록은_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 3, 3, 3, 3, 5, 2, 10, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10));
+			3, 2, 6, 3, 3, 3, 3, 5, 2, 10, 7, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		// 높은 날 연속(P03)과 낮은 날 연속(P11)은 오늘의 불편함 지수 하나로 갈려 동시에 맞지 않는다.
 		SituationalQuestionContext context = context(painDraft(7), painDay(2, 7), painDay(1, 7));
 		assertThat(new HighPainStreakRule(properties).matches(context)).isTrue();
 		assertThat(new LowPainStreakRule(properties).matches(context)).isFalse();
+	}
+
+	// ── P12 ──
+
+	private SituationalDay neckDay(int daysAgo) {
+		return day(daysAgo, null, Set.of(BodyPart.NECK), Set.of());
+	}
+
+	private ChatDraft neckDraft() {
+		return draft("{\"painIndex\": 3, \"conditions\": {\"NECK\": {\"pain\": 3}}}");
+	}
+
+	@Test
+	void P12는_같은_부위가_오늘을_포함해_최근_7일_중_5일_이상이면_나온다() {
+		RepeatedPartRule rule = new RepeatedPartRule(properties);
+
+		// 오늘 + 지난 4일 = 5일
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(2), neckDay(3), neckDay(4)))).isTrue();
+		// 사이에 쉰 날이 있어도 7일 안이면 센다.
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(3), neckDay(5), neckDay(6)))).isTrue();
+		// 4일뿐
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(2), neckDay(3)))).isFalse();
+		// 7일 밖(8일 전)은 세지 않는다.
+		assertThat(rule.matches(context(neckDraft(), neckDay(1), neckDay(2), neckDay(3), neckDay(8)))).isFalse();
+	}
+
+	@Test
+	void P12는_오늘_그_부위를_고르지_않았거나_다른_부위면_나오지_않는다() {
+		RepeatedPartRule rule = new RepeatedPartRule(properties);
+		SituationalDay[] days = {neckDay(1), neckDay(2), neckDay(3), neckDay(4)};
+
+		assertThat(rule.matches(context(painDraft(3), days))).isFalse();
+		assertThat(rule.matches(context(
+			draft("{\"painIndex\": 3, \"conditions\": {\"FACE\": {\"pain\": 3}}}"), days))).isFalse();
+	}
+
+	@Test
+	void P12는_가장_많이_기록된_부위의_이름을_쓴다() {
+		ChatDraft both = draft("{\"painIndex\": 3, \"conditions\": {\"NECK\": {\"pain\": 3}, \"FACE\": {\"pain\": 3}}}");
+		List<SituationalDay> days = List.of(neckDay(1), neckDay(2), neckDay(3), neckDay(4),
+			day(5, null, Set.of(BodyPart.FACE), Set.of()));
+
+		assertThat(RepeatedPartRule.subject(both, today, days, 5, 7)).contains(BodyPart.NECK.label());
+		assertThat(RepeatedPartRule.subject(neckDraft(), today, List.of(), 5, 7)).isEmpty();
 	}
 
 	// ── 순위 ──
@@ -397,7 +442,8 @@ class SituationalRulesTest {
 	@Test
 	void 지난_기록은_P03_연속_일수보다_짧게_읽지_않는다() {
 		SituationalQuestionProperties longStreak = new SituationalQuestionProperties(2, 3, BigDecimal.valueOf(5), 4,
-			3, 2, 6, 10, 3, 3, 3, 5, 2, 5, new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10));
+			3, 2, 6, 10, 3, 3, 3, 5, 2, 5, 7, 5,
+			new SituationalQuestionProperties.Priority(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11));
 
 		assertThat(longStreak.historyDays()).isEqualTo(9);
 		assertThat(properties.historyDays()).isEqualTo(7);

@@ -162,6 +162,7 @@ export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   P09: '상황 질문',
   P10: '상황 질문',
   P11: '상황 질문',
+  P12: '상황 질문',
   C02: '마무리 질문',
 };
 

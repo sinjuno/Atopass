@@ -405,6 +405,21 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           skip={skip}
         />
       );
+    case 'P12':
+      // 같은 부위가 며칠 동안 불편할 때만 나오는 상황 질문. 칩을 누르면 "부터 그래요"가 채워진다.
+      return (
+        <SituationalTextAnswer
+          disabled={disabled}
+          placeholder="예: 지난주부터 계속 그래요"
+          template="부터 그래요"
+          templateLabel="~부터 그래요"
+          templateCursor={0}
+          unknownLabel="잘 모르겠어요"
+          ariaLabel="계속 불편한 부위가 언제부터였는지"
+          onSubmit={(text) => onChoose({ field, value: text })}
+          skip={skip}
+        />
+      );
     case 'P11':
       // 불편함이 낮은 날이 며칠 이어질 때만 나오는 상황 질문. 칩은 P03처럼 "요즘 " 뒤에 커서를 둔다.
       return (
