@@ -111,6 +111,24 @@ class ReportHtmlBuilderTest {
 	}
 
 	@Test
+	void 그래프_상자에_그_기간의_최저_최고를_보여준다() {
+		LocalDate start = LocalDate.of(2026, 3, 1);
+		List<DayEntry> days = List.of(
+			new DayEntry(start, new EnumMap<>(BodyPart.class), new java.math.BigDecimal("7.5"), null, null, null,
+				List.of(), 2, null, List.of()),
+			new DayEntry(start.plusDays(1), new EnumMap<>(BodyPart.class), new java.math.BigDecimal("4.0"), null,
+				null, null, List.of(), 8, null, List.of()));
+		ReportContent content = new ReportContent(start, start.plusDays(1), start.plusDays(2), 2, false,
+			List.of(), days, new ReportContent.LifestyleSummary(5.75, 2, 0, 0, Map.of()));
+
+		String html = builder.build(content);
+
+		assertThat(html)
+			.contains("<p class=\"chart-minmax\">최저 2점 · 최고 8점</p>")
+			.contains("<p class=\"chart-minmax\">최저 4시간 · 최고 7.5시간</p>");
+	}
+
+	@Test
 	void 필요한_구역과_면책_문구가_들어_있다() {
 		String html = builder.build(ReportSamples.content(false, "약을 먹지 않았음", List.of()));
 

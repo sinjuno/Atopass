@@ -122,26 +122,65 @@ class ReportHtmlBuilder {
 		if (painPng == null && sleepPng == null) {
 			return;
 		}
+		String startDate = SHORT_DATE.format(content.startDate());
+		String endDate = SHORT_DATE.format(content.endDate());
 		html.append("<h2>기간 흐름 비교</h2>")
 			.append("<p class=\"hint\">불편함 지수와 수면 시간을 같은 기간으로 나란히 두어, ")
 			.append("수면이 짧았던 날과 불편함이 심했던 날이 겹치는지 바로 볼 수 있습니다.</p>");
 		if (painPng != null && sleepPng != null) {
 			html.append("<table class=\"chart-pair\"><tr><td class=\"chart-cell\">");
-			chartBox(html, "불편함 지수 (0~10)", painPng, "점선은 5점, 큰 점은 가장 높은 날");
+			chartBox(html, "불편함 지수 (0~10)", painPng, 10, 5, startDate, endDate,
+				painMinMaxText(content.days()), "점선은 5점, 큰 점은 가장 높은 날");
 			html.append("</td><td class=\"chart-cell\">");
-			chartBox(html, "수면 시간 (0~12시간)", sleepPng, "점선은 6시간, 큰 점은 가장 적게 잔 날");
+			chartBox(html, "수면 시간 (0~12시간)", sleepPng, 12, 6, startDate, endDate,
+				sleepMinMaxText(content.days()), "점선은 6시간, 큰 점은 가장 적게 잔 날");
 			html.append("</td></tr></table>");
 		} else if (painPng != null) {
-			chartBox(html, "불편함 지수 (0~10)", painPng, "점선은 5점, 큰 점은 가장 높은 날");
+			chartBox(html, "불편함 지수 (0~10)", painPng, 10, 5, startDate, endDate,
+				painMinMaxText(content.days()), "점선은 5점, 큰 점은 가장 높은 날");
 		} else {
-			chartBox(html, "수면 시간 (0~12시간)", sleepPng, "점선은 6시간, 큰 점은 가장 적게 잔 날");
+			chartBox(html, "수면 시간 (0~12시간)", sleepPng, 12, 6, startDate, endDate,
+				sleepMinMaxText(content.days()), "점선은 6시간, 큰 점은 가장 적게 잔 날");
 		}
 	}
 
-	private void chartBox(StringBuilder html, String title, byte[] png, String note) {
-		html.append("<div class=\"chart-box\"><p class=\"chart-title\">").append(escape(title)).append("</p>")
+	/** 그래프에 그려진 기간 중 불편함 지수의 최저·최고. 기록한 날이 없으면 null (호출부에서 이미 걸러짐) */
+	private String painMinMaxText(List<DayEntry> days) {
+		List<Integer> scores = days.stream().map(DayEntry::painIndex).filter(p -> p != null).toList();
+		if (scores.isEmpty()) {
+			return null;
+		}
+		int min = scores.stream().mapToInt(Integer::intValue).min().orElse(0);
+		int max = scores.stream().mapToInt(Integer::intValue).max().orElse(0);
+		return "최저 " + min + "점 · 최고 " + max + "점";
+	}
+
+	/** 그래프에 그려진 기간 중 수면 시간의 최저·최고 */
+	private String sleepMinMaxText(List<DayEntry> days) {
+		List<java.math.BigDecimal> hours = days.stream().map(DayEntry::sleepHours).filter(h -> h != null).toList();
+		if (hours.isEmpty()) {
+			return null;
+		}
+		java.math.BigDecimal min = hours.stream().min(java.util.Comparator.naturalOrder()).orElseThrow();
+		java.math.BigDecimal max = hours.stream().max(java.util.Comparator.naturalOrder()).orElseThrow();
+		return "최저 " + min.stripTrailingZeros().toPlainString() + "시간 · 최고 "
+			+ max.stripTrailingZeros().toPlainString() + "시간";
+	}
+
+	/** 그래프 상자: 제목, 최저·최고, 왼쪽 눈금(최댓값·가운데값·0), 그래프 이미지, 아래 시작·끝 날짜 */
+	private void chartBox(StringBuilder html, String title, byte[] png, int maxScale, int midScale,
+		String startDate, String endDate, String minMax, String note) {
+		html.append("<div class=\"chart-box\"><p class=\"chart-title\">").append(escape(title)).append("</p>");
+		if (minMax != null) {
+			html.append("<p class=\"chart-minmax\">").append(escape(minMax)).append("</p>");
+		}
+		html.append("<table class=\"chart\"><tr><td class=\"chart-scale\">")
+			.append("<div class=\"scale-top\">").append(maxScale).append("</div><div class=\"scale-mid\">")
+			.append(midScale).append("</div><div>0</div></td><td>")
 			.append("<img class=\"chart\" alt=\"").append(escape(title)).append(" 그래프\" src=\"data:image/png;base64,")
-			.append(Base64.getEncoder().encodeToString(png)).append("\"/>")
+			.append(Base64.getEncoder().encodeToString(png)).append("\"/></td></tr>")
+			.append("<tr><td></td><td><table class=\"chart-dates\"><tr><td>").append(startDate)
+			.append("</td><td class=\"end\">").append(endDate).append("</td></tr></table></td></tr></table>")
 			.append("<p class=\"chart-note\">").append(escape(note)).append("</p></div>");
 	}
 
@@ -452,7 +491,14 @@ class ReportHtmlBuilder {
 			td.chart-cell { width: 50%; vertical-align: top; padding: 0; }
 			.chart-box { border: 1px solid #dce6dc; background-color: #fbfcfa; padding: 7pt 8pt 6pt 8pt; margin-top: 2pt; }
 			.chart-title { font-size: 9pt; font-weight: bold; color: #315b47; margin: 0 0 5pt 0; }
+			.chart-minmax { font-size: 8pt; color: #4a5b50; margin: -3pt 0 5pt 0; }
+			table.chart td { padding: 0; vertical-align: top; }
+			td.chart-scale { width: 13pt; padding-right: 3pt; font-size: 7pt; line-height: 8pt; color: #7b877f; text-align: right; }
+			.scale-top, .scale-mid { height: 25pt; }
 			img.chart { width: 100%; height: 58pt; }
+			table.chart-dates { margin-top: 1pt; }
+			table.chart-dates td { font-size: 7pt; color: #7b877f; }
+			table.chart-dates td.end { text-align: right; }
 			.chart-note { font-size: 7pt; color: #7b877f; margin: 4pt 0 0 0; }
 
 			.bars { border: 1px solid #dce5dc; border-radius: 6pt; padding: 8pt 10pt; margin: 2pt 0; }
