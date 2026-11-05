@@ -240,10 +240,10 @@ class ReportHtmlBuilder {
 		}
 	}
 
-	/** 회원이 등록한 약 정보(이름·종류·용량·복용 시간·기간)를 표로 보여 준다. */
+	/** 환자가 등록한 약 정보(이름·종류·용량·복용 시간·기간)를 표로 보여 준다. 중단한 약도 기간과 겹치면 함께 보여 준다. */
 	private void medicationListSection(StringBuilder html, List<MedicationResponse> medications) {
-		html.append("<h3 class=\"sub\">복용 중인 약</h3>")
-			.append("<p class=\"hint\">회원이 등록한 약 정보이며, 기간과 겹치는 약만 보여 줍니다.</p>")
+		html.append("<h3 class=\"sub\">기간 중 복용한 약</h3>")
+			.append("<p class=\"hint\">환자가 등록한 약 정보이며, 기간과 겹치는 약만 보여 줍니다.</p>")
 			.append("<table class=\"grid\"><tr><th>이름</th><th>종류</th><th>용량</th><th>복용 시간</th><th>기간</th></tr>");
 		for (MedicationResponse m : medications) {
 			String type = MedicationType.fromCode(m.type()).map(MEDICATION_TYPE_LABELS::get).orElse(m.type());
@@ -305,9 +305,13 @@ class ReportHtmlBuilder {
 		return parts.isEmpty() ? "생활 기록 없음" : String.join(" · ", parts);
 	}
 
+	/**
+	 * Symptom.PAIN의 라벨("고통")은 분석 인사이트·챗봇 프롬프트 등 다른 곳에서도 그대로 쓰므로 그 라벨 자체는
+	 * 바꾸지 않고, 이 보고서에서 부위별 점수를 부르는 말만 "불편함 지수"와 맞춰 "불편함"으로 통일한다.
+	 */
 	private String jumpLabel(ScoreJump jump) {
 		return jump.bodyPart() == null || jump.symptom() == null
-			? "불편함 지수" : jump.bodyPart().label() + " " + jump.symptom().label();
+			? "불편함 지수" : jump.bodyPart().label() + " 불편함";
 	}
 
 	private boolean isShortSleep(DayEntry day, Double usualSleep) {

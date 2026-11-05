@@ -131,7 +131,7 @@ class ReportHtmlBuilderTest {
 
 		assertThat(html)
 			.contains("<h3>2026.03.02 (월)</h3>")
-			.contains("팔 고통 4점 → 7점 (+3)")
+			.contains("팔 불편함 4점 → 7점 (+3)")
 			.contains("<span class=\"chip-label\">당일</span> <b>음주 있음</b>")
 			.contains("<span class=\"chip-label\">전날</span> 수면 6시간 · 음주 없음 · 야외활동 보통")
 			.contains("당일: 회식");
@@ -157,8 +157,8 @@ class ReportHtmlBuilderTest {
 		String html = builder.build(content);
 
 		assertThat(html)
-			.contains("<span class=\"badge\">팔 고통 1점 → 5점 (+4)</span>")
-			.contains("<span class=\"badge\">다리 고통 1점 → 6점 (+5)</span>");
+			.contains("<span class=\"badge\">팔 불편함 1점 → 5점 (+4)</span>")
+			.contains("<span class=\"badge\">다리 불편함 1점 → 6점 (+5)</span>");
 	}
 
 	@Test
@@ -246,7 +246,7 @@ class ReportHtmlBuilderTest {
 
 		assertThat(html)
 			.contains("<h2>약 정보</h2>")
-			.contains("복용 중인 약")
+			.contains("기간 중 복용한 약")
 			.contains("세티리진정").contains("먹는 약").contains("1정").contains("저녁")
 			.contains("항히스타민제").contains("<span class=\"med-stopped\">(중단)</span>")
 			.contains("복용 현황")
