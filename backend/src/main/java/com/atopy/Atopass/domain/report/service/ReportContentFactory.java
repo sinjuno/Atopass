@@ -1,6 +1,7 @@
 package com.atopy.Atopass.domain.report.service;
 
 import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
+import com.atopy.Atopass.domain.medication.dto.response.MedicationResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinCondition;
@@ -34,14 +35,16 @@ class ReportContentFactory {
 	/**
 	 * @param records 기간 내 기록. 날짜 오름차순이어야 한다.
 	 * @param situationalAnswers 날짜별 챗봇 상황 질문·마무리 질문 답. 기록이 있는 날의 답만 쓴다.
+	 * @param medications 기간과 겹치는 복용 약
 	 */
 	ReportContent create(List<SkinRecord> records, Map<LocalDate, List<SituationalAnswerItem>> situationalAnswers,
-		LocalDate startDate, LocalDate endDate, boolean includePhotos, LocalDate today) {
+		List<MedicationResponse> medications, LocalDate startDate, LocalDate endDate, boolean includePhotos,
+		LocalDate today) {
 		List<DayEntry> days = records.stream()
 			.map(r -> dayEntry(r, includePhotos, situationalAnswers.getOrDefault(r.getRecordDate(), List.of())))
 			.toList();
 		return new ReportContent(startDate, endDate, today, records.size(), includePhotos,
-			flareDays(days), days, lifestyleSummary(records));
+			flareDays(days), days, lifestyleSummary(records), medications);
 	}
 
 	/**

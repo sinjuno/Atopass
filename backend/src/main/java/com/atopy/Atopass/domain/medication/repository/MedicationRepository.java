@@ -27,4 +27,13 @@ public interface MedicationRepository extends JpaRepository<Medication, Long> {
 		order by m.startDate desc, m.id desc""")
 	List<Medication> findStopped(@Param("memberId") Long memberId, @Param("today") LocalDate today);
 
+	/** 기간(periodStart~periodEnd)과 겹치는 약. 시작일이 기간 끝 이전이고, 종료일이 없거나 기간 시작 이후인 약 */
+	@Query("""
+		select m from Medication m
+		where m.memberId = :memberId and m.startDate <= :periodEnd
+		and (m.endDate is null or m.endDate >= :periodStart)
+		order by m.startDate asc, m.id asc""")
+	List<Medication> findOverlapping(@Param("memberId") Long memberId, @Param("periodStart") LocalDate periodStart,
+		@Param("periodEnd") LocalDate periodEnd);
+
 }
