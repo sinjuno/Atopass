@@ -1,3 +1,4 @@
+import type { MedicationTime } from './medication';
 import type { BodyPart, RecordInput, SkinSign } from './record';
 
 export type ChatMode = 'RECORD' | 'QUERY';
@@ -37,6 +38,12 @@ export type PendingField =
   | 'C02';
 
 export type ShortSleepReason = 'ITCH_WOKE' | 'LATE_SLEEP' | 'BOTH' | 'OTHER';
+/** 못 먹은 약 하나(와 그 시간대) */
+export interface MissedMedicationItem {
+  medicationId: number;
+  time?: MedicationTime;
+}
+
 export type MissedMedicationReason = 'FORGOT' | 'RAN_OUT' | 'AWAY' | 'OTHER';
 export type LongGapAnswer = 'SIMILAR' | 'BETTER' | 'WORSE';
 export type RevisitChangeAnswer = 'CHANGED' | 'SAME' | 'NOT_YET';
@@ -101,8 +108,14 @@ export type ChatChoiceRequest =
   | { field: 'P02'; value: string }
   /** 상황 질문(P04) 답 — 잠을 적게 잔 이유 */
   | { field: 'P04'; value: ShortSleepReason }
-  /** 상황 질문(P05) 답 — 약을 못 챙긴 이유 */
-  | { field: 'P05'; value: MissedMedicationReason }
+  /** 상황 질문(P05) 답 — 약을 못 챙긴 이유와, 못 먹은 약·시간대(선택). 시간대가 없는 약은 time 을 뺀다 */
+  | { field: 'P05'; value: {
+        answer: MissedMedicationReason;
+        missed?: MissedMedicationItem[];
+        /** 대화창에 보여 줄 "아침 약이름" 글. 서버는 쓰지 않고 missed 로 직접 만든다 */
+        missedLabels?: string[];
+      };
+    }
   /** 상황 질문(P03) 답 — 며칠째 많이 불편한 동안 생활에서 달라진 것 (글, 200자 이내) */
   | { field: 'P03'; value: string }
   /** 상황 질문(P06) 답 — 며칠 만에 기록할 때 그동안 피부가 어땠는지, 덧붙인 글은 선택 (200자 이내) */

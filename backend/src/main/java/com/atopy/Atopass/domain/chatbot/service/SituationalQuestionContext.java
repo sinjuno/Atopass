@@ -9,10 +9,18 @@ import java.util.Optional;
  * recentDays에는 기록한 날만 들어 있다. previousRecordDate는 기간과 상관없이 오늘 전 가장 최근 기록의 날짜이고,
  * 처음 기록하는 날이면 null이다. revisitToday는 오늘이 등록해 둔 재진 날짜인지(P08)이고,
  * prescriptionChangedOn은 최근에 재진 날 "처방이나 연고가 바뀌었다"고 답한 날짜(P10)로, 없으면 null이다.
+ * hasActiveMedication은 지금 복용 중으로 등록해 둔 약이 있는지(P05)다.
  */
 record SituationalQuestionContext(
 	ChatDraft draft, LocalDate today, List<SituationalDay> recentDays, LocalDate previousRecordDate,
-	boolean revisitToday, LocalDate prescriptionChangedOn) {
+	boolean revisitToday, LocalDate prescriptionChangedOn, boolean hasActiveMedication) {
+
+	/** 등록해 둔 약이 없는 경우(테스트 등) */
+	SituationalQuestionContext(
+		ChatDraft draft, LocalDate today, List<SituationalDay> recentDays, LocalDate previousRecordDate,
+		boolean revisitToday, LocalDate prescriptionChangedOn) {
+		this(draft, today, recentDays, previousRecordDate, revisitToday, prescriptionChangedOn, false);
+	}
 
 	/** 처방이 바뀐 날이 없는 경우(테스트 등) */
 	SituationalQuestionContext(

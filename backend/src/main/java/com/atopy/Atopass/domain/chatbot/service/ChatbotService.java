@@ -23,6 +23,9 @@ import com.atopy.Atopass.domain.visit.repository.ClinicVisitRepository;
 import com.atopy.Atopass.global.exception.BusinessException;
 import com.atopy.Atopass.global.exception.ErrorCode;
 import java.time.LocalDate;
+import com.atopy.Atopass.domain.medication.entity.Medication;
+import com.atopy.Atopass.domain.medication.entity.MedicationTime;
+import com.atopy.Atopass.domain.medication.repository.MedicationRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +100,7 @@ public class ChatbotService {
 	private static final Set<String> SITUATIONAL_FIELDS =
 		Set.of(P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, P11, P12);
 	/** 선택지와 덧붙인 글(선택)로 답하는 상황 질문 */
-	private static final Set<String> SITUATIONAL_CHOICE_WITH_TEXT_FIELDS = Set.of(P06, P08, P10);
+	private static final Set<String> SITUATIONAL_CHOICE_WITH_TEXT_FIELDS = Set.of(P05, P06, P08, P10);
 	/** 글로 답하는 상황 질문 */
 	private static final Set<String> SITUATIONAL_TEXT_FIELDS = Set.of(P02, P03, P07, P09, P11, P12);
 	/** 선택지로 답하는 상황 질문의 답 코드와 대화 내역에 남길 말. 화면의 버튼 글자와 같다. */
@@ -136,6 +139,7 @@ public class ChatbotService {
 	private final ClinicVisitRepository clinicVisitRepository;
 	private final NotesPromptSelector notesPromptSelector;
 	private final MemberRepository memberRepository;
+	private final MedicationRepository medicationRepository;
 
 	public ChatSessionResponse createSession(Long memberId, ChatMode mode) {
 		consentService.requireConsent(memberId);
@@ -387,9 +391,46 @@ public class ChatbotService {
 		if (label == null) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
 		}
-		String text = optionalNoteOrNull(value.path("text"));
+		String text = P05.equals(field)
+			? missedMedicationText(value.path("missed"), memberId, context.recordDate())
+			: optionalNoteOrNull(value.path("text"));
 		situationalAnswerService.saveChoiceWithText(memberId, context.recordDate(), field, answer, text);
 		return text == null ? label : label + ". " + text;
+	}
+
+	/**
+	 * P05에서 고른 못 먹은 약·시간대를 "아침 약이름, 저녁 약이름"처럼 한 줄로 만든다.
+	 * 값은 [{"medicationId": 1, "time": "morning"}]이고 time은 시간대가 없는 약이면 뺀다. 고른 것이 없으면 null이다.
+	 * 복용 중으로 등록한 내 약이 아니거나 그 약의 시간대가 아니면 값 오류다.
+	 */
+	private String missedMedicationText(JsonNode missed, Long memberId, LocalDate recordDate) {
+		if (missed.isMissingNode() || missed.isNull() || (missed.isArray() && missed.isEmpty())) {
+			return null;
+		}
+		if (!missed.isArray()) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		Map<Long, Medication> active = medicationRepository.findActive(memberId, recordDate).stream()
+			.collect(Collectors.toMap(Medication::getId, medication -> medication));
+		List<String> parts = new ArrayList<>();
+		for (JsonNode item : missed) {
+			Medication medication = item.path("medicationId").isNumber()
+				? active.get(item.path("medicationId").asLong()) : null;
+			if (medication == null) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+			}
+			String timeCode = item.path("time").isString() ? item.path("time").asString() : null;
+			MedicationTime time = null;
+			if (timeCode != null) {
+				time = MedicationTime.fromCode(timeCode).filter(medication.timeList()::contains)
+					.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다."));
+			}
+			String part = time == null ? medication.getName() : time.label() + " " + medication.getName();
+			if (!parts.contains(part)) {
+				parts.add(part);
+			}
+		}
+		return String.join(", ", parts);
 	}
 
 	/** 글로 답하는 상황 질문의 답. 비었거나 너무 길면 값 오류. */
@@ -457,9 +498,11 @@ public class ChatbotService {
 		LocalDate prescriptionChangedOn = situationalHistoryLoader.prescriptionChangedOn(memberId,
 			today.minusDays(situationalQuestionProperties.prescriptionFollowUpMaxDays()),
 			today.minusDays(situationalQuestionProperties.prescriptionFollowUpMinDays()));
+		boolean hasActiveMedication = Boolean.FALSE.equals(draft.toResponse().medication())
+			&& !medicationRepository.findActive(memberId, today).isEmpty();
 		Optional<String> selected = situationalQuestionSelector.select(
 			new SituationalQuestionContext(draft, today, recentDays, previousRecordDate, revisitToday,
-				prescriptionChangedOn), lastShown, today);
+				prescriptionChangedOn, hasActiveMedication), lastShown, today);
 		draft.decideSituationalQuestion(selected.orElse(null));
 		selected.ifPresent(id -> markSituationalShown(memberId, id, today));
 	}
@@ -649,7 +692,7 @@ public class ChatbotService {
 			case P02 -> newSignOrPartQuestion(draft, memberId, today);
 			case P03 -> "며칠째 많이 불편하네요. 요즘 생활에서 달라진 게 있어요?";
 			case P04 -> "잠을 적게 잤네요. 가려워서 깼어요, 다른 이유가 있었어요?";
-			case P05 -> "오늘은 약을 못 챙기셨네요. 어떤 이유였어요?";
+			case P05 -> "오늘은 약을 못 챙기셨네요. 못 드신 약이 있다면 골라 주시고, 이유도 알려 주세요.";
 			case P06 -> "며칠 만이에요. 그동안 피부는 어땠어요?";
 			case P07 -> "많이 좋아졌네요! 달라진 게 있었어요?";
 			case P08 -> "오늘 재진 날이네요. 처방이나 연고가 바뀐 게 있어요?";

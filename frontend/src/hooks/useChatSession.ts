@@ -80,8 +80,12 @@ export function choiceText(choice: ChatChoiceRequest): string {
     }
     case 'P04':
       return SHORT_SLEEP_REASON_LABELS[choice.value];
-    case 'P05':
-      return MISSED_MEDICATION_REASON_LABELS[choice.value];
+    case 'P05': {
+      // 서버의 대화 내역과 같게 "깜빡함. 아침 약이름, 자기 전 약이름"처럼 붙인다
+      const label = MISSED_MEDICATION_REASON_LABELS[choice.value.answer];
+      const missed = choice.value.missedLabels?.join(', ');
+      return missed ? `${label}. ${missed}` : label;
+    }
     case 'C02':
       return '적어 둘게요';
   }
