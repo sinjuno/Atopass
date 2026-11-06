@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState, type AnimationEvent, type ReactNode } from 'react';
+import { medicationApi } from '@/apis/medication';
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
 import type {
   ChatChoiceRequest,
   ChoiceField,
+  MissedMedicationItem,
   MissedMedicationReason,
   ShortSleepReason,
 } from '@/types/chatbot';
 import type { BodyPart, SkinSign } from '@/types/record';
+import { timeLabel } from '@/utils/medication';
 import { sortSkinSigns, type BodyMapCounts } from '@/utils/bodyMap';
 import {
   BODY_MAP_PARTS,
@@ -500,16 +503,8 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
         />
       );
     case 'P05':
-      // 평소 약을 챙기다 오늘 못 챙긴 날만 나오는 상황 질문. 이유만 남기고 복용을 권하지 않는다.
-      return (
-        <ReasonChoices
-          labels={MISSED_MEDICATION_REASON_LABELS}
-          ariaLabel="약을 못 챙긴 이유"
-          disabled={disabled}
-          onPick={(value: MissedMedicationReason) => onChoose({ field, value })}
-          skip={skip}
-        />
-      );
+      // 오늘 약을 못 챙긴 날 나오는 상황 질문. 등록한 약·시간대 중 못 먹은 것과 이유만 남기고 복용을 권하지 않는다.
+      return <MissedMedicationChoices disabled={disabled} onSubmit={(value) => onChoose({ field, value })} skip={skip} />;
     case 'C02': {
       // 매일 특이사항 다음에 묻는 마무리 질문. 고른 항목만 보내고, "없어요"는 아무것도 저장하지 않는다.
       const items: Array<{
@@ -564,6 +559,101 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
       );
     }
   }
+}
+
+/**
+ * P05: 복용 중으로 등록한 약을 약·시간대별로 보여 주고 못 먹은 것을 고른 뒤(안 골라도 됨), 이유를 고르면 함께 보낸다.
+ * 시간대가 없는 약은 약 하나가 한 칸이다. 등록한 약이 없거나 못 불러오면 이유만 고른다.
+ */
+function MissedMedicationChoices({
+  disabled,
+  onSubmit,
+  skip,
+}: {
+  disabled?: boolean;
+  onSubmit: (value: {
+    answer: MissedMedicationReason;
+    missed?: MissedMedicationItem[];
+    missedLabels?: string[];
+  }) => void;
+  skip: ReactNode;
+}) {
+  const [slots, setSlots] = useState<Array<{ key: string; item: MissedMedicationItem; label: string }>>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    medicationApi
+      .list('active')
+      .then((medications) => {
+        if (!alive) return;
+        setSlots(
+          medications.flatMap((m) =>
+            m.times.length === 0
+              ? [{ key: m.id, item: { medicationId: Number(m.id) }, label: m.name }]
+              : m.times.map((time) => ({
+                  key: `${m.id}:${time}`,
+                  item: { medicationId: Number(m.id), time },
+                  label: `${timeLabel(time)} ${m.name}`,
+                })),
+          ),
+        );
+      })
+      .catch(() => {
+        // 약 목록을 못 불러오면 이유만 고른다
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggle = (key: string) =>
+    setPicked((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
+  const submit = (answer: MissedMedicationReason) => {
+    const chosen = slots.filter((slot) => picked.includes(slot.key));
+    onSubmit(
+      chosen.length === 0
+        ? { answer }
+        : { answer, missed: chosen.map((s) => s.item), missedLabels: chosen.map((s) => s.label) },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      {slots.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-gray-600">못 드신 약이 있으면 골라 주세요. (여러 개 가능)</p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="못 먹은 약">
+            {slots.map((slot) => {
+              const on = picked.includes(slot.key);
+              return (
+                <button
+                  key={slot.key}
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={on}
+                  onClick={() => toggle(slot.key)}
+                  className={`min-h-11 rounded-full border-2 px-4 text-base disabled:opacity-40 ${
+                    on ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-800'
+                  }`}
+                >
+                  {slot.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <ReasonChoices
+        labels={MISSED_MEDICATION_REASON_LABELS}
+        ariaLabel="약을 못 챙긴 이유"
+        disabled={disabled}
+        onPick={submit}
+        skip={skip}
+      />
+    </div>
+  );
 }
 
 /** 이유를 하나 고르는 상황 질문(P04·P05). 버튼 2개씩 두 줄로 두고, 맨 아래에 넘어가기 */

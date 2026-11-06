@@ -42,6 +42,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	@Autowired
 	com.atopy.Atopass.domain.chatbot.repository.SituationalQuestionLogRepository situationalQuestionLogRepository;
 	@Autowired
+	com.atopy.Atopass.domain.medication.repository.MedicationRepository medicationRepository;
+	@Autowired
 	com.atopy.Atopass.domain.record.repository.ClinicQuestionNoteRepository clinicQuestionNoteRepository;
 	@Autowired
 	com.atopy.Atopass.domain.chatbot.repository.SituationalAnswerRepository situationalAnswerRepository;
@@ -1326,13 +1328,57 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
 		mockMvc.perform(choice(bearer, session, "medication", false))
 			.andExpect(jsonPath("$.data.askingField").value("P05"))
-			.andExpect(jsonPath("$.data.reply").value("오늘은 약을 못 챙기셨네요. 어떤 이유였어요?"));
+			.andExpect(jsonPath("$.data.reply").value("오늘은 약을 못 챙기셨네요. 못 드신 약이 있다면 골라 주시고, 이유도 알려 주세요."));
 
 		mockMvc.perform(skipChoice(bearer, session, "P05"))
 			.andExpect(jsonPath("$.data.askingField").value("notes"));
 
 		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today)).isEmpty();
 		assertThat(situationalQuestionLogRepository.findByMemberIdAndQuestionId(memberId, "P05")).isPresent();
+	}
+
+	@Test
+	void 등록한_약이_있는데_오늘_안_먹었으면_기록이_적어도_P05가_나오고_못_먹은_약과_시간대를_함께_저장한다() throws Exception {
+		String email = "user-" + java.util.UUID.randomUUID() + "@example.com";
+		String bearer = newMemberBearer(email);
+		Long memberId = memberRepository.findByEmail(email).orElseThrow().getId();
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		var medication = medicationRepository.save(com.atopy.Atopass.domain.medication.entity.Medication.builder()
+			.memberId(memberId).name("항히스타민")
+			.type(com.atopy.Atopass.domain.medication.entity.MedicationType.ORAL)
+			.times(List.of(com.atopy.Atopass.domain.medication.entity.MedicationTime.MORNING,
+				com.atopy.Atopass.domain.medication.entity.MedicationTime.BEDTIME))
+			.startDate(today.minusDays(10))
+			.source(com.atopy.Atopass.domain.medication.entity.MedicationSource.MYPAGE).build());
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+		mockMvc.perform(skipChoice(bearer, session, "skinSigns"));
+		mockMvc.perform(skipChoice(bearer, session, "bodyParts"));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.askingField").value("P05"));
+
+		// 등록하지 않은 약이나 그 약에 없는 시간대는 받지 않는다.
+		mockMvc.perform(choice(bearer, session, "P05", Map.of("answer", "FORGOT",
+			"missed", List.of(Map.of("medicationId", medication.getId() + 999)))))
+			.andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "P05", Map.of("answer", "FORGOT",
+			"missed", List.of(Map.of("medicationId", medication.getId(), "time", "lunch")))))
+			.andExpect(status().isBadRequest());
+
+		mockMvc.perform(choice(bearer, session, "P05", Map.of("answer", "FORGOT",
+			"missed", List.of(Map.of("medicationId", medication.getId(), "time", "morning"),
+				Map.of("medicationId", medication.getId(), "time", "bedtime")))))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		assertThat(situationalAnswerRepository.findByMemberIdAndRecordDate(memberId, today))
+			.singleElement()
+			.satisfies(answer -> {
+				assertThat(answer.getQuestionId()).isEqualTo("P05");
+				assertThat(answer.getAnswerJson())
+					.isEqualTo("{\"answer\":\"FORGOT\",\"text\":\"아침 항히스타민, 자기 전 항히스타민\"}");
+			});
 	}
 
 	@Test

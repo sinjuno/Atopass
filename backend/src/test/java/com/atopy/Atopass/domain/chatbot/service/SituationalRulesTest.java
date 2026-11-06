@@ -155,6 +155,18 @@ class SituationalRulesTest {
 			.isFalse();
 	}
 
+	@Test
+	void P05는_등록한_약이_있으면_최근_복용_기록이_없어도_오늘_안_먹었을_때_나온다() {
+		MissedMedicationRule rule = new MissedMedicationRule(properties);
+		ChatDraft notTaken = draft("{\"painIndex\": 3, \"medication\": false}");
+		ChatDraft taken = draft("{\"painIndex\": 3, \"medication\": true}");
+
+		assertThat(rule.matches(new SituationalQuestionContext(notTaken, today, List.of(), null, false, null, true)))
+			.isTrue();
+		assertThat(rule.matches(new SituationalQuestionContext(taken, today, List.of(), null, false, null, true)))
+			.isFalse();
+	}
+
 	// ── P03 ──
 
 	@Test

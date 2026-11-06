@@ -1,6 +1,8 @@
 package com.atopy.Atopass.domain.report.service;
 
 import com.atopy.Atopass.domain.chatbot.service.SituationalAnswerReader;
+import com.atopy.Atopass.domain.medication.dto.response.MedicationResponse;
+import com.atopy.Atopass.domain.medication.repository.MedicationRepository;
 import com.atopy.Atopass.domain.member.repository.MemberRepository;
 import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.repository.RecordRepository;
@@ -38,6 +40,7 @@ public class ReportService {
 
 	private final ReportRepository reportRepository;
 	private final RecordRepository recordRepository;
+	private final MedicationRepository medicationRepository;
 	private final MemberRepository memberRepository;
 	private final ReportFileStorage fileStorage;
 	private final ReportContentFactory contentFactory;
@@ -107,8 +110,13 @@ public class ReportService {
 	}
 
 	private byte[] storePdf(Report report, List<SkinRecord> records) {
+		Long memberId = report.getMember().getId();
+		List<MedicationResponse> medications = medicationRepository
+			.findOverlapping(memberId, report.getStartDate(), report.getEndDate()).stream()
+			.map(MedicationResponse::from)
+			.toList();
 		ReportContent content = contentFactory.create(records,
-			situationalAnswerReader.forPeriod(report.getMember().getId(), report.getStartDate(), report.getEndDate()),
+			situationalAnswerReader.forPeriod(memberId, report.getStartDate(), report.getEndDate()), medications,
 			report.getStartDate(), report.getEndDate(), report.isIncludePhotos(), LocalDate.now(clock));
 		byte[] pdf = pdfGenerator.generate(htmlBuilder.build(content));
 		report.attachFile(fileStorage.store(pdf),

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import ChatChoices from '@/components/chatbot/ChatChoices';
+import ChatMedicationPanel from '@/components/chatbot/ChatMedicationPanel';
 import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
@@ -50,6 +51,9 @@ export default function ChatbotPage() {
   const [choiceRound, setChoiceRound] = useState(0);
   // 선택지를 내려 두면 글로 답할 수 있고, 펼쳐 두면 선택지로만 답한다
   const [choicesMinimized, setChoicesMinimized] = useState(false);
+  // 재진 날 "처방·연고가 바뀐 게 있어요"(P08)로 답하면, 그 답을 보내기 전에 내 약에도 반영할지 먼저 묻는다.
+  // 패널을 닫을 때 붙들어 둔 답을 보낸다.
+  const [heldChoice, setHeldChoice] = useState<ChatChoiceRequest | null>(null);
 
   const goToSummary = () => navigate(recordPath(recordDate));
 
@@ -69,7 +73,8 @@ export default function ChatbotPage() {
   // 그 밖의 선택지 단계는 어차피 글로 답하지 않으므로 아래 입력창 자체를 숨긴다.
   // 선택지를 내려 두면(choicesMinimized) 다시 보인다.
   const hideInput =
-    started && choiceField !== null && choiceField !== 'notes' && choiceField !== 'signImage' && !choicesMinimized;
+    heldChoice !== null ||
+    (started && choiceField !== null && choiceField !== 'notes' && choiceField !== 'signImage' && !choicesMinimized);
 
   // 가장 최근의 일일 총정리(저장·수정 안내) 말풍선 아래에, 부위마다 나타난 증상 개수만큼 칠한 마네킹을 붙인다.
   // 저장한 뒤에는 고칠 때마다 바로 다시 저장하므로, 지금 초안이 곧 저장된 기록이다
@@ -110,10 +115,25 @@ export default function ChatbotPage() {
   };
 
   // 선택지는 답을 고르면 스스로 내려간 뒤 여기로 답을 넘긴다
-  const handleChoose = async (choice: ChatChoiceRequest) => {
+  const submitChoice = async (choice: ChatChoiceRequest) => {
     const result = await choose(choice);
     setChoiceRound((n) => n + 1);
     if (result.closed) void retry();
+  };
+
+  const handleChoose = async (choice: ChatChoiceRequest) => {
+    if ('value' in choice && choice.field === 'P08' && choice.value.answer === 'CHANGED') {
+      setHeldChoice(choice);
+      return;
+    }
+    await submitChoice(choice);
+  };
+
+  // 내 약 반영 패널을 닫으면 붙들어 둔 P08 답을 보낸다
+  const handleMedicationPanelClose = () => {
+    const choice = heldChoice;
+    setHeldChoice(null);
+    if (choice) void submitChoice(choice);
   };
 
   const handleAttach = (files: File[]) => {
@@ -151,7 +171,9 @@ export default function ChatbotPage() {
 
 
       {/* 질문에 맞는 선택지(막대·버튼)가 아래에서 올라온다. 답을 보내는 동안에는 내려가 있고, 다음 질문과 함께 다시 올라온다 */}
-      {choiceField && status === 'ready' && (
+      {heldChoice && status === 'ready' && <ChatMedicationPanel onClose={handleMedicationPanelClose} />}
+
+      {choiceField && !heldChoice && status === 'ready' && (
         <ChatChoices
           key={`${choiceField}:${choiceRound}`}
           field={choiceField}
