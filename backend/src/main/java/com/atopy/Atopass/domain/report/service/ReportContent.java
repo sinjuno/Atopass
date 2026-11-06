@@ -1,6 +1,7 @@
 package com.atopy.Atopass.domain.report.service;
 
 import com.atopy.Atopass.domain.chatbot.dto.response.SituationalAnswerItem;
+import com.atopy.Atopass.domain.medication.dto.response.MedicationResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
@@ -17,6 +18,7 @@ import java.util.Map;
  *
  * @param includePhotos 사진 포함을 요청했는지
  * @param flareDays 증상이 갑자기 심해진 날 (날짜 오름차순)
+ * @param medications 기간과 겹치는 복용 약 (시작일 오름차순). 약 이름·기간까지 포함한다
  */
 record ReportContent(
 	LocalDate startDate,
@@ -26,8 +28,15 @@ record ReportContent(
 	boolean includePhotos,
 	List<FlareDay> flareDays,
 	List<DayEntry> days,
-	LifestyleSummary lifestyle
+	LifestyleSummary lifestyle,
+	List<MedicationResponse> medications
 ) {
+
+	/** 약 목록 없이 만들 때 (약 목록을 아직 안 쓰는 호출부·테스트용) */
+	ReportContent(LocalDate startDate, LocalDate endDate, LocalDate generatedDate, int recordCount,
+		boolean includePhotos, List<FlareDay> flareDays, List<DayEntry> days, LifestyleSummary lifestyle) {
+		this(startDate, endDate, generatedDate, recordCount, includePhotos, flareDays, days, lifestyle, List.of());
+	}
 
 	/** 같은 부위·증상(또는 불편함 지수)이 직전 기록보다 크게 오른 것. 불편함 지수이면 bodyPart와 symptom이 null이다. */
 	record ScoreJump(

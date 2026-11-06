@@ -84,7 +84,7 @@ class ReportIntegrationTest extends ApiTestSupport {
 		assertThat(new String(pdf, 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
 		try (PDDocument document = PDDocument.load(pdf)) {
 			String text = new PDFTextStripper().getText(document);
-			assertThat(text).contains("진료 참고용 피부 기록").contains("고통").contains("저녁에 팔이 가려웠음");
+			assertThat(text).contains("진료 참고용 피부 기록").contains("불편함").contains("저녁에 팔이 가려웠음");
 		}
 	}
 

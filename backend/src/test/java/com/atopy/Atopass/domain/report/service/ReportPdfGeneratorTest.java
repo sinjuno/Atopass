@@ -35,7 +35,7 @@ class ReportPdfGeneratorTest {
 		assertThat(text)
 			.contains("진료 참고용 피부 기록")
 			.contains("증상이 갑자기 심해진 날")
-			.contains("고통")
+			.contains("불편함")
 			.contains("저녁에 팔이 가려웠음")
 			.contains("의료진의 판단을 대체하지 않습니다.");
 	}
