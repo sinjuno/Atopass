@@ -26,11 +26,11 @@ class ChatPromptFactory {
 	/** 사용자가 증상을 말할 때 흔히 쓰는 표현. 쉬운 설명과 함께 프롬프트에 넣어 일상 표현을 증상으로 알아듣게 한다. */
 	private static final Map<SkinSign, String> SIGN_EXPRESSIONS = new EnumMap<>(Map.of(
 		SkinSign.ERYTHEMA, "빨개요, 붉어졌어요, 울긋불긋해요",
-		SkinSign.EDEMA, "부었어요, 오돌토돌해요, 좁쌀 같은 게 올라왔어요, 멍울이 잡혀요",
-		SkinSign.OOZING, "진물이 나요, 짓물러요, 딱지가 앉았어요",
+		SkinSign.EDEMA, "부었어요, 오돌토돌해요, 좁쌀 같은 게 올라왔어요, 멍울이 잡혀요, 몽우리가 만져져요, 혹처럼 솟았어요",
+		SkinSign.OOZING, "진물이 나요, 짓물러요, 딱지가 앉았어요, 축축해요, 옷에 묻어나요, 노란 물이 나요",
 		SkinSign.EXCORIATION, "긁어서 까졌어요, 긁힌 자국이 있어요, 피가 났어요",
-		SkinSign.LICHENIFICATION, "피부가 두꺼워졌어요, 코끼리 피부 같아요, 거칠고 딱딱해요",
-		SkinSign.XEROSIS, "건조해요, 당겨요, 하얗게 일어나요, 각질이 생겨요",
+		SkinSign.LICHENIFICATION, "피부가 두꺼워졌어요, 코끼리 피부 같아요, 거칠고 딱딱해요, 가죽 같아요, 뻣뻣해요",
+		SkinSign.XEROSIS, "건조해요, 당겨요, 하얗게 일어나요, 각질이 생겨요, 갈라졌어요, 트였어요, 비늘 같아요",
 		SkinSign.ITCHING, "가려워요, 간지러워요"));
 
 	/** 저장된 기록을 고칠 때 덧붙이는 안내 */
