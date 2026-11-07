@@ -41,6 +41,8 @@ export function choiceText(choice: ChatChoiceRequest): string {
   switch (choice.field) {
     case 'signImage':
       return choice.value ? '보여 주세요' : '괜찮아요';
+    case 'noteSuggestion':
+      return choice.value ? '예' : '아니오';
     case 'painIndex':
       return `${choice.value}점`;
     case 'bodyParts':

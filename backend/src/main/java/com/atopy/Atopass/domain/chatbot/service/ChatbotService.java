@@ -79,6 +79,8 @@ public class ChatbotService {
 	static final String EDIT_RESUME = "바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요.";
 	/** 증상 예시 사진을 보여 줄지 묻는 항목. 기록 값이 아니라 사진을 보여 줄지에 대한 답이다. */
 	static final String SIGN_IMAGE = "signImage";
+	/** 나타난 증상을 3번 연속 못 알아들었을 때, 그 말을 특이사항에 적을지 묻는 항목. 기록 값이 아니다. */
+	static final String NOTE_SUGGESTION = "noteSuggestion";
 	/** 상황 질문 */
 	private static final String P01 = "P01";
 	private static final String P02 = "P02";
@@ -120,7 +122,7 @@ public class ChatbotService {
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
 	private static final Set<String> CHOICE_FIELDS =
 		Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes", SIGN_IMAGE,
-			P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, P11, P12, C02);
+			NOTE_SUGGESTION, P01, P02, P03, P04, P05, P06, P07, P08, P09, P10, P11, P12, C02);
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -161,6 +163,8 @@ public class ChatbotService {
 		if (context.mode() == ChatMode.RECORD) {
 			// 사진을 보여 줄지 묻던 중에 글로 다른 말을 하면, 보여 주지 않는 것으로 보고 그 말을 받는다.
 			draft.clearOffer();
+			// 특이사항에 적을지 묻던 중에 글로 다른 말을 하면, 적지 않기로 한 것으로 보고 그 말을 받는다.
+			draft.resolveNoteSuggestion(false);
 			Optional<SkinSign> asked = SkinSignQuestion.detect(userText);
 			if (asked.isPresent()) {
 				return withNotesPlaceholder(
@@ -184,7 +188,7 @@ public class ChatbotService {
 		Optional<ModelOutput> localMatch = context.mode() == ChatMode.RECORD && draft.editing()
 			? localEditParser.parse(userText, "symptoms".equals(draft.askingField())) : Optional.empty();
 		if (localMatch.isPresent()) {
-			outcome = recordOutcome(context, draft, localMatch, memberId);
+			outcome = recordOutcome(context, draft, localMatch, memberId, userText);
 		} else {
 			// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
 			requireWithinDailyLimit(memberId);
@@ -193,7 +197,7 @@ public class ChatbotService {
 				: promptFactory.queryPrompt(context.queryContext(), context.today());
 			String raw = modelClient.complete(systemPrompt, withUserMessage(context.history(), userText));
 			outcome = context.mode() == ChatMode.RECORD
-				? recordOutcome(context, draft, replyParser.parse(raw), memberId)
+				? recordOutcome(context, draft, replyParser.parse(raw), memberId, userText)
 				: queryOutcome(context, raw);
 		}
 
@@ -222,6 +226,9 @@ public class ChatbotService {
 		}
 		if (SIGN_IMAGE.equals(field)) {
 			return imageTurn(context, draft, request, memberId);
+		}
+		if (NOTE_SUGGESTION.equals(field)) {
+			return noteSuggestionTurn(context, draft, request, memberId);
 		}
 		if (SITUATIONAL_FIELDS.contains(field)) {
 			return situationalTurn(context, draft, request, memberId);
@@ -259,6 +266,7 @@ public class ChatbotService {
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
 		draft.markFollowUp(false);
 		draft.clearOffer();
+		draft.resolveNoteSuggestion(false);
 		return withNotesPlaceholder(choiceTurn(context, draft, FINISH_TEXT, true, memberId), memberId, context.today());
 	}
 
@@ -328,6 +336,20 @@ public class ChatbotService {
 		Long recordId = sessionService.saveTurn(context.sessionId(), show ? SHOW_IMAGE_TEXT : NO_IMAGE_TEXT, reply,
 			draft.toJson(jsonMapper), 0, ready, true, ready ? draft.toRecordRequest(context.recordDate()) : null, imageSign);
 		return response.withRecordId(recordId);
+	}
+
+	/**
+	 * 나타난 증상을 3번 연속 못 알아들어 특이사항에 적을지 물은 것에 대한 답.
+	 * "예"면 그 말을 특이사항 후보로 남겨 두고(특이사항을 묻는 차례가 오면 합쳐진다), 이어서 나타난 증상을 다시 묻는다.
+	 * LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 */
+	private ChatReplyResponse noteSuggestionTurn(
+		TurnContext context, ChatDraft draft, ChatChoiceRequest request, Long memberId) {
+		if (!(request.value() instanceof Boolean save)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		draft.resolveNoteSuggestion(save);
+		return choiceTurn(context, draft, save ? "예" : "아니오", false, memberId);
 	}
 
 	/** 사진을 보여 줄지 묻는 중이면 그 질문을, 아니면 원래 묻던 질문을. 저장된 기록을 고치는 중이면 고칠 내용을 기다린다. */
@@ -582,7 +604,8 @@ public class ChatbotService {
 	 * 기록 모드: 응답을 검증한 뒤에만 초안에 반영하고, 반영 결과에 따라 다음 질문을 정한다.
 	 * 다음에 물을 항목이 선택지로 답하는 항목이면 화면의 선택지와 어긋나지 않도록 서버의 정해진 문장으로 묻는다.
 	 */
-	private Outcome recordOutcome(TurnContext context, ChatDraft draft, Optional<ModelOutput> parsed, Long memberId) {
+	private Outcome recordOutcome(
+		TurnContext context, ChatDraft draft, Optional<ModelOutput> parsed, Long memberId, String userText) {
 		boolean understood = false;
 		boolean explain = false;
 		String reply = null;
@@ -620,8 +643,14 @@ public class ChatbotService {
 		boolean save = readyForConfirmation && !unchanged;
 
 		if (!understood) {
-			String message = reply == null ? NOT_UNDERSTOOD : reply;
-			reply = failCount >= EXAMPLE_AFTER_FAILURES ? message + EXAMPLE : message;
+			// 나타난 증상을 3번 연속 못 알아들었으면, 그 말을 포기하지 않고 특이사항에 적어 둘지 물어본다.
+			if (failCount >= EXAMPLE_AFTER_FAILURES && "skinSigns".equals(draft.askingField())) {
+				draft.offerNoteSuggestion(userText);
+				reply = "그럼 특이사항에 적을까요?";
+			} else {
+				String message = reply == null ? NOT_UNDERSTOOD : reply;
+				reply = failCount >= EXAMPLE_AFTER_FAILURES ? message + EXAMPLE : message;
+			}
 		} else if (save) {
 			reply = completion(draft, reply);
 		} else if (readyForConfirmation) {
