@@ -442,4 +442,57 @@ class ChatDraftTest {
 		assertThat(draft.pendingFields()).doesNotContain("C02", "P01");
 	}
 
+	@Test
+	void 특이사항_제안을_물으면_askingField가_그것이_되고_확인_단계로_넘어가지_못한다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 5, \"skipped\": [\"bodyParts\", \"sleepHours\", \"medication\", \"skinSigns\"]}"));
+
+		draft.offerNoteSuggestion("몽글몽글해요");
+
+		assertThat(draft.askingField()).isEqualTo("noteSuggestion");
+		assertThat(draft.readyForConfirmation(true)).isFalse();
+	}
+
+	@Test
+	void 예라고_답하면_나중에_특이사항을_글로_답할_때_앞에_합쳐진다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 5, \"skipped\": [\"bodyParts\", \"sleepHours\", \"medication\", \"skinSigns\"]}"));
+		draft.offerNoteSuggestion("몽글몽글해요");
+
+		draft.resolveNoteSuggestion(true);
+		assertThat(draft.askingField()).isEqualTo("notes");
+		assertThat(draft.readyForConfirmation(true)).isTrue();
+
+		draft.apply(json("{\"notes\": \"새 보습제를 썼어요\"}"));
+
+		assertThat(draft.toResponse().notes()).isEqualTo("몽글몽글해요\n새 보습제를 썼어요");
+	}
+
+	@Test
+	void 예라고_답하고_특이사항을_없어요로_건너뛰어도_적어_두기로_한_말은_남는다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 5, \"skipped\": [\"bodyParts\", \"sleepHours\", \"medication\", \"skinSigns\"]}"));
+		draft.offerNoteSuggestion("몽글몽글해요");
+		draft.resolveNoteSuggestion(true);
+
+		draft.apply(json("{\"skipped\": [\"notes\"]}"));
+		draft.resolveC02();
+
+		assertThat(draft.toResponse().notes()).isEqualTo("몽글몽글해요");
+		assertThat(draft.readyForConfirmation(false)).isTrue();
+	}
+
+	@Test
+	void 아니오라고_답하면_특이사항에_아무것도_남지_않는다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"painIndex\": 5, \"skipped\": [\"bodyParts\", \"sleepHours\", \"medication\", \"skinSigns\"]}"));
+		draft.offerNoteSuggestion("몽글몽글해요");
+
+		draft.resolveNoteSuggestion(false);
+
+		assertThat(draft.askingField()).isEqualTo("notes");
+		draft.apply(json("{\"skipped\": [\"notes\"]}"));
+		assertThat(draft.toResponse().notes()).isNull();
+	}
+
 }

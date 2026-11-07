@@ -21,6 +21,8 @@ export type PendingField =
   | 'skinSigns'
   | 'notes'
   | 'signImage'
+  /** 나타난 증상을 3번 연속 못 알아들었을 때, 그 말을 특이사항에 적을지 묻는 항목 (askingField로만 온다) */
+  | 'noteSuggestion'
   /** 상황 질문. 조건에 맞을 때만, 수면 시간 다음~특이사항 앞에 하루 1개 나온다 */
   | 'P01'
   | 'P02'
@@ -102,6 +104,8 @@ export type ChatChoiceRequest =
   | { field: 'skinSigns'; value: SkinSign[] }
   /** 증상 예시 사진을 보여 줄지 */
   | { field: 'signImage'; value: boolean }
+  /** 나타난 증상을 3번 연속 못 알아들었을 때, 그 말을 특이사항에 적을지 */
+  | { field: 'noteSuggestion'; value: boolean }
   /** 상황 질문(P01) 답 — 불편함 지수가 언제부터 심해졌는지 */
   | { field: 'P01'; value: 'TODAY' | 'SINCE_YESTERDAY' | 'FEW_DAYS_AGO' }
   /** 상황 질문(P02) 답 — 어제 없던 증상·부위가 어떻게 시작됐는지 (글, 200자 이내) */

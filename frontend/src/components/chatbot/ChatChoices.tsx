@@ -333,6 +333,18 @@ function ChoiceBody({ field, onChoose, disabled, skinSigns = [], onAttachPhotos 
           </ChoiceButton>
         </div>
       );
+    case 'noteSuggestion':
+      // 나타난 증상을 3번 연속 못 알아들었을 때, 그 말을 특이사항에 적을지에 대한 답
+      return (
+        <div className="flex gap-2" role="group" aria-label="특이사항으로 적을지">
+          <ChoiceButton onClick={() => onChoose({ field, value: true })} disabled={disabled} primary wide>
+            예
+          </ChoiceButton>
+          <ChoiceButton onClick={() => onChoose({ field, value: false })} disabled={disabled} wide>
+            아니오
+          </ChoiceButton>
+        </div>
+      );
     case 'P01':
       // 불편함 지수가 어제보다 많이 오른 날만 나오는 상황 질문. 사진도 바로 붙일 수 있게 둔다.
       return (

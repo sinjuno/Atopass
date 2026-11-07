@@ -95,6 +95,13 @@ public final class ChatDraft {
 	private String situationalQuestionId;
 	/** 마무리 질문(C02)에 답했거나 건너뛰었는지. 매일 특이사항 다음에 한 번 묻는다. */
 	private boolean c02Resolved;
+	/**
+	 * 나타난 증상(skinSigns)을 되물었지만 3번 연속 못 알아들었을 때, 그 말을 특이사항에 적을지 물어본 상태.
+	 * 사용자가 답하면(예/아니오) 지운다. 기록 값은 아니다.
+	 */
+	private String noteSuggestion;
+	/** 특이사항을 적을지 물어 "예"로 답해 모아 둔 글. 특이사항을 실제로 묻는 차례가 오면 거기에 합쳐진다. */
+	private String pendingSymptomNote;
 
 	public static ChatDraft empty() {
 		return new ChatDraft();
@@ -190,6 +197,12 @@ public final class ChatDraft {
 		if (c02Resolved) {
 			root.put("c02Resolved", true);
 		}
+		if (noteSuggestion != null) {
+			root.put("noteSuggestion", noteSuggestion);
+		}
+		if (pendingSymptomNote != null) {
+			root.put("pendingSymptomNote", pendingSymptomNote);
+		}
 		return mapper.writeValueAsString(root);
 	}
 
@@ -253,6 +266,10 @@ public final class ChatDraft {
 			draft.situationalQuestionId = root.path("situationalQuestionId").isString()
 				? root.path("situationalQuestionId").asString() : null;
 			draft.c02Resolved = root.path("c02Resolved").asBoolean(false);
+			draft.noteSuggestion = root.path("noteSuggestion").isString()
+				? root.path("noteSuggestion").asString() : null;
+			draft.pendingSymptomNote = root.path("pendingSymptomNote").isString()
+				? root.path("pendingSymptomNote").asString() : null;
 			// 이 기능이 배포되기 전에 저장된 "수정 중" 초안에는 이 값들이 없다 — 다른 선택 항목과 똑같이,
 			// 수정 중이면 상황 질문·마무리 질문도 더 묻지 않는다 (startEditing()·fromRecord()와 같은 규칙).
 			if (draft.editing) {
@@ -399,7 +416,7 @@ public final class ChatDraft {
 				return ApplyResult.INVALID_VALUE;
 			}
 			String text = notesNode.asString().trim();
-			next.notes = text.isEmpty() ? null : text;
+			next.notes = mergeWithPendingSymptomNote(next, text.isEmpty() ? null : text);
 		}
 
 		// 저장된 기록을 고칠 때 "가려움은 없어졌어요", "얼굴은 빼 주세요"처럼 지우는 말을 받는다.
@@ -441,14 +458,31 @@ public final class ChatDraft {
 		JsonNode skippedNode = updates.path("skipped");
 		if (skippedNode.isArray()) {
 			for (JsonNode item : skippedNode) {
-				if (item.isString() && SKIPPABLE.contains(item.asString())) {
-					next.skipped.add(item.asString());
+				if (!item.isString() || !SKIPPABLE.contains(item.asString())) {
+					continue;
+				}
+				String field = item.asString();
+				if (SKIP_NOTES.equals(field) && next.pendingSymptomNote != null) {
+					// 특이사항을 "없어요"로 건너뛰어도, 앞서 증상 말을 적어 두겠다고 한 글은 그대로 남긴다.
+					next.notes = mergeWithPendingSymptomNote(next, null);
+				} else {
+					next.skipped.add(field);
 				}
 			}
 		}
 
 		commit(next);
 		return ApplyResult.OK;
+	}
+
+	/** 특이사항에 적힐 글 앞에, 적어 두기로 한 증상 설명(pendingSymptomNote)이 있으면 합친다. */
+	private static String mergeWithPendingSymptomNote(ChatDraft next, String typedNotes) {
+		if (next.pendingSymptomNote == null) {
+			return typedNotes;
+		}
+		String merged = typedNotes == null ? next.pendingSymptomNote : next.pendingSymptomNote + "\n" + typedNotes;
+		next.pendingSymptomNote = null;
+		return merged;
 	}
 
 	/** "넘어갈게요"로 건너뛸 수 있는 항목인지 */
@@ -486,7 +520,7 @@ public final class ChatDraft {
 		LifestyleRequest lifestyle = alcohol == null && outdoorActivity == null
 			? null : new LifestyleRequest(alcohol, outdoorActivity);
 		return new RecordRequest(recordDate, list, painIndex, sleepHours, medication,
-			skinSigns == null ? List.of() : List.copyOf(skinSigns), lifestyle, notes);
+			skinSigns == null ? List.of() : List.copyOf(skinSigns), lifestyle, effectiveNotes());
 	}
 
 	/** 이 증상의 예시 사진을 보여 줘도 되는지 묻는다. 다음 답은 signImage 선택지로 받는다. */
@@ -502,6 +536,25 @@ public final class ChatDraft {
 	/** 사진을 보여 줄지 묻던 것을 끝낸다. (답했거나, 답 대신 다른 말을 했을 때) */
 	void clearOffer() {
 		this.offeredSign = null;
+	}
+
+	/** 나타난 증상을 3번 연속 못 알아들었을 때, 그 말을 특이사항에 적을지 묻는다. 다음 답은 noteSuggestion 선택지로 받는다. */
+	void offerNoteSuggestion(String text) {
+		this.noteSuggestion = text;
+	}
+
+	/** 특이사항에 적을지 묻고 있는 말. 묻고 있지 않으면 null */
+	String noteSuggestion() {
+		return noteSuggestion;
+	}
+
+	/** 특이사항에 적을지 물은 것에 답했다(또는 답 대신 다른 말을 했다). save면 그 말을 특이사항 후보로 남겨 둔다. */
+	void resolveNoteSuggestion(boolean save) {
+		if (save && noteSuggestion != null) {
+			this.pendingSymptomNote = pendingSymptomNote == null
+				? noteSuggestion : pendingSymptomNote + "\n" + noteSuggestion;
+		}
+		this.noteSuggestion = null;
 	}
 
 	/** 이번 응답이 부위나 증상 점수를 되묻는 질문인지 기록한다. 다음 턴이 성공하면 다시 정해진다. */
@@ -702,6 +755,9 @@ public final class ChatDraft {
 		if (offeredSign != null) {
 			return "signImage";
 		}
+		if (noteSuggestion != null) {
+			return "noteSuggestion";
+		}
 		if (followUp || conditions.values().stream().anyMatch(Map::isEmpty)) {
 			return "symptoms";
 		}
@@ -714,7 +770,8 @@ public final class ChatDraft {
 	 * 예시 사진을 보여 줄지 묻는 중이면 그 답을 먼저 받는다.
 	 */
 	public boolean readyForConfirmation(boolean userFinished) {
-		return offeredSign == null && requiredSatisfied() && (userFinished || pendingOptionalFields().isEmpty());
+		return offeredSign == null && noteSuggestion == null && requiredSatisfied()
+			&& (userFinished || pendingOptionalFields().isEmpty());
 	}
 
 	// ── 화면·프롬프트용 변환 ──
@@ -733,7 +790,15 @@ public final class ChatDraft {
 			medication,
 			skinSigns == null ? null : List.copyOf(skinSigns),
 			new LifestyleResponse(alcohol, outdoorActivity),
-			notes);
+			effectiveNotes());
+	}
+
+	/**
+	 * 특이사항을 아직 묻지 않았는데(예: 바로 기록을 마쳐서) 적어 두기로 한 증상 설명(pendingSymptomNote)이
+	 * 남아 있으면, 그것을 특이사항으로 본다. 보통은 특이사항을 묻는 차례에 이미 notes로 합쳐져 null이다.
+	 */
+	private String effectiveNotes() {
+		return notes != null ? notes : pendingSymptomNote;
 	}
 
 	/**
@@ -760,8 +825,8 @@ public final class ChatDraft {
 		if (skinSigns != null) {
 			lines.add("- 나타난 증상: " + (skinSigns.isEmpty() ? "없음" : labels(skinSigns)));
 		}
-		if (notes != null) {
-			lines.add("- 특이사항: " + notes);
+		if (effectiveNotes() != null) {
+			lines.add("- 특이사항: " + effectiveNotes());
 		}
 		return lines.toString();
 	}
@@ -802,6 +867,8 @@ public final class ChatDraft {
 		copy.situationalDecided = situationalDecided;
 		copy.situationalQuestionId = situationalQuestionId;
 		copy.c02Resolved = c02Resolved;
+		copy.noteSuggestion = noteSuggestion;
+		copy.pendingSymptomNote = pendingSymptomNote;
 		return copy;
 	}
 
@@ -825,6 +892,8 @@ public final class ChatDraft {
 		situationalDecided = next.situationalDecided;
 		situationalQuestionId = next.situationalQuestionId;
 		c02Resolved = next.c02Resolved;
+		noteSuggestion = next.noteSuggestion;
+		pendingSymptomNote = next.pendingSymptomNote;
 	}
 
 }

@@ -296,6 +296,56 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 나타난_증상을_3번_연속_못_알아들으면_특이사항에_적을지_묻고_예라고_답하면_특이사항으로_저장된다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
+		mockMvc.perform(sendMessage(bearer, session, "5점"))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+
+		for (int i = 1; i <= 2; i++) {
+			llm.enqueue("{\"understood\": false, \"reply\": \"어떤 증상인지 다시 말씀해 주세요.\"}");
+			mockMvc.perform(sendMessage(bearer, session, "몽글몽글해요"))
+				.andExpect(jsonPath("$.data.understood").value(false))
+				.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+		}
+		llm.enqueue("{\"understood\": false, \"reply\": \"어떤 증상인지 다시 말씀해 주세요.\"}");
+		mockMvc.perform(sendMessage(bearer, session, "몽글몽글해요"))
+			.andExpect(jsonPath("$.data.understood").value(false))
+			.andExpect(jsonPath("$.data.reply").value("그럼 특이사항에 적을까요?"))
+			.andExpect(jsonPath("$.data.askingField").value("noteSuggestion"));
+
+		mockMvc.perform(choice(bearer, session, "noteSuggestion", true))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+
+		// 특이사항을 실제로 묻는 차례가 오기 전에 바로 마쳐도, 적어 두기로 한 말이 특이사항으로 저장된다.
+		mockMvc.perform(post("/api/v1/chatbot/sessions/" + session + "/finish").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.draft.notes").value("몽글몽글해요"));
+	}
+
+	@Test
+	void 특이사항에_적을지_물었을_때_아니오라고_답하면_저장하지_않는다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
+		mockMvc.perform(sendMessage(bearer, session, "5점"));
+		for (int i = 1; i <= 3; i++) {
+			llm.enqueue("{\"understood\": false, \"reply\": \"어떤 증상인지 다시 말씀해 주세요.\"}");
+			mockMvc.perform(sendMessage(bearer, session, "몽글몽글해요"));
+		}
+
+		mockMvc.perform(choice(bearer, session, "noteSuggestion", false))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+
+		mockMvc.perform(post("/api/v1/chatbot/sessions/" + session + "/finish").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.draft.notes").doesNotExist());
+	}
+
+	@Test
 	void 질문은_고통_지수_증상_부위_수면_약_복용_특이사항_순서로_이어진다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
